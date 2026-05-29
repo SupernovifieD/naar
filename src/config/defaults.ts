@@ -1,4 +1,4 @@
-import type { InstallTarget, PomConfig } from "../types/index.js";
+import type { InstallTarget, NaarConfig } from "../types/index.js";
 
 export const DEFAULT_PROVIDERS = ["anthropic", "clawhub"];
 export const DEFAULT_TARGETS: InstallTarget[] = [
@@ -8,7 +8,7 @@ export const DEFAULT_TARGETS: InstallTarget[] = [
   "codex_repo_skills"
 ];
 
-export const DEFAULT_CONFIG: PomConfig = {
+export const DEFAULT_CONFIG: NaarConfig = {
   defaultProviders: DEFAULT_PROVIDERS,
   defaultTargets: DEFAULT_TARGETS,
   minSecurityScore: 80,

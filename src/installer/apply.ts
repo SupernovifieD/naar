@@ -38,8 +38,8 @@ export async function uninstallManagedFiles(repoRoot: string, state: InstalledSt
 
   for (const skill of selected) {
     for (const managed of skill.managedFiles) {
-      if (managed.includes("#pom:skill:")) {
-        const [filePath, markerSuffix] = managed.split("#pom:skill:");
+      if (managed.includes("#naar:skill:")) {
+        const [filePath, markerSuffix] = managed.split("#naar:skill:");
         const slug = markerSuffix;
         const fullPath = path.join(repoRoot, filePath);
         if (!(await exists(fullPath))) {
@@ -48,7 +48,7 @@ export async function uninstallManagedFiles(repoRoot: string, state: InstalledSt
 
         const content = await readFile(fullPath, "utf8");
         const blockRegex = new RegExp(
-          `\\n?<!-- pom:skill:${escapeRegExp(slug)}:start -->[\\s\\S]*?<!-- pom:skill:${escapeRegExp(slug)}:end -->\\n?`,
+          `\\n?<!-- naar:skill:${escapeRegExp(slug)}:start -->[\\s\\S]*?<!-- naar:skill:${escapeRegExp(slug)}:end -->\\n?`,
           "g"
         );
         const next = content.replace(blockRegex, "\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";

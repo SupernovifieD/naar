@@ -1,13 +1,13 @@
 import path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import type { InstalledState, PomLock, SkillCandidate, InstallTarget } from "../types/index.js";
+import type { InstalledState, NaarLock, SkillCandidate, InstallTarget } from "../types/index.js";
 
-const POM_DIR = ".pom";
+const NAAR_DIR = ".naar";
 const INSTALLED_FILE = "installed.json";
-const LOCK_FILE = "pom.lock.json";
+const LOCK_FILE = "naar.lock.json";
 
 export function installedStatePath(repoRoot: string): string {
-  return path.join(repoRoot, POM_DIR, INSTALLED_FILE);
+  return path.join(repoRoot, NAAR_DIR, INSTALLED_FILE);
 }
 
 export function lockfilePath(repoRoot: string): string {
@@ -24,21 +24,21 @@ export async function loadInstalledState(repoRoot: string): Promise<InstalledSta
 }
 
 export async function saveInstalledState(repoRoot: string, state: InstalledState): Promise<void> {
-  const dir = path.join(repoRoot, POM_DIR);
+  const dir = path.join(repoRoot, NAAR_DIR);
   await mkdir(dir, { recursive: true });
   await writeFile(installedStatePath(repoRoot), JSON.stringify(state, null, 2) + "\n", "utf8");
 }
 
-export async function loadLockfile(repoRoot: string): Promise<PomLock> {
+export async function loadLockfile(repoRoot: string): Promise<NaarLock> {
   try {
     const raw = await readFile(lockfilePath(repoRoot), "utf8");
-    return JSON.parse(raw) as PomLock;
+    return JSON.parse(raw) as NaarLock;
   } catch {
     return { version: 1, skills: [] };
   }
 }
 
-export async function saveLockfile(repoRoot: string, lockfile: PomLock): Promise<void> {
+export async function saveLockfile(repoRoot: string, lockfile: NaarLock): Promise<void> {
   await writeFile(lockfilePath(repoRoot), JSON.stringify(lockfile, null, 2) + "\n", "utf8");
 }
 

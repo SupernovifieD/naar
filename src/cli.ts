@@ -12,8 +12,8 @@ import { runConfig } from "./commands/config.js";
 const program = new Command();
 
 program
-  .name("pom")
-  .description("Pomegranate: repo-aware Agent Skill recommender and safe installer")
+  .name("naar")
+  .description("Naar: repo-aware Agent Skill recommender and safe installer")
   .version("0.1.0");
 
 applySharedOptions(program
@@ -66,7 +66,7 @@ applySharedOptions(program
 
 applySharedOptions(program
   .command("config")
-  .description("View or update Pomegranate config")
+  .description("View or update Naar config")
   .option("--set-provider <id>", "Set default provider (repeatable)", collectOption, [])
   .option("--set-target <id>", "Set default target (repeatable)", collectOption, [])
   .option("--set-min-security-score <n>", "Set default min security score", parseIntOption)

@@ -103,7 +103,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
 
   process.stdout.write("\nInstallation complete.\n");
-  process.stdout.write("Next: run `pom list` to review installed skills.\n");
+  process.stdout.write("Next: run `naar list` to review installed skills.\n");
 
   // Keep config synced with explicit runtime flags when used.
   if (flags.target.length > 0 || flags.provider.length > 0 || flags.minSecurityScore !== config.minSecurityScore) {
@@ -258,7 +258,7 @@ async function persistInstallationState(
         .filter((action) => action.sourceSkillId === skill.canonicalSkillId)
         .map((action) => {
           if (action.type === "append" && action.path === ".github/copilot-instructions.md") {
-            return `${action.path}#pom:skill:${slug}`;
+            return `${action.path}#naar:skill:${slug}`;
           }
           return action.path;
         })

@@ -245,7 +245,7 @@ export interface InstalledState {
   skills: InstalledSkillRecord[];
 }
 
-export interface PomLock {
+export interface NaarLock {
   version: 1;
   skills: Array<{
     canonicalSkillId: string;
@@ -257,7 +257,7 @@ export interface PomLock {
   }>;
 }
 
-export interface PomConfig {
+export interface NaarConfig {
   defaultProviders: string[];
   defaultTargets: InstallTarget[];
   minSecurityScore: number;

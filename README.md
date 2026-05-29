@@ -1,4 +1,4 @@
-# Pomegranate (`pom`)
+# Naar (`naar`)
 
 Repo-aware CLI for auditing repositories, recommending Agent Skills, and installing selected skills safely.
 
@@ -10,8 +10,8 @@ Repo-aware CLI for auditing repositories, recommending Agent Skills, and install
 - Applies security scoring and blocks risky skills by default
 - Previews install plan before any write
 - Installs project-local skills and tracks provenance in:
-  - `.pom/installed.json`
-  - `pom.lock.json`
+  - `.naar/installed.json`
+  - `naar.lock.json`
 
 ## Quick Start
 
@@ -30,13 +30,13 @@ npm run dev -- go
 ## Commands
 
 ```bash
-pom go
-pom scan
-pom recommend
-pom install
-pom list
-pom uninstall
-pom config
+naar go
+naar scan
+naar recommend
+naar install
+naar list
+naar uninstall
+naar config
 ```
 
 ## Important Flags
@@ -66,7 +66,7 @@ Target aliases:
 ## Install Targets (MVP)
 
 - Claude: `.claude/skills/<skill>/SKILL.md`
-- Cursor: `.cursor/rules/pom-<skill>.mdc`
+- Cursor: `.cursor/rules/naar-<skill>.mdc`
 - Copilot: `.github/copilot-instructions.md` (appended managed blocks)
 - Codex: `.agents/skills/<skill>/SKILL.md`
 - Generic: `.agents/skills/<skill>/SKILL.md`

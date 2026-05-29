@@ -29,7 +29,7 @@ function renderSummary(
   repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
   recommendations: Awaited<ReturnType<typeof buildRecommendations>>["recommendations"]
 ): void {
-  process.stdout.write(`Pomegranate v0.1\n`);
+  process.stdout.write(`Naar v0.1\n`);
   process.stdout.write(`Repo: ${repoRoot}\n\n`);
 
   process.stdout.write("[1/5] Scanning repository...\n");

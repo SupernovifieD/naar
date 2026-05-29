@@ -2,7 +2,7 @@ import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { RepoFacts, SkillRecommendation } from "../types/index.js";
 
-const CACHE_DIR = path.join(".pom", "cache");
+const CACHE_DIR = path.join(".naar", "cache");
 const SCAN_FILE = "scan.json";
 const RECOMMEND_FILE = "recommendations.json";
 

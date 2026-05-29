@@ -32,7 +32,7 @@ export async function createInstallPlan(options: CreatePlanOptions): Promise<Ins
 
     actions.push({
       type: "write",
-      path: `.pom/skills/${slug}/SKILL.md`,
+      path: `.naar/skills/${slug}/SKILL.md`,
       content: skillMarkdown,
       sourceSkillId: skill.canonicalSkillId,
       overwrite: true
@@ -100,7 +100,7 @@ function buildTargetActions(
       return [
         {
           type: "write",
-          path: `.cursor/rules/pom-${slug}.mdc`,
+          path: `.cursor/rules/naar-${slug}.mdc`,
           content: buildCursorRule(skillName, skillSummary, skillMarkdown),
           overwrite: false
         }
@@ -133,7 +133,7 @@ function buildCursorRule(skillName: string, summary: string, markdown: string): 
 }
 
 function buildCopilotBlock(slug: string, skillName: string, summary: string, markdown: string): string {
-  return `\n<!-- pom:skill:${slug}:start -->\n## Pomegranate Skill: ${skillName}\n${summary}\n\n${markdown}\n<!-- pom:skill:${slug}:end -->\n`;
+  return `\n<!-- naar:skill:${slug}:start -->\n## Naar Skill: ${skillName}\n${summary}\n\n${markdown}\n<!-- naar:skill:${slug}:end -->\n`;
 }
 
 function dedupeActions(actions: InstallAction[]): InstallAction[] {

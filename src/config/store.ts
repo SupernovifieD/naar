@@ -1,16 +1,16 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_CONFIG } from "./defaults.js";
-import type { PomConfig } from "../types/index.js";
+import type { NaarConfig } from "../types/index.js";
 
-const POM_DIR = ".pom";
+const NAAR_DIR = ".naar";
 const CONFIG_FILE = "config.json";
 
-export async function loadConfig(repoRoot: string): Promise<PomConfig> {
-  const file = path.join(repoRoot, POM_DIR, CONFIG_FILE);
+export async function loadConfig(repoRoot: string): Promise<NaarConfig> {
+  const file = path.join(repoRoot, NAAR_DIR, CONFIG_FILE);
   try {
     const raw = await readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as Partial<PomConfig>;
+    const parsed = JSON.parse(raw) as Partial<NaarConfig>;
     return {
       ...DEFAULT_CONFIG,
       ...parsed,
@@ -22,8 +22,8 @@ export async function loadConfig(repoRoot: string): Promise<PomConfig> {
   }
 }
 
-export async function saveConfig(repoRoot: string, config: PomConfig): Promise<string> {
-  const dir = path.join(repoRoot, POM_DIR);
+export async function saveConfig(repoRoot: string, config: NaarConfig): Promise<string> {
+  const dir = path.join(repoRoot, NAAR_DIR);
   const file = path.join(dir, CONFIG_FILE);
   await mkdir(dir, { recursive: true });
   await writeFile(file, JSON.stringify(config, null, 2) + "\n", "utf8");

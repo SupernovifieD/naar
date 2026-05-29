@@ -41,6 +41,6 @@ export async function runConfig(flags: CliFlags, updates: ConfigUpdates): Promis
     return;
   }
 
-  process.stdout.write(`Config path: ${repoRoot}/.pom/config.json\n`);
+  process.stdout.write(`Config path: ${repoRoot}/.naar/config.json\n`);
   process.stdout.write(`${JSON.stringify(config, null, 2)}\n`);
 }

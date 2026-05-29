@@ -13,7 +13,7 @@ export async function runList(flags: CliFlags): Promise<void> {
   }
 
   if (state.skills.length === 0) {
-    process.stdout.write("No skills installed by Pomegranate.\n");
+    process.stdout.write("No skills installed by Naar.\n");
     return;
   }
 
