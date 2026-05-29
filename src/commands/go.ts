@@ -22,13 +22,21 @@ export async function runGo(flags: CliFlags): Promise<void> {
     printJson({
       repoRoot,
       repoFacts: pipeline.repoFacts,
+      providers: pipeline.providerSummaries,
+      warnings: pipeline.providerWarnings,
       recommendations: pipeline.recommendations
     });
     if (flags.apply === false) {
       return;
     }
   } else {
-    renderSummary(repoRoot, pipeline.repoFacts, pipeline.recommendations, pipeline.providerWarnings);
+    renderSummary(
+      repoRoot,
+      pipeline.repoFacts,
+      pipeline.recommendations,
+      pipeline.providerWarnings,
+      pipeline.providerSummaries
+    );
   }
 
   await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
@@ -38,7 +46,8 @@ function renderSummary(
   repoRoot: string,
   repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
   recommendations: Awaited<ReturnType<typeof buildRecommendations>>["recommendations"],
-  providerWarnings: string[]
+  providerWarnings: string[],
+  providerSummaries: Awaited<ReturnType<typeof buildRecommendations>>["providerSummaries"]
 ): void {
   process.stdout.write(`${pc.bold("Naar")} v0.1\n`);
   process.stdout.write(`Repo: ${pc.dim(repoRoot)}\n\n`);
@@ -71,7 +80,19 @@ function renderSummary(
   );
 
   process.stdout.write(`${pc.bold("[2/5]")} Fetching skill candidates...\n`);
-  process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")}\n\n`);
+  if (providerWarnings.length === 0) {
+    process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")}\n\n`);
+  } else {
+    process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")} ${pc.yellow("(degraded mode)")}\n\n`);
+  }
+
+  if (providerSummaries.length > 0) {
+    for (const provider of providerSummaries) {
+      const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
+      process.stdout.write(`    - ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}\n`);
+    }
+    process.stdout.write("\n");
+  }
 
   process.stdout.write(`${pc.bold("[3/5]")} Ranking recommendations...\n`);
   for (const [index, recommendation] of recommendations.entries()) {

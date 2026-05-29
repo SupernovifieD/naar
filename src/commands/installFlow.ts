@@ -19,7 +19,8 @@ import {
   loadInstalledState,
   loadLockfile,
   saveInstalledState,
-  saveLockfile
+  saveLockfile,
+  toProviderScopedId
 } from "../installer/state.js";
 import { buildProviders } from "../providers/orchestrator.js";
 import { printJson } from "../utils/json.js";
@@ -27,6 +28,7 @@ import { buildRecommendations, loadOrBuildRecommendations } from "./pipeline.js"
 import { resolveRepoRoot } from "./shared.js";
 import { toSlug } from "../utils/slug.js";
 import { colorRisk, colorScore, warningHeader, warningLine } from "../utils/output.js";
+import { analyzeSkill, isInstallAllowed } from "../security/analyzeSkill.js";
 
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
@@ -52,6 +54,35 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   const targets = flags.target.length > 0 ? flags.target : config.defaultTargets;
   const spinner = flags.json ? null : ora("Preparing install plan").start();
   const resolvedSkills = await resolveBundles(selectedRecommendations, targets);
+
+  const blockedAfterFetch = resolvedSkills
+    .map((resolved) => {
+      const risk = analyzeSkill(resolved.bundle.skill);
+      resolved.bundle.skill.risk = risk;
+      const allowed = isInstallAllowed(risk, {
+        minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
+        noScripts: flags.noScripts
+      }, !!resolved.bundle.skill.metadata.hasScripts);
+
+      return {
+        skillName: resolved.bundle.skill.name,
+        allowed,
+        risk
+      };
+    })
+    .filter((entry) => !entry.allowed.allowed);
+
+  if (blockedAfterFetch.length > 0) {
+    spinner?.stop();
+    process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
+    for (const entry of blockedAfterFetch) {
+      process.stderr.write(
+        `- ${entry.skillName} risk=${colorRisk(entry.risk.score)} reason=${entry.allowed.reasons.join("; ")}\n`
+      );
+    }
+    return;
+  }
+
   const plan = await createInstallPlan({
     repoRoot,
     resolvedSkills,
@@ -268,6 +299,7 @@ async function persistInstallationState(
 
   for (const resolved of resolvedSkills) {
     const skill = resolved.bundle.skill;
+    const scopedId = skill.providerScopedId ?? toProviderScopedId(skill.source.providerId, skill.providerSkillId);
     const slug = toSlug(skill.canonicalSkillId);
     const managedFiles = dedupe(
       actions
@@ -280,10 +312,16 @@ async function persistInstallationState(
         })
     );
 
-    state.skills = state.skills.filter((entry) => entry.canonicalSkillId !== skill.canonicalSkillId);
+    state.skills = state.skills.filter((entry) => {
+      const entryScopedId = entry.providerScopedId ?? toProviderScopedId(entry.providerId, entry.providerSkillId);
+      return entryScopedId !== scopedId;
+    });
     state.skills.push(buildInstalledRecord(skill, managedFiles, resolved.targets));
 
-    lock.skills = lock.skills.filter((entry) => entry.canonicalSkillId !== skill.canonicalSkillId);
+    lock.skills = lock.skills.filter((entry) => !(
+      entry.providerId === skill.source.providerId
+      && entry.providerSkillId === skill.providerSkillId
+    ));
     lock.skills.push({
       canonicalSkillId: skill.canonicalSkillId,
       providerId: skill.source.providerId,

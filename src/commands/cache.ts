@@ -9,6 +9,12 @@ const RECOMMEND_FILE = "recommendations.json";
 export interface RecommendationCache {
   repoFacts: RepoFacts;
   recommendations: SkillRecommendation[];
+  providerSummaries?: Array<{
+    providerId: string;
+    mode?: string;
+    candidateCount: number;
+    warnings?: string[];
+  }>;
   generatedAtIso: string;
 }
 

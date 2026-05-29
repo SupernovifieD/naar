@@ -2,7 +2,7 @@ import { loadConfig } from "../config/store.js";
 import { buildProviders, queryProviders } from "../providers/orchestrator.js";
 import { recommendSkills } from "../recommend/recommend.js";
 import { scanRepo } from "../scanner/scanRepo.js";
-import { loadInstalledState } from "../installer/state.js";
+import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
 import type { CliFlags, RepoFacts, SkillCandidate, SkillRecommendation } from "../types/index.js";
 import { loadRecommendationCache, loadScanCache, saveRecommendationCache, saveScanCache } from "./cache.js";
 
@@ -10,6 +10,12 @@ export interface PipelineResult {
   repoFacts: RepoFacts;
   recommendations: SkillRecommendation[];
   providerWarnings: string[];
+  providerSummaries: Array<{
+    providerId: string;
+    mode?: string;
+    candidateCount: number;
+    warnings?: string[];
+  }>;
 }
 
 export async function ensureScan(repoRoot: string, useCache = true): Promise<RepoFacts> {
@@ -38,7 +44,10 @@ export async function buildRecommendations(repoRoot: string, flags: CliFlags): P
 
   const candidates: SkillCandidate[] = providerResults
     .flatMap((result) => result.candidates)
-    .filter((candidate) => !installedIds.has(candidate.canonicalSkillId));
+    .filter((candidate) => {
+      const candidateScopedId = candidate.providerScopedId ?? toProviderScopedId(candidate.source.providerId, candidate.providerSkillId);
+      return !installedIds.has(candidateScopedId);
+    });
 
   const recommendations = recommendSkills(repoFacts, candidates, {
     minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
@@ -49,17 +58,25 @@ export async function buildRecommendations(repoRoot: string, flags: CliFlags): P
 
   const filteredRecommendations = filterInstalledRecommendations(recommendations, installedIds);
   const warnings = providerResults.flatMap((result) => result.warnings ?? []);
+  const providerSummaries = providerResults.map((result) => ({
+    providerId: result.providerId,
+    mode: result.mode,
+    candidateCount: result.candidates.length,
+    warnings: result.warnings
+  }));
 
   await saveRecommendationCache(repoRoot, {
     repoFacts,
     recommendations: filteredRecommendations,
+    providerSummaries,
     generatedAtIso: new Date().toISOString()
   });
 
   return {
     repoFacts,
     recommendations: filteredRecommendations,
-    providerWarnings: warnings
+    providerWarnings: warnings,
+    providerSummaries
   };
 }
 
@@ -73,18 +90,25 @@ export async function loadOrBuildRecommendations(repoRoot: string, flags: CliFla
   return {
     repoFacts: cached.repoFacts,
     recommendations: filterInstalledRecommendations(cached.recommendations, installedIds),
-    providerWarnings: []
+    providerWarnings: [],
+    providerSummaries: cached.providerSummaries ?? []
   };
 }
 
 async function getInstalledSkillIds(repoRoot: string): Promise<Set<string>> {
   const state = await loadInstalledState(repoRoot);
-  return new Set(state.skills.map((skill) => skill.canonicalSkillId));
+  return new Set(
+    state.skills.map((skill) => skill.providerScopedId ?? toProviderScopedId(skill.providerId, skill.providerSkillId))
+  );
 }
 
 function filterInstalledRecommendations(
   recommendations: SkillRecommendation[],
   installedIds: Set<string>
 ): SkillRecommendation[] {
-  return recommendations.filter((recommendation) => !installedIds.has(recommendation.candidate.canonicalSkillId));
+  return recommendations.filter((recommendation) => {
+    const candidate = recommendation.candidate;
+    const scopedId = candidate.providerScopedId ?? toProviderScopedId(candidate.source.providerId, candidate.providerSkillId);
+    return !installedIds.has(scopedId);
+  });
 }

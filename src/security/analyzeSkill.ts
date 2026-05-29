@@ -96,6 +96,9 @@ export function isInstallAllowed(report: SkillSecurityReport, policy: SecurityPo
   if (report.signals.some((signal) => signal.id === "suspicious_behavior")) {
     reasons.push("Suspicious behavior signal detected.");
   }
+  if (report.signals.some((signal) => signal.id === "unpinned_source")) {
+    reasons.push("Install source is not pinned to an immutable version/ref.");
+  }
 
   return {
     allowed: reasons.length === 0,

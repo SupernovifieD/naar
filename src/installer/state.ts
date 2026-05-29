@@ -17,7 +17,14 @@ export function lockfilePath(repoRoot: string): string {
 export async function loadInstalledState(repoRoot: string): Promise<InstalledState> {
   try {
     const raw = await readFile(installedStatePath(repoRoot), "utf8");
-    return JSON.parse(raw) as InstalledState;
+    const parsed = JSON.parse(raw) as InstalledState;
+    return {
+      version: 1,
+      skills: (parsed.skills ?? []).map((skill) => ({
+        ...skill,
+        providerScopedId: skill.providerScopedId ?? toProviderScopedId(skill.providerId, skill.providerSkillId)
+      }))
+    };
   } catch {
     return { version: 1, skills: [] };
   }
@@ -47,7 +54,9 @@ export function buildInstalledRecord(
   managedFiles: string[],
   targets: InstallTarget[]
 ): InstalledState["skills"][number] {
+  const scopedId = skill.providerScopedId ?? toProviderScopedId(skill.source.providerId, skill.providerSkillId);
   return {
+    providerScopedId: scopedId,
     canonicalSkillId: skill.canonicalSkillId,
     providerId: skill.source.providerId,
     providerSkillId: skill.providerSkillId,
@@ -58,4 +67,8 @@ export function buildInstalledRecord(
     managedFiles,
     securityScoreAtInstall: skill.risk.score
   };
+}
+
+export function toProviderScopedId(providerId: string, providerSkillId: string): string {
+  return `${providerId}:${providerSkillId}`;
 }

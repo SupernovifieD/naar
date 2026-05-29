@@ -1,76 +1,43 @@
-import ora from "ora";
 import pc from "picocolors";
-import type { CliFlags, SkillCandidate } from "../types/index.js";
+import type { CliFlags } from "../types/index.js";
 import { printJson } from "../utils/json.js";
 import { resolveRepoRoot } from "./shared.js";
-import { loadConfig } from "../config/store.js";
-import { loadScanCache, saveRecommendationCache, saveScanCache } from "./cache.js";
-import { scanRepo } from "../scanner/scanRepo.js";
-import { buildProviders, queryProviders } from "../providers/orchestrator.js";
-import { recommendSkills } from "../recommend/recommend.js";
-import { loadInstalledState } from "../installer/state.js";
+import { buildRecommendations } from "./pipeline.js";
 import { colorRisk, colorScore, formatReason, warningHeader, warningLine } from "../utils/output.js";
 
 export async function runRecommend(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
-  const config = await loadConfig(repoRoot);
-
-  let repoFacts = await loadScanCache(repoRoot);
-  if (!repoFacts) {
-    repoFacts = await scanRepo(repoRoot);
-    await saveScanCache(repoRoot, repoFacts);
-  }
-
-  const providerIds = flags.provider.length > 0 ? flags.provider : config.defaultProviders;
-  const providers = buildProviders(providerIds);
-  const installedIds = new Set((await loadInstalledState(repoRoot)).skills.map((skill) => skill.canonicalSkillId));
-
-  const spinner = flags.json ? null : ora("Fetching skill candidates from providers").start();
-  const providerResults = await queryProviders(providers, {
-    repoFacts,
-    targets: flags.target,
-    limit: 200
-  });
-
-  const warnings = providerResults.flatMap((result) => result.warnings ?? []);
-  const candidates: SkillCandidate[] = providerResults
-    .flatMap((result) => result.candidates)
-    .filter((candidate) => !installedIds.has(candidate.canonicalSkillId));
-
-  const recommendations = recommendSkills(repoFacts, candidates, {
-    minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
-    noScripts: flags.noScripts,
-    targetAssistants: repoFacts.aiAssistants.map((assistant) => assistant.id),
-    maxResults: 20
-  });
-
-  await saveRecommendationCache(repoRoot, {
-    repoFacts,
-    recommendations,
-    generatedAtIso: new Date().toISOString()
-  });
-
-  spinner?.succeed(pc.green(`Ranked ${recommendations.length} recommendations`));
+  const pipeline = await buildRecommendations(repoRoot, flags);
 
   if (flags.json) {
     printJson({
-      repoFacts,
-      providers: providerResults.map((result) => ({ providerId: result.providerId, count: result.candidates.length })),
-      warnings,
-      recommendations
+      repoFacts: pipeline.repoFacts,
+      providers: pipeline.providerSummaries,
+      warnings: pipeline.providerWarnings,
+      recommendations: pipeline.recommendations
     });
     return;
   }
 
-  if (warnings.length > 0) {
+  if (pipeline.providerWarnings.length > 0) {
     process.stdout.write(`\n${warningHeader("Provider notes")}:\n`);
-    for (const warning of warnings) {
+    for (const warning of pipeline.providerWarnings) {
       process.stdout.write(`- ${warningLine(warning)}\n`);
     }
   }
 
+  if (pipeline.providerSummaries.length > 0) {
+    process.stdout.write(`\n${pc.bold("Providers")}:\n`);
+    for (const provider of pipeline.providerSummaries) {
+      const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
+      process.stdout.write(
+        `- ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}\n`
+      );
+    }
+  }
+
   process.stdout.write(`\n${pc.bold("Recommendations")}:\n`);
-  for (const recommendation of recommendations) {
+  for (const recommendation of pipeline.recommendations) {
     const blockedLabel = recommendation.blocked ? ` ${pc.red("[BLOCKED]")}` : "";
     process.stdout.write(
       `- ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `

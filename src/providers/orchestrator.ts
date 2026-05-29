@@ -23,5 +23,22 @@ export async function queryProviders(
   providers: SkillProvider[],
   query: ProviderSearchQuery
 ): Promise<SkillProviderResult[]> {
-  return Promise.all(providers.map((provider) => provider.search(query)));
+  const results = await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        return await provider.search(query);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          providerId: provider.id,
+          fetchedAtIso: new Date().toISOString(),
+          mode: "error",
+          candidates: [],
+          warnings: [`Provider ${provider.id} failed: ${message}`]
+        } satisfies SkillProviderResult;
+      }
+    })
+  );
+
+  return results;
 }

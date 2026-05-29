@@ -67,6 +67,7 @@ export interface RepoFinding {
 }
 
 export interface SkillCandidate {
+  providerScopedId?: string;
   providerSkillId: string;
   canonicalSkillId: string;
   name: string;
@@ -170,6 +171,7 @@ export interface SkillProvider {
 export interface SkillProviderResult {
   providerId: string;
   fetchedAtIso: string;
+  mode?: string;
   candidates: SkillCandidate[];
   nextCursor?: string;
   rateLimit?: { remaining?: number; resetAtIso?: string };
@@ -229,6 +231,7 @@ export interface InstallPlan {
 }
 
 export interface InstalledSkillRecord {
+  providerScopedId?: string;
   canonicalSkillId: string;
   providerId: string;
   providerSkillId: string;

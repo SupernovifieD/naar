@@ -63,6 +63,33 @@ Target aliases:
 - `codex` -> `codex_repo_skills`
 - `generic` -> `generic_agent_skills`
 
+## Provider Auth and API Access
+
+Naar uses real provider APIs by default and supports degraded fallback modes.
+
+- Anthropic:
+  - Set `ANTHROPIC_API_KEY` to use Anthropic Skills API mode.
+  - Optional: `ANTHROPIC_API_BASE_URL` (default `https://api.anthropic.com`)
+  - Optional: `ANTHROPIC_API_VERSION` (default `2023-06-01`)
+  - Optional: `ANTHROPIC_BETA_HEADERS` (comma-separated; default includes skills/code-exec/files betas)
+  - If key is missing or API fails, Naar falls back to Anthropic GitHub skills catalog.
+
+- ClawHub:
+  - Public read endpoints work without auth.
+  - Optional: `CLAWHUB_API_TOKEN` enables token-auth mode for auth-required endpoints.
+  - Optional: `CLAWHUB_API_BASE_URL` (default `https://clawhub.ai`)
+  
+- GitHub fallback headroom:
+  - Optional: `GITHUB_TOKEN` for higher rate-limit headroom when Anthropic fallback uses GitHub.
+  - Optional: `GITHUB_API_BASE_URL` (default `https://api.github.com`)
+
+Provider runtime tuning:
+
+- `NAAR_PROVIDER_TIMEOUT_MS` (default `10000`)
+- `NAAR_PROVIDER_RETRY_ATTEMPTS` (default `3`)
+
+`naar recommend --json` and `naar go --json` include provider mode hints (`api`, `github_fallback`, `public`, `token`) and provider warnings.
+
 ## Install Targets (MVP)
 
 - Claude: `.claude/skills/<skill>/SKILL.md`
@@ -78,6 +105,7 @@ Target aliases:
 - Do not run scripts by default (`--no-scripts`)
 - No write before preview + confirmation
 - `--json` mode is non-writing unless `--apply`
+- No repository source files are uploaded to providers
 
 ## Testing
 
@@ -89,5 +117,6 @@ npm run build
 
 ## Current MVP Notes
 
-- Provider integrations currently use curated fallback catalogs with normalized metadata.
-- The architecture is provider-pluggable and ready for deeper API integrations.
+- Provider discovery/recommendation uses live provider APIs.
+- Fail-open on provider availability (partial results + warnings).
+- Fail-closed on install security policy.
