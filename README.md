@@ -1,6 +1,8 @@
 # Naar (`naar`)
 
-Repo-aware CLI for auditing repositories, recommending Agent Skills, and installing selected skills safely.
+Naar is a repo-aware CLI that helps developers discover, evaluate, and safely install AI agent skills from different marketplaces.
+
+It scans your repository, detects your stack and AI-assistant setup, recommends compatible skills, applies security scoring, previews the install plan, and installs only the skills you approve.
 
 ## What It Does
 
