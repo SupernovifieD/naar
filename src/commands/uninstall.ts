@@ -1,22 +1,24 @@
 import { checkbox, confirm } from "@inquirer/prompts";
+import pc from "picocolors";
 import type { CliFlags } from "../types/index.js";
 import { resolveRepoRoot } from "./shared.js";
 import { loadInstalledState, loadLockfile, saveInstalledState, saveLockfile } from "../installer/state.js";
 import { uninstallManagedFiles } from "../installer/apply.js";
 import { printJson } from "../utils/json.js";
+import { warningLine } from "../utils/output.js";
 
 export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
   const state = await loadInstalledState(repoRoot);
 
   if (state.skills.length === 0) {
-    process.stdout.write("No installed skills found.\n");
+    process.stdout.write(`${warningLine("No installed skills found.")}\n`);
     return;
   }
 
   const selectedIds = await chooseSkills(flags, state.skills.map((skill) => skill.canonicalSkillId), skillIdsFromArgs);
   if (selectedIds.length === 0) {
-    process.stdout.write("No skills selected for uninstall.\n");
+    process.stdout.write(`${warningLine("No skills selected for uninstall.")}\n`);
     return;
   }
 
@@ -32,14 +34,14 @@ export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]):
       return;
     }
   } else {
-    process.stdout.write("Files that will be removed/edited:\n");
+    process.stdout.write(`${pc.bold("Files that will be removed/edited")}:\n`);
     for (const file of preview) {
-      process.stdout.write(`- ${file}\n`);
+      process.stdout.write(`- ${pc.red(file)}\n`);
     }
   }
 
   if (flags.dryRun) {
-    process.stdout.write("Dry run enabled. Nothing was changed.\n");
+    process.stdout.write(`${warningLine("Dry run enabled. Nothing was changed.")}\n`);
     return;
   }
 
@@ -50,7 +52,7 @@ export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]):
       : await confirm({ message: "Proceed with uninstall?", default: false });
 
   if (!shouldProceed) {
-    process.stdout.write("Uninstall canceled.\n");
+    process.stdout.write(`${warningLine("Uninstall canceled.")}\n`);
     return;
   }
 
@@ -63,7 +65,7 @@ export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]):
   await saveInstalledState(repoRoot, state);
   await saveLockfile(repoRoot, lock);
 
-  process.stdout.write(`Removed ${removed.length} managed entries.\n`);
+  process.stdout.write(`${pc.green("✔ Uninstall complete")}: removed ${pc.cyan(String(removed.length))} managed entries.\n`);
 }
 
 async function chooseSkills(
@@ -81,6 +83,6 @@ async function chooseSkills(
 
   return checkbox<string>({
     message: "Select skills to uninstall",
-    choices: available.map((id) => ({ name: id, value: id }))
+    choices: available.map((id) => ({ name: pc.bold(id), value: id }))
   });
 }

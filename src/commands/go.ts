@@ -4,6 +4,15 @@ import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations } from "./pipeline.js";
 import { runInstallFlow } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
+import {
+  colorAssistantStatus,
+  colorRisk,
+  colorScore,
+  formatList,
+  formatReason,
+  warningHeader,
+  warningLine
+} from "../utils/output.js";
 
 export async function runGo(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -55,12 +64,7 @@ function renderSummary(
 
   process.stdout.write("  AI config:\n");
   for (const assistant of repoFacts.aiAssistants) {
-    const status = assistant.status === "found"
-      ? pc.green("found")
-      : assistant.status === "partial"
-        ? pc.yellow("partial")
-        : pc.dim("missing");
-    process.stdout.write(`    - ${pc.cyan(assistant.id)}: ${status}\n`);
+    process.stdout.write(`    - ${pc.cyan(assistant.id)}: ${colorAssistantStatus(assistant.status)}\n`);
   }
   process.stdout.write(
     `  Readiness score: ${colorScore(repoFacts.readiness.score)}/100 (${pc.bold(repoFacts.readiness.grade)})\n\n`
@@ -90,9 +94,9 @@ function renderSummary(
   warnings.push(...providerWarnings);
 
   if (warnings.length > 0) {
-    process.stdout.write(`\n${pc.yellow("⚠ Warnings")}\n`);
+    process.stdout.write(`\n${warningHeader("Warnings")}\n`);
     for (const warning of warnings) {
-      process.stdout.write(`  ${pc.yellow("⚠")} ${pc.yellow(warning)}\n`);
+      process.stdout.write(`  ${warningLine(warning)}\n`);
     }
   }
 
@@ -116,31 +120,4 @@ function groupFrameworks(
   }
 
   return grouped;
-}
-
-function formatList(values: string[], fallback = "none"): string {
-  if (values.length === 0) return pc.dim(fallback);
-  return values.map((value) => pc.cyan(value)).join(", ");
-}
-
-function colorScore(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
-}
-
-function colorRisk(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
-}
-
-function formatReason(reason: string): string {
-  const [label, ...rest] = reason.split(":");
-  if (rest.length === 0) {
-    return pc.white(reason);
-  }
-
-  const detail = rest.join(":").trim();
-  return `${pc.blue(label.trim())}:${detail ? ` ${pc.white(detail)}` : ""}`;
 }

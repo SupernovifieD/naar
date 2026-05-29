@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import pc from "picocolors";
 import { coerceFlags, parseTargets } from "./commands/shared.js";
 import { runScan } from "./commands/scan.js";
 import { runRecommend } from "./commands/recommend.js";
@@ -10,6 +11,18 @@ import { runUninstall } from "./commands/uninstall.js";
 import { runConfig } from "./commands/config.js";
 
 const program = new Command();
+
+program.configureOutput({
+  writeOut: (str) => {
+    process.stdout.write(colorizeCommanderOutput(str));
+  },
+  writeErr: (str) => {
+    process.stderr.write(colorizeCommanderOutput(str));
+  },
+  outputError: (str, write) => {
+    write(pc.red(str));
+  }
+});
 
 program
   .name("naar")
@@ -83,7 +96,7 @@ applySharedOptions(program
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Error: ${message}\n`);
+  process.stderr.write(`${pc.red(`Error: ${message}`)}\n`);
   process.exitCode = 1;
 });
 
@@ -117,4 +130,32 @@ function applySharedOptions(command: Command): Command {
     .option("--from-plan <file>", "Load install selections from plan JSON")
     .option("--no-scripts", "Disallow script-bearing skills")
     .option("--allow-scripts", "Allow script-bearing skills (unsafe)");
+}
+
+function colorizeCommanderOutput(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) {
+        return line;
+      }
+
+      if (/^Usage:/.test(trimmed)) {
+        return line.replace(trimmed, pc.bold(pc.cyan(trimmed)));
+      }
+
+      if (/^(Commands|Options|Arguments):$/.test(trimmed)) {
+        return line.replace(trimmed, pc.bold(trimmed));
+      }
+
+      const termMatch = line.match(/^(\s{2,})(\S.*?)(\s{2,}.*)$/);
+      if (termMatch) {
+        const [, indent, term, detail] = termMatch;
+        return `${indent}${pc.cyan(term)}${detail}`;
+      }
+
+      return line;
+    })
+    .join("\n");
 }

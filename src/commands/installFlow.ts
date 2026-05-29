@@ -26,6 +26,7 @@ import { printJson } from "../utils/json.js";
 import { buildRecommendations, loadOrBuildRecommendations } from "./pipeline.js";
 import { resolveRepoRoot } from "./shared.js";
 import { toSlug } from "../utils/slug.js";
+import { colorRisk, colorScore, warningHeader, warningLine } from "../utils/output.js";
 
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
@@ -44,7 +45,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   const selectedRecommendations = await chooseRecommendations(flags, recommendations);
 
   if (selectedRecommendations.length === 0) {
-    process.stdout.write("No skills selected for installation.\n");
+    process.stdout.write(`${warningLine("No skills selected for installation.")}\n`);
     return;
   }
 
@@ -77,20 +78,20 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   renderPlanPreview(plan, includePlanTitle);
 
   if (plan.conflicts.length > 0 && !flags.force) {
-    process.stderr.write("\nConflicts detected. Resolve manually or rerun with --force.\n");
+    process.stderr.write(`\n${warningHeader("Conflicts")}: ${pc.yellow("Resolve manually or rerun with --force.")}\n`);
     for (const conflict of plan.conflicts) {
-      process.stderr.write(`- ${conflict.path}: ${conflict.reason}\n`);
+      process.stderr.write(`- ${pc.red(conflict.path)}: ${conflict.reason}\n`);
     }
     return;
   }
 
   if (flags.dryRun) {
-    process.stdout.write("\nDry run enabled. No files were written.\n");
+    process.stdout.write(`\n${warningLine("Dry run enabled. No files were written.")}\n`);
     return;
   }
 
   if (flags.nonInteractive && !flags.apply && !flags.yes) {
-    process.stderr.write("Non-interactive mode requires --apply to perform writes.\n");
+    process.stderr.write(`${pc.red("Non-interactive mode requires --apply to perform writes.")}\n`);
     return;
   }
 
@@ -101,15 +102,15 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
       : await confirm({ message: "Proceed with installation?", default: false });
 
   if (!shouldWrite) {
-    process.stdout.write("Installation canceled.\n");
+    process.stdout.write(`${warningLine("Installation canceled.")}\n`);
     return;
   }
 
   await applyInstallPlan(repoRoot, plan);
   await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
 
-  process.stdout.write("\nInstallation complete.\n");
-  process.stdout.write("Next: run `naar list` to review installed skills.\n");
+  process.stdout.write(`\n${pc.green("✔ Installation complete.")}\n`);
+  process.stdout.write(`${pc.cyan("Next")}: run ${pc.bold("naar list")} to review installed skills.\n`);
 
   // Keep config synced with explicit runtime flags when used.
   if (flags.target.length > 0 || flags.provider.length > 0 || flags.minSecurityScore !== config.minSecurityScore) {
@@ -242,17 +243,18 @@ function renderPlanPreview(
   includeTitle = true
 ): void {
   if (includeTitle) {
-    process.stdout.write("\nInstallation plan preview:\n");
+    process.stdout.write(`\n${pc.bold("Installation plan preview")}:\n`);
   } else {
     process.stdout.write("\n");
   }
 
   for (const action of plan.actions) {
-    const prefix = action.type === "append" ? "~" : "+";
+    const prefix = action.type === "append" ? pc.yellow("~") : pc.green("+");
     process.stdout.write(`  ${prefix} ${action.path}\n`);
   }
   process.stdout.write(
-    `\nSummary: write=${plan.summary.filesToWrite}, update=${plan.summary.filesToUpdate}, blocked=${plan.summary.filesBlocked}\n`
+    `\n${pc.bold("Summary")}: write=${pc.green(String(plan.summary.filesToWrite))}, `
+    + `update=${pc.yellow(String(plan.summary.filesToUpdate))}, blocked=${pc.red(String(plan.summary.filesBlocked))}\n`
   );
 }
 
@@ -303,16 +305,4 @@ function dedupe(values: string[]): string[] {
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
   return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
     + `score=${colorScore(recommendation.score)} risk=${colorRisk(recommendation.candidate.risk.score)}`;
-}
-
-function colorScore(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
-}
-
-function colorRisk(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
 }
