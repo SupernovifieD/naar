@@ -1,6 +1,7 @@
 import path from "node:path";
 import { checkbox, confirm } from "@inquirer/prompts";
 import ora from "ora";
+import pc from "picocolors";
 import { readFile } from "node:fs/promises";
 import type {
   CliFlags,
@@ -68,7 +69,12 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     }
   }
 
-  renderPlanPreview(plan);
+  if (flowOptions.printHeader && flags.json === false) {
+    process.stdout.write(`${pc.bold("[5/5]")} Installation plan preview\n`);
+  }
+
+  const includePlanTitle = flowOptions.printHeader && flags.json === false ? false : true;
+  renderPlanPreview(plan, includePlanTitle);
 
   if (plan.conflicts.length > 0 && !flags.force) {
     process.stderr.write("\nConflicts detected. Resolve manually or rerun with --force.\n");
@@ -143,7 +149,7 @@ async function chooseRecommendations(
   const selectedIds = await checkbox<string>({
     message: "Select skills to install",
     choices: eligible.map((recommendation, index) => ({
-      name: `${recommendation.candidate.name} (${recommendation.candidate.source.providerId}) score=${recommendation.score} risk=${recommendation.candidate.risk.score}`,
+      name: formatChoiceLabel(recommendation),
       value: recommendation.candidate.canonicalSkillId,
       checked: index < 2
     }))
@@ -231,8 +237,16 @@ function targetCompatible(candidate: SkillCandidate, target: InstallTarget): boo
   return candidate.compatibility.assistants.includes(assistant as never) || candidate.compatibility.assistants.includes("generic");
 }
 
-function renderPlanPreview(plan: { actions: Array<{ type: string; path: string }>; summary: { filesToWrite: number; filesToUpdate: number; filesBlocked: number } }): void {
-  process.stdout.write("\nInstallation plan preview:\n");
+function renderPlanPreview(
+  plan: { actions: Array<{ type: string; path: string }>; summary: { filesToWrite: number; filesToUpdate: number; filesBlocked: number } },
+  includeTitle = true
+): void {
+  if (includeTitle) {
+    process.stdout.write("\nInstallation plan preview:\n");
+  } else {
+    process.stdout.write("\n");
+  }
+
   for (const action of plan.actions) {
     const prefix = action.type === "append" ? "~" : "+";
     process.stdout.write(`  ${prefix} ${action.path}\n`);
@@ -284,4 +298,21 @@ async function persistInstallationState(
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function formatChoiceLabel(recommendation: SkillRecommendation): string {
+  return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
+    + `score=${colorScore(recommendation.score)} risk=${colorRisk(recommendation.candidate.risk.score)}`;
+}
+
+function colorScore(score: number): string {
+  if (score >= 80) return pc.green(String(score));
+  if (score >= 60) return pc.yellow(String(score));
+  return pc.red(String(score));
+}
+
+function colorRisk(score: number): string {
+  if (score >= 80) return pc.green(String(score));
+  if (score >= 60) return pc.yellow(String(score));
+  return pc.red(String(score));
 }

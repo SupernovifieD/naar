@@ -1,4 +1,5 @@
 import type { CliFlags } from "../types/index.js";
+import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations } from "./pipeline.js";
 import { runInstallFlow } from "./installFlow.js";
@@ -14,70 +15,93 @@ export async function runGo(flags: CliFlags): Promise<void> {
       repoFacts: pipeline.repoFacts,
       recommendations: pipeline.recommendations
     });
-    if (!flags.apply) {
+    if (flags.apply === false) {
       return;
     }
   } else {
-    renderSummary(repoRoot, pipeline.repoFacts, pipeline.recommendations);
+    renderSummary(repoRoot, pipeline.repoFacts, pipeline.recommendations, pipeline.providerWarnings);
   }
 
-  await runInstallFlow(flags, { forceFreshRecommendations: false });
+  await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
 }
 
 function renderSummary(
   repoRoot: string,
   repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
-  recommendations: Awaited<ReturnType<typeof buildRecommendations>>["recommendations"]
+  recommendations: Awaited<ReturnType<typeof buildRecommendations>>["recommendations"],
+  providerWarnings: string[]
 ): void {
-  process.stdout.write(`Naar v0.1\n`);
-  process.stdout.write(`Repo: ${repoRoot}\n\n`);
+  process.stdout.write(`${pc.bold("Naar")} v0.1\n`);
+  process.stdout.write(`Repo: ${pc.dim(repoRoot)}\n\n`);
 
-  process.stdout.write("[1/5] Scanning repository...\n");
-  process.stdout.write(`  Languages: ${repoFacts.languages.join(", ") || "none"}\n`);
+  process.stdout.write(`${pc.bold("[1/5]")} Scanning repository...\n`);
+  process.stdout.write(`  Languages: ${formatList(repoFacts.languages)}\n`);
   process.stdout.write(
-    `  Package manager: ${repoFacts.packageManagers.map((packageManager) => packageManager.id).join(", ") || "unknown"}\n`
+    `  Package manager: ${formatList(repoFacts.packageManagers.map((packageManager) => packageManager.id), "unknown")}\n`
   );
 
   const byCategory = groupFrameworks(repoFacts.frameworks);
-  process.stdout.write(`  Frontend: ${byCategory.frontend.join(", ") || "none"}\n`);
-  process.stdout.write(`  Backend: ${byCategory.backend.join(", ") || "none"}\n`);
-  process.stdout.write(`  Tests: ${byCategory.testing.join(", ") || "none"}\n`);
-  process.stdout.write(`  Styling: ${byCategory.styling.join(", ") || "none"}\n`);
+  process.stdout.write(`  Frontend: ${formatList(byCategory.frontend)}\n`);
+  process.stdout.write(`  Backend: ${formatList(byCategory.backend)}\n`);
+  process.stdout.write(`  Tests: ${formatList(byCategory.testing)}\n`);
+  process.stdout.write(`  Styling: ${formatList(byCategory.styling)}\n`);
   process.stdout.write(
-    `  CI/CD: ${repoFacts.frameworks.some((framework) => framework.id === "github-actions") ? "github-actions" : "none"}\n`
+    `  CI/CD: ${
+      repoFacts.frameworks.some((framework) => framework.id === "github-actions")
+        ? pc.cyan("github-actions")
+        : pc.dim("none")
+    }\n`
   );
 
   process.stdout.write("  AI config:\n");
   for (const assistant of repoFacts.aiAssistants) {
-    const status = assistant.status === "found" ? "found" : "missing";
-    process.stdout.write(`    - ${assistant.id}: ${status}\n`);
+    const status = assistant.status === "found"
+      ? pc.green("found")
+      : assistant.status === "partial"
+        ? pc.yellow("partial")
+        : pc.dim("missing");
+    process.stdout.write(`    - ${pc.cyan(assistant.id)}: ${status}\n`);
   }
   process.stdout.write(
-    `  Readiness score: ${repoFacts.readiness.score}/100 (${repoFacts.readiness.grade})\n\n`
+    `  Readiness score: ${colorScore(repoFacts.readiness.score)}/100 (${pc.bold(repoFacts.readiness.grade)})\n\n`
   );
 
-  process.stdout.write("[2/5] Fetching skill candidates...\n");
-  process.stdout.write(`  Providers: anthropic, clawhub\n\n`);
+  process.stdout.write(`${pc.bold("[2/5]")} Fetching skill candidates...\n`);
+  process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")}\n\n`);
 
-  process.stdout.write("[3/5] Ranking recommendations...\n");
+  process.stdout.write(`${pc.bold("[3/5]")} Ranking recommendations...\n`);
   for (const [index, recommendation] of recommendations.entries()) {
     process.stdout.write(
-      `  ${index + 1}) ${recommendation.candidate.name} (${recommendation.candidate.source.providerId}) [score ${recommendation.score}, risk ${recommendation.candidate.risk.score}]\n`
+      `  ${index + 1}) ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
+      + `[score ${colorScore(recommendation.score)}, risk ${colorRisk(recommendation.candidate.risk.score)}]\n`
     );
-    process.stdout.write(`     Why: ${recommendation.reasons.slice(0, 2).join("; ")}\n`);
+    const reasons = recommendation.reasons
+      .slice(0, 2)
+      .map((reason) => formatReason(reason))
+      .join(`${pc.dim("; ")} `);
+    process.stdout.write(`     ${pc.magenta("Why")}: ${reasons}\n`);
   }
 
   const blocked = recommendations.filter((recommendation) => recommendation.blocked);
+  const warnings: string[] = [];
   if (blocked.length > 0) {
-    process.stdout.write(`\nWarnings:\n`);
-    process.stdout.write(`  - ${blocked.length} candidates blocked by security policy\n`);
+    warnings.push(`${blocked.length} candidates blocked by security policy`);
+  }
+  warnings.push(...providerWarnings);
+
+  if (warnings.length > 0) {
+    process.stdout.write(`\n${pc.yellow("⚠ Warnings")}\n`);
+    for (const warning of warnings) {
+      process.stdout.write(`  ${pc.yellow("⚠")} ${pc.yellow(warning)}\n`);
+    }
   }
 
-  process.stdout.write("\n[4/5] Select skills to install\n");
-  process.stdout.write("[5/5] Installation plan preview\n\n");
+  process.stdout.write(`\n${pc.bold("[4/5]")} Select skills to install\n\n`);
 }
 
-function groupFrameworks(frameworks: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"]["frameworks"]): Record<string, string[]> {
+function groupFrameworks(
+  frameworks: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"]["frameworks"]
+): Record<string, string[]> {
   const grouped: Record<string, string[]> = {
     frontend: [],
     backend: [],
@@ -92,4 +116,31 @@ function groupFrameworks(frameworks: Awaited<ReturnType<typeof buildRecommendati
   }
 
   return grouped;
+}
+
+function formatList(values: string[], fallback = "none"): string {
+  if (values.length === 0) return pc.dim(fallback);
+  return values.map((value) => pc.cyan(value)).join(", ");
+}
+
+function colorScore(score: number): string {
+  if (score >= 80) return pc.green(String(score));
+  if (score >= 60) return pc.yellow(String(score));
+  return pc.red(String(score));
+}
+
+function colorRisk(score: number): string {
+  if (score >= 80) return pc.green(String(score));
+  if (score >= 60) return pc.yellow(String(score));
+  return pc.red(String(score));
+}
+
+function formatReason(reason: string): string {
+  const [label, ...rest] = reason.split(":");
+  if (rest.length === 0) {
+    return pc.white(reason);
+  }
+
+  const detail = rest.join(":").trim();
+  return `${pc.blue(label.trim())}:${detail ? ` ${pc.white(detail)}` : ""}`;
 }

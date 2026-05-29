@@ -1,0 +1,170 @@
+{
+  "repoRoot": "/Users/yasin/naar",
+  "scanTimeIso": "2026-05-29T18:00:46.588Z",
+  "languages": [
+    "JavaScript",
+    "Python",
+    "TypeScript"
+  ],
+  "packageManagers": [
+    {
+      "id": "npm",
+      "confidence": 1,
+      "lockfiles": [
+        "package-lock.json"
+      ],
+      "workspaceMode": false
+    }
+  ],
+  "frameworks": [
+    {
+      "id": "react",
+      "category": "frontend",
+      "evidence": [
+        "package.json dependencies",
+        "*.tsx|*.jsx"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "nextjs",
+      "category": "frontend",
+      "evidence": [
+        "next.config.* or dependency"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "vite",
+      "category": "build",
+      "evidence": [
+        "vite.config.* or dependency"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "tailwind",
+      "category": "styling",
+      "evidence": [
+        "tailwind.config.* or dependency"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "id": "typescript",
+      "category": "build",
+      "evidence": [
+        "typescript dependency or tsconfig.json"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "fastapi",
+      "category": "backend",
+      "evidence": [
+        "fastapi dependency or main.py"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "id": "pytest",
+      "category": "testing",
+      "evidence": [
+        "pytest dependency or tests folder"
+      ],
+      "confidence": 0.6
+    }
+  ],
+  "aiAssistants": [
+    {
+      "id": "claude",
+      "status": "missing",
+      "configPathsFound": [],
+      "recommendedInstallTargets": [
+        "claude_project_skills"
+      ]
+    },
+    {
+      "id": "cursor",
+      "status": "missing",
+      "configPathsFound": [],
+      "recommendedInstallTargets": [
+        "cursor_project_rules"
+      ]
+    },
+    {
+      "id": "copilot",
+      "status": "missing",
+      "configPathsFound": [],
+      "recommendedInstallTargets": [
+        "copilot_repo_instructions"
+      ]
+    },
+    {
+      "id": "codex",
+      "status": "missing",
+      "configPathsFound": [],
+      "recommendedInstallTargets": [
+        "codex_repo_skills"
+      ]
+    },
+    {
+      "id": "generic",
+      "status": "missing",
+      "configPathsFound": [],
+      "recommendedInstallTargets": [
+        "generic_agent_skills"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "code": "missing_copilot_instructions",
+      "severity": "info",
+      "message": "GitHub Copilot repository instructions are missing.",
+      "category": "ai-config"
+    },
+    {
+      "code": "missing_claude_config",
+      "severity": "info",
+      "message": "Claude Code project configuration is missing.",
+      "category": "ai-config"
+    },
+    {
+      "code": "missing_ci_or_container",
+      "severity": "info",
+      "message": "No CI workflows or container manifests detected.",
+      "category": "stack"
+    }
+  ],
+  "topology": {
+    "sourceDirs": [
+      "src"
+    ],
+    "routeDirs": [],
+    "componentDirs": [],
+    "apiDirs": [],
+    "testDirs": [
+      "tests/fixtures/empty",
+      "tests/fixtures/fastapi",
+      "tests/fixtures/fastapi/tests",
+      "tests/fixtures/next-tailwind",
+      "tests/fixtures/next-tailwind/.github/workflows",
+      "tests/unit"
+    ],
+    "docDirs": [
+      ".",
+      "tests/fixtures/empty",
+      "tests/fixtures/next-tailwind"
+    ]
+  },
+  "readiness": {
+    "score": 85,
+    "grade": "Excellent",
+    "missingCapabilities": [
+      "missing_copilot_instructions",
+      "missing_claude_config",
+      "missing_ci_or_container"
+    ]
+  }
+}
