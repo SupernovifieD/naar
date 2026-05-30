@@ -84,11 +84,15 @@ function stalePenaltyFromDate(lastUpdatedIso?: string): number {
 
 export function isInstallAllowed(report: SkillSecurityReport, policy: SecurityPolicy, hasScripts: boolean): { allowed: boolean; reasons: string[] } {
   const reasons: string[] = [];
+  const riskPercent = toRiskPercent(report.score);
+  const hardBlockThreshold = toRiskPercent(60);
+  const requiredRiskThreshold = toRiskPercent(policy.minSecurityScore);
+
   if (report.score < 60) {
-    reasons.push("Security score below hard block threshold (<60).");
+    reasons.push(`Risk ${riskPercent}% exceeds hard block threshold (>${hardBlockThreshold}%).`);
   }
   if (report.score < policy.minSecurityScore) {
-    reasons.push(`Security score below required threshold (${policy.minSecurityScore}).`);
+    reasons.push(`Risk ${riskPercent}% exceeds required threshold (>${requiredRiskThreshold}%).`);
   }
   if (policy.noScripts && hasScripts) {
     reasons.push("Skill includes scripts and --no-scripts is enabled.");
@@ -104,4 +108,9 @@ export function isInstallAllowed(report: SkillSecurityReport, policy: SecurityPo
     allowed: reasons.length === 0,
     reasons
   };
+}
+
+function toRiskPercent(safetyScore: number): number {
+  const clampedSafety = Math.max(0, Math.min(100, Math.round(safetyScore)));
+  return 100 - clampedSafety;
 }

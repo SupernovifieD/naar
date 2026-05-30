@@ -13,9 +13,10 @@ export function colorScore(score: number, options: ColorValueOptions = {}): stri
 }
 
 export function colorRisk(score: number, options: ColorValueOptions = {}): string {
-  const label = formatValue(score, options.percent === true);
-  if (score >= 80) return pc.green(label);
-  if (score >= 60) return pc.yellow(label);
+  const riskPercent = toRiskPercent(score);
+  const label = formatValue(riskPercent, options.percent === true);
+  if (riskPercent <= 20) return pc.green(label);
+  if (riskPercent <= 40) return pc.yellow(label);
   return pc.red(label);
 }
 
@@ -62,4 +63,10 @@ function formatValue(value: number, asPercent: boolean): string {
   const normalized = Number.isFinite(value) ? Math.round(value) : 0;
   const clamped = Math.max(0, Math.min(100, normalized));
   return `${clamped}%`;
+}
+
+export function toRiskPercent(safetyScore: number): number {
+  const normalized = Number.isFinite(safetyScore) ? Math.round(safetyScore) : 0;
+  const clampedSafety = Math.max(0, Math.min(100, normalized));
+  return 100 - clampedSafety;
 }
