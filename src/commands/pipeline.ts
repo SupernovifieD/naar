@@ -82,7 +82,7 @@ export async function buildRecommendations(
     minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
     noScripts: flags.noScripts,
     targetAssistants: repoFacts.aiAssistants.map((assistant) => assistant.id),
-    maxResults: 20
+    maxResults: 10
   });
 
   const filteredRecommendations = filterInstalledRecommendations(recommendations, installedIds);
