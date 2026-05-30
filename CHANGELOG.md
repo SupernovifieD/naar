@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.1] - 2026-05-30
+
+### Added
+- Added recommendation card layout in `naar go` and `naar recommend` for clearer scanability.
+- Added per-skill description lines (provider description with summary fallback) in recommendation output.
+- Added global `--compact` mode for dense, power-user recommendation output.
+- Added post-install output showing where Naar installed artifacts.
+- Added npm auto-publish workflow on `v*` tags using GitHub Actions + npm Trusted Publishing (OIDC).
+
+### Changed
+- Reduced default recommendation list size from 20 to 10 to lower decision overload.
+- Improved install prompt UX with clearer key hints, including explicit `q` quit visibility.
+
 ## [0.1.0] - 2026-05-30
 
 ### Added
