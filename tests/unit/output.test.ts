@@ -133,6 +133,21 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("blocked: Risk 80% exceeds threshold");
   });
 
+  it("renders compact card without description/targets/meta", () => {
+    const output = stripAnsi(renderRecommendationCard(makeRecommendation(), 1, {
+      columns: 80,
+      compact: true
+    }));
+
+    expect(output).toContain("1) Frontend Design Pro [anthropic]");
+    expect(output).toContain("score: 88%");
+    expect(output).toContain("status: ELIGIBLE");
+    expect(output).toContain("why: Matched stack: Next.js");
+    expect(output).not.toContain("description:");
+    expect(output).not.toContain("targets:");
+    expect(output).not.toContain("meta:");
+  });
+
   it("builds focused install choice description", () => {
     const text = formatRecommendationChoiceDescription(makeRecommendation());
     expect(text).toContain("desc: API description");

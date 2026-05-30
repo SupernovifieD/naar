@@ -9,6 +9,7 @@ interface RecommendationCardRenderOptions {
   indent?: string;
   reasonLimit?: number;
   columns?: number;
+  compact?: boolean;
 }
 
 const CARD_MIN_WIDTH = 68;
@@ -142,7 +143,10 @@ export function renderRecommendationCard(
   options: RecommendationCardRenderOptions = {}
 ): string {
   const indent = options.indent ?? "";
-  const reasonLimit = options.reasonLimit ?? DEFAULT_REASON_LIMIT;
+  const compact = options.compact === true;
+  const reasonLimit = compact
+    ? 1
+    : (options.reasonLimit ?? DEFAULT_REASON_LIMIT);
   const cardWidth = resolveRecommendationCardWidth(options.columns);
   const divider = `${indent}${pc.dim("-".repeat(cardWidth))}`;
 
@@ -157,14 +161,16 @@ export function renderRecommendationCard(
     + `   ${pc.blue("status")}: ${recommendation.blocked ? pc.red("BLOCKED") : pc.green("ELIGIBLE")}`
   );
 
-  const description = resolveSkillDescription(recommendation.candidate);
-  if (description) {
-    appendWrappedField(lines, {
-      cardWidth,
-      indent,
-      label: "description",
-      value: description
-    });
+  if (!compact) {
+    const description = resolveSkillDescription(recommendation.candidate);
+    if (description) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "description",
+        value: description
+      });
+    }
   }
 
   const reasons = recommendation.reasons.slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
@@ -175,21 +181,23 @@ export function renderRecommendationCard(
     value: reasons.length > 0 ? reasons.join("; ") : "n/a"
   });
 
-  appendWrappedField(lines, {
-    cardWidth,
-    indent,
-    label: "targets",
-    value: formatTargets(recommendation.candidate.compatibility.assistants)
-  });
-
-  const metadataLine = formatRecommendationMeta(recommendation);
-  if (metadataLine) {
+  if (!compact) {
     appendWrappedField(lines, {
       cardWidth,
       indent,
-      label: "meta",
-      value: metadataLine
+      label: "targets",
+      value: formatTargets(recommendation.candidate.compatibility.assistants)
     });
+
+    const metadataLine = formatRecommendationMeta(recommendation);
+    if (metadataLine) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "meta",
+        value: metadataLine
+      });
+    }
   }
 
   if (recommendation.blocked && recommendation.blockReasons && recommendation.blockReasons.length > 0) {

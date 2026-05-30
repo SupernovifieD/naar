@@ -286,7 +286,7 @@ async function chooseRecommendations(
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: eligible.map((recommendation, index) => ({
           name: formatChoiceLabel(recommendation),
-          description: formatRecommendationChoiceDescription(recommendation),
+          description: flags.compact ? undefined : formatRecommendationChoiceDescription(recommendation),
           value: recommendation.candidate.canonicalSkillId,
           checked: index < 2
         }))

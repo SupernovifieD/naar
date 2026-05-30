@@ -32,6 +32,13 @@ Use in any project repo:
 naar go
 ```
 
+Power-user compact mode:
+
+```bash
+naar recommend --compact
+naar go --compact
+```
+
 Ephemeral run without global install:
 
 ```bash
@@ -68,6 +75,7 @@ naar config
 
 ```bash
 --json
+--compact
 --apply
 --repo <path>
 --provider <id>
@@ -79,6 +87,8 @@ naar config
 --allow-scripts
 --force
 ```
+
+`--compact` keeps recommendation output dense by removing description/targets/meta sections while preserving score, risk, status, and concise rationale.
 
 Target aliases:
 

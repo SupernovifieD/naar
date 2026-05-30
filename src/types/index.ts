@@ -272,6 +272,7 @@ export interface CliFlags {
   provider: string[];
   target: InstallTarget[];
   json: boolean;
+  compact: boolean;
   apply: boolean;
   dryRun: boolean;
   yes: boolean;

@@ -34,6 +34,7 @@ const baseFlags: CliFlags = {
   provider: [],
   target: [],
   json: false,
+  compact: false,
   apply: false,
   dryRun: false,
   yes: false,
@@ -239,5 +240,49 @@ describe("recommend/go output descriptions", () => {
 
     expect(output).toContain("status: BLOCKED");
     expect(output).toContain("blocked: Risk 90% exceeds required threshold");
+  });
+
+  it("renders compact recommendation cards without description/targets/meta", async () => {
+    const result = makePipelineResult([makeRecommendation("Compact description from API")]);
+    buildRecommendationsMock.mockResolvedValue(result);
+
+    const output = await captureStdout(async () => {
+      await runRecommend({ ...baseFlags, compact: true });
+    });
+
+    expect(output).toContain("1) Frontend Design [anthropic]");
+    expect(output).toContain("score:");
+    expect(output).toContain("risk:");
+    expect(output).toContain("status: ELIGIBLE");
+    expect(output).toContain("why:");
+    expect(output).not.toContain("description:");
+    expect(output).not.toContain("targets:");
+    expect(output).not.toContain("meta:");
+  });
+
+  it("renders compact cards in go ranking section", async () => {
+    const recommendations = [makeRecommendation("Go compact description")];
+    const result = makePipelineResult(recommendations);
+
+    buildRecommendationsMock.mockImplementation(async (_repoRoot: string, _flags: CliFlags, hooks?: { onPhase?: (event: unknown) => void | Promise<void> }) => {
+      await hooks?.onPhase?.({ phase: "scan:start" });
+      await hooks?.onPhase?.({ phase: "scan:done", repoFacts });
+      await hooks?.onPhase?.({ phase: "providers:start", providerIds: ["anthropic"] });
+      await hooks?.onPhase?.({ phase: "providers:done", providerIds: ["anthropic"], providerResults: makeProviderResults(recommendations) });
+      await hooks?.onPhase?.({ phase: "rank:start" });
+      await hooks?.onPhase?.({ phase: "rank:done", result });
+      return result;
+    });
+
+    const output = await captureStdout(async () => {
+      await runGo({ ...baseFlags, compact: true });
+    });
+
+    expect(output).toContain("[3/5] Ranking recommendations...");
+    expect(output).toContain("1) Frontend Design [anthropic]");
+    expect(output).toContain("why:");
+    expect(output).not.toContain("description:");
+    expect(output).not.toContain("targets:");
+    expect(output).not.toContain("meta:");
   });
 });

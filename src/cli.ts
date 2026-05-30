@@ -118,6 +118,7 @@ function applySharedOptions(command: Command): Command {
     .option("--provider <id>", "Provider id (repeatable)", collectOption, [])
     .option("--target <id>", "Install target id (repeatable)", collectOption, [])
     .option("--json", "Emit JSON output")
+    .option("--compact", "Compact recommendation output")
     .option("--apply", "Apply writes in non-interactive/json modes")
     .option("--non-interactive", "Disable prompts")
     .option("--yes", "Skip confirmation prompts")

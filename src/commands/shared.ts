@@ -42,6 +42,7 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     provider: normalizeProviders(raw.provider as string[] | undefined),
     target: parseTargets(raw.target as string[] | undefined),
     json: Boolean(raw.json),
+    compact: Boolean(raw.compact),
     apply: Boolean(raw.apply),
     dryRun: Boolean(raw.dryRun),
     yes: Boolean(raw.yes),

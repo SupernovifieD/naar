@@ -32,13 +32,13 @@ export async function runGo(flags: CliFlags): Promise<void> {
     return;
   }
 
-  const progress = createGoProgressRenderer(repoRoot);
+  const progress = createGoProgressRenderer(repoRoot, flags);
   await buildRecommendations(repoRoot, flags, { onPhase: (event) => progress(event) });
 
   await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
 }
 
-function createGoProgressRenderer(repoRoot: string): (event: PipelinePhaseEvent) => void {
+function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: PipelinePhaseEvent) => void {
   let activeSpinner: ReturnType<typeof ora> | null = null;
 
   process.stdout.write(`${pc.bold("Naar")} v0.1\n`);
@@ -99,7 +99,7 @@ function createGoProgressRenderer(repoRoot: string): (event: PipelinePhaseEvent)
         activeSpinner?.succeed("Ranking complete");
         activeSpinner = null;
         if (!event.result) return;
-        renderRankingSummary(event.result);
+        renderRankingSummary(event.result, flags);
         process.stdout.write(`\n${pc.bold("[4/5]")} Select skills to install\n\n`);
         return;
       }
@@ -140,7 +140,8 @@ function renderScanSummary(
 }
 
 function renderRankingSummary(
-  result: Awaited<ReturnType<typeof buildRecommendations>>
+  result: Awaited<ReturnType<typeof buildRecommendations>>,
+  flags: CliFlags
 ): void {
   const { recommendations, providerWarnings } = result;
 
@@ -148,7 +149,11 @@ function renderRankingSummary(
     process.stdout.write(`  ${warningLine("No recommendations available for this run.")}\n`);
   }
 
-  process.stdout.write(renderRecommendationCards(recommendations, { indent: "  ", reasonLimit: 2 }));
+  process.stdout.write(renderRecommendationCards(recommendations, {
+    indent: "  ",
+    reasonLimit: 2,
+    compact: flags.compact
+  }));
 
   const blocked = recommendations.filter((recommendation) => recommendation.blocked);
   const warnings: string[] = [];

@@ -108,6 +108,7 @@ describe("pipeline installed filtering", () => {
       provider: [],
       target: [],
       json: false,
+      compact: false,
       apply: false,
       dryRun: false,
       yes: false,
