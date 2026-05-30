@@ -136,7 +136,7 @@ function renderScanSummary(
     process.stdout.write(`    - ${pc.cyan(assistant.id)}: ${colorAssistantStatus(assistant.status)}\n`);
   }
   process.stdout.write(
-    `  Readiness score: ${colorScore(repoFacts.readiness.score)}/100 (${pc.bold(repoFacts.readiness.grade)})\n\n`
+    `  Readiness score: ${colorScore(repoFacts.readiness.score, { percent: true })} (${pc.bold(repoFacts.readiness.grade)})\n\n`
   );
 }
 
@@ -152,7 +152,7 @@ function renderRankingSummary(
   for (const [index, recommendation] of recommendations.entries()) {
     process.stdout.write(
       `  ${index + 1}) ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-      + `[score ${colorScore(recommendation.score)}, risk ${colorRisk(recommendation.candidate.risk.score)}]\n`
+      + `[score ${colorScore(recommendation.score, { percent: true })}, risk ${colorRisk(recommendation.candidate.risk.score, { percent: true })}]\n`
     );
     const reasons = recommendation.reasons
       .slice(0, 2)

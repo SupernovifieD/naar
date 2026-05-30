@@ -29,7 +29,7 @@ export async function runScan(flags: CliFlags): Promise<void> {
   process.stdout.write(
     `${pc.bold("Frameworks")}: ${formatList(facts.frameworks.map((framework) => framework.id))}\n`
   );
-  process.stdout.write(`${pc.bold("Readiness")}: ${colorScore(facts.readiness.score)}/100 (${pc.bold(facts.readiness.grade)})\n`);
+  process.stdout.write(`${pc.bold("Readiness")}: ${colorScore(facts.readiness.score, { percent: true })} (${pc.bold(facts.readiness.grade)})\n`);
 
   process.stdout.write(`\n${pc.bold("AI assistants")}:\n`);
   for (const assistant of facts.aiAssistants) {

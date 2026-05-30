@@ -77,7 +77,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
     for (const entry of blockedAfterFetch) {
       process.stderr.write(
-        `- ${entry.skillName} risk=${colorRisk(entry.risk.score)} reason=${entry.allowed.reasons.join("; ")}\n`
+        `- ${entry.skillName} risk=${colorRisk(entry.risk.score, { percent: true })} reason=${entry.allowed.reasons.join("; ")}\n`
       );
     }
     return;
@@ -345,5 +345,5 @@ function dedupe(values: string[]): string[] {
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
   return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-    + `score=${colorScore(recommendation.score)} risk=${colorRisk(recommendation.candidate.risk.score)}`;
+    + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })}`;
 }

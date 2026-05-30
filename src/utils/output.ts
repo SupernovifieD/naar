@@ -1,16 +1,22 @@
 import pc from "picocolors";
 import type { RepoFinding } from "../types/index.js";
 
-export function colorScore(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
+interface ColorValueOptions {
+  percent?: boolean;
 }
 
-export function colorRisk(score: number): string {
-  if (score >= 80) return pc.green(String(score));
-  if (score >= 60) return pc.yellow(String(score));
-  return pc.red(String(score));
+export function colorScore(score: number, options: ColorValueOptions = {}): string {
+  const label = formatValue(score, options.percent === true);
+  if (score >= 80) return pc.green(label);
+  if (score >= 60) return pc.yellow(label);
+  return pc.red(label);
+}
+
+export function colorRisk(score: number, options: ColorValueOptions = {}): string {
+  const label = formatValue(score, options.percent === true);
+  if (score >= 80) return pc.green(label);
+  if (score >= 60) return pc.yellow(label);
+  return pc.red(label);
 }
 
 export function formatReason(reason: string): string {
@@ -46,4 +52,14 @@ export function warningLine(message: string): string {
 
 export function warningHeader(title = "Warnings"): string {
   return pc.yellow(`⚠ ${title}`);
+}
+
+function formatValue(value: number, asPercent: boolean): string {
+  if (!asPercent) {
+    return String(value);
+  }
+
+  const normalized = Number.isFinite(value) ? Math.round(value) : 0;
+  const clamped = Math.max(0, Math.min(100, normalized));
+  return `${clamped}%`;
 }
