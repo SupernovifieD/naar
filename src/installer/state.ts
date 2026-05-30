@@ -1,6 +1,7 @@
 import path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import type { InstalledState, NaarLock, SkillCandidate, InstallTarget } from "../types/index.js";
+import { ensureNaarRuntimeGitignore } from "../utils/gitignore.js";
 
 const NAAR_DIR = ".naar";
 const INSTALLED_FILE = "installed.json";
@@ -31,6 +32,7 @@ export async function loadInstalledState(repoRoot: string): Promise<InstalledSta
 }
 
 export async function saveInstalledState(repoRoot: string, state: InstalledState): Promise<void> {
+  await ensureNaarRuntimeGitignore(repoRoot);
   const dir = path.join(repoRoot, NAAR_DIR);
   await mkdir(dir, { recursive: true });
   await writeFile(installedStatePath(repoRoot), JSON.stringify(state, null, 2) + "\n", "utf8");

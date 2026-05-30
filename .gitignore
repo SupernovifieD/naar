@@ -6,5 +6,12 @@ pnpm-debug.log*
 dist
 coverage
 .DS_Store
+
+# Legacy cache path from pre-rename
 .pom/cache
-/.naar
+
+# Naar local/runtime artifacts (do not commit)
+/.naar/cache/
+/.naar/tmp/
+/.naar/logs/
+/.naar/installed.json
