@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.2] - 2026-05-30
+
+### Fixed
+- Stabilized CLI output tests by stripping ANSI terminal escape codes in stdout capture for command output assertions.
+- Unblocked release pipeline failures at the `npm test` step in tag-triggered publish workflow runs.
+
 ## [0.1.1] - 2026-05-30
 
 ### Added
