@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import type { RepoFinding } from "../types/index.js";
+import type { RepoFinding, SkillCandidate } from "../types/index.js";
 
 interface ColorValueOptions {
   percent?: boolean;
@@ -53,6 +53,15 @@ export function warningLine(message: string): string {
 
 export function warningHeader(title = "Warnings"): string {
   return pc.yellow(`⚠ ${title}`);
+}
+
+export function resolveSkillDescription(candidate: Pick<SkillCandidate, "summary" | "metadata">): string | null {
+  const preferred = candidate.metadata.description ?? candidate.summary;
+  const normalized = preferred
+    .replace(/[\t\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function formatValue(value: number, asPercent: boolean): string {

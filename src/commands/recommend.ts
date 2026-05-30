@@ -3,7 +3,7 @@ import type { CliFlags } from "../types/index.js";
 import { printJson } from "../utils/json.js";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations } from "./pipeline.js";
-import { colorRisk, colorScore, formatReason, warningHeader, warningLine } from "../utils/output.js";
+import { colorRisk, colorScore, formatReason, resolveSkillDescription, warningHeader, warningLine } from "../utils/output.js";
 
 export async function runRecommend(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -43,6 +43,10 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
       `- ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
       + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })}${blockedLabel}\n`
     );
+    const description = resolveSkillDescription(recommendation.candidate);
+    if (description) {
+      process.stdout.write(`  ${pc.blue("description")}: ${pc.white(description)}\n`);
+    }
     process.stdout.write(
       `  ${pc.magenta("why")}: ${recommendation.reasons.slice(0, 3).map((reason) => formatReason(reason)).join(`${pc.dim("; ")} `)}\n`
     );

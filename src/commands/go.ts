@@ -11,6 +11,7 @@ import {
   colorScore,
   formatList,
   formatReason,
+  resolveSkillDescription,
   warningHeader,
   warningLine
 } from "../utils/output.js";
@@ -154,6 +155,10 @@ function renderRankingSummary(
       `  ${index + 1}) ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
       + `[score ${colorScore(recommendation.score, { percent: true })}, risk ${colorRisk(recommendation.candidate.risk.score, { percent: true })}]\n`
     );
+    const description = resolveSkillDescription(recommendation.candidate);
+    if (description) {
+      process.stdout.write(`     ${pc.blue("description")}: ${pc.white(description)}\n`);
+    }
     const reasons = recommendation.reasons
       .slice(0, 2)
       .map((reason) => formatReason(reason))
