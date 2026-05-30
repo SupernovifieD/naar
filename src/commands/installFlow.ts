@@ -35,6 +35,13 @@ export interface InstallFlowOptions {
   printHeader?: boolean;
 }
 
+class PromptExitRequestedError extends Error {
+  constructor() {
+    super("Prompt exited by user");
+    this.name = "PromptExitRequestedError";
+  }
+}
+
 const INSTALL_TARGET_ORDER: InstallTarget[] = [
   "claude_project_skills",
   "cursor_project_rules",
@@ -75,14 +82,33 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     : await loadOrBuildRecommendations(repoRoot, flags);
 
   const recommendations = pipeline.recommendations;
-  const selectedRecommendations = await chooseRecommendations(flags, recommendations);
+  let selectedRecommendations: SkillRecommendation[] = [];
+  try {
+    selectedRecommendations = await chooseRecommendations(flags, recommendations);
+  } catch (error) {
+    if (error instanceof PromptExitRequestedError) {
+      process.stdout.write(`${warningLine("Installation canceled.")}\n`);
+      return;
+    }
+    throw error;
+  }
 
   if (selectedRecommendations.length === 0) {
     process.stdout.write(`${warningLine("No skills selected for installation.")}\n`);
     return;
   }
 
-  const targets = await chooseInstallTargets(flags, config.defaultTargets, selectedRecommendations);
+  let targets: InstallTarget[] = [];
+  try {
+    targets = await chooseInstallTargets(flags, config.defaultTargets, selectedRecommendations);
+  } catch (error) {
+    if (error instanceof PromptExitRequestedError) {
+      process.stdout.write(`${warningLine("Installation canceled.")}\n`);
+      return;
+    }
+    throw error;
+  }
+
   if (targets.length === 0) {
     process.stdout.write(`${warningLine("No coding assistant targets selected. Installation canceled.")}\n`);
     return;
@@ -162,11 +188,28 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     return;
   }
 
-  const shouldWrite = flags.yes
+  let shouldWrite = flags.yes
     ? true
     : flags.nonInteractive
       ? flags.apply
-      : await confirm({ message: "Proceed with installation?", default: false });
+      : false;
+
+  if (!flags.yes && !flags.nonInteractive) {
+    try {
+      shouldWrite = await runPromptWithQuitShortcut((context) =>
+        confirm(
+          { message: "Proceed with installation? (press q to quit)", default: false },
+          context
+        )
+      );
+    } catch (error) {
+      if (error instanceof PromptExitRequestedError) {
+        process.stdout.write(`${warningLine("Installation canceled.")}\n`);
+        return;
+      }
+      throw error;
+    }
+  }
 
   if (!shouldWrite) {
     process.stdout.write(`${warningLine("Installation canceled.")}\n`);
@@ -217,14 +260,19 @@ async function chooseRecommendations(
     return eligible;
   }
 
-  const selectedIds = await checkbox<string>({
-    message: "Select skills to install",
-    choices: eligible.map((recommendation, index) => ({
-      name: formatChoiceLabel(recommendation),
-      value: recommendation.candidate.canonicalSkillId,
-      checked: index < 2
-    }))
-  });
+  const selectedIds = await runPromptWithQuitShortcut((context) =>
+    checkbox<string>(
+      {
+        message: "Select skills to install (press q to quit)",
+        choices: eligible.map((recommendation, index) => ({
+          name: formatChoiceLabel(recommendation),
+          value: recommendation.candidate.canonicalSkillId,
+          checked: index < 2
+        }))
+      },
+      context
+    )
+  );
 
   return eligible.filter((recommendation) => selectedIds.includes(recommendation.candidate.canonicalSkillId));
 }
@@ -253,19 +301,24 @@ async function chooseInstallTargets(
     return [];
   }
 
-  const selectedTargets = await checkbox<InstallTarget>({
-    message: "Select coding assistant rules/skills to install",
-    choices: INSTALL_TARGET_ORDER.map((target) => {
-      const compatibilityCount = compatibilityCountByTarget.get(target) ?? 0;
-      const targetLabel = INSTALL_TARGET_LABELS[target];
-      return {
-        name: `${pc.bold(targetLabel.name)} (${pc.dim(targetLabel.pathHint)}) ${pc.cyan(`[${compatibilityCount} compatible skills]`)}`,
-        value: target,
-        checked: configuredTargets.includes(target),
-        disabled: compatibilityCount === 0 ? "No selected skills are compatible with this target" : false
-      };
-    })
-  });
+  const selectedTargets = await runPromptWithQuitShortcut((context) =>
+    checkbox<InstallTarget>(
+      {
+        message: "Select coding assistant rules/skills to install (press q to quit)",
+        choices: INSTALL_TARGET_ORDER.map((target) => {
+          const compatibilityCount = compatibilityCountByTarget.get(target) ?? 0;
+          const targetLabel = INSTALL_TARGET_LABELS[target];
+          return {
+            name: `${pc.bold(targetLabel.name)} (${pc.dim(targetLabel.pathHint)}) ${pc.cyan(`[${compatibilityCount} compatible skills]`)}`,
+            value: target,
+            checked: configuredTargets.includes(target),
+            disabled: compatibilityCount === 0 ? "No selected skills are compatible with this target" : false
+          };
+        })
+      },
+      context
+    )
+  );
 
   return dedupeInstallTargets(selectedTargets);
 }
@@ -422,6 +475,38 @@ function dedupe(values: string[]): string[] {
 
 function dedupeInstallTargets(targets: InstallTarget[]): InstallTarget[] {
   return [...new Set(targets)];
+}
+
+async function runPromptWithQuitShortcut<T>(
+  runner: (context: { signal: AbortSignal }) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController();
+  let quitPressed = false;
+
+  const onData = (chunk: Buffer | string): void => {
+    const raw = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    if (raw.length === 1 && (raw === "q" || raw === "Q")) {
+      quitPressed = true;
+      controller.abort();
+    }
+  };
+
+  process.stdin.on("data", onData);
+  try {
+    return await runner({ signal: controller.signal });
+  } catch (error) {
+    if (quitPressed || isPromptAbortError(error)) {
+      throw new PromptExitRequestedError();
+    }
+    throw error;
+  } finally {
+    process.stdin.off("data", onData);
+  }
+}
+
+function isPromptAbortError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.name === "AbortPromptError" || error.name === "ExitPromptError";
 }
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
