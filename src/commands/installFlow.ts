@@ -27,7 +27,13 @@ import { printJson } from "../utils/json.js";
 import { buildRecommendations, loadOrBuildRecommendations } from "./pipeline.js";
 import { resolveRepoRoot } from "./shared.js";
 import { toSlug } from "../utils/slug.js";
-import { colorRisk, colorScore, warningHeader, warningLine } from "../utils/output.js";
+import {
+  colorRisk,
+  colorScore,
+  formatRecommendationChoiceDescription,
+  warningHeader,
+  warningLine
+} from "../utils/output.js";
 import { analyzeSkill, isInstallAllowed } from "../security/analyzeSkill.js";
 
 export interface InstallFlowOptions {
@@ -280,6 +286,7 @@ async function chooseRecommendations(
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: eligible.map((recommendation, index) => ({
           name: formatChoiceLabel(recommendation),
+          description: formatRecommendationChoiceDescription(recommendation),
           value: recommendation.candidate.canonicalSkillId,
           checked: index < 2
         }))

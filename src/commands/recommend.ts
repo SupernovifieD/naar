@@ -3,7 +3,7 @@ import type { CliFlags } from "../types/index.js";
 import { printJson } from "../utils/json.js";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations } from "./pipeline.js";
-import { colorRisk, colorScore, formatReason, resolveSkillDescription, warningHeader, warningLine } from "../utils/output.js";
+import { renderRecommendationCards, warningHeader, warningLine } from "../utils/output.js";
 
 export async function runRecommend(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -37,21 +37,5 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
   }
 
   process.stdout.write(`\n${pc.bold("Recommendations")}:\n`);
-  for (const recommendation of pipeline.recommendations) {
-    const blockedLabel = recommendation.blocked ? ` ${pc.red("[BLOCKED]")}` : "";
-    process.stdout.write(
-      `- ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-      + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })}${blockedLabel}\n`
-    );
-    const description = resolveSkillDescription(recommendation.candidate);
-    if (description) {
-      process.stdout.write(`  ${pc.blue("description")}: ${pc.white(description)}\n`);
-    }
-    process.stdout.write(
-      `  ${pc.magenta("why")}: ${recommendation.reasons.slice(0, 3).map((reason) => formatReason(reason)).join(`${pc.dim("; ")} `)}\n`
-    );
-    if (recommendation.blocked && recommendation.blockReasons && recommendation.blockReasons.length > 0) {
-      process.stdout.write(`  ${pc.red("blocked")}: ${recommendation.blockReasons.join(`${pc.dim("; ")} `)}\n`);
-    }
-  }
+  process.stdout.write(renderRecommendationCards(pipeline.recommendations, { indent: "  ", reasonLimit: 2 }));
 }

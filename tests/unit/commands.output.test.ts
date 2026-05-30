@@ -79,10 +79,13 @@ function makeRecommendation(description?: string, summary = "Summary fallback"):
       compatibility: { assistants: ["claude"], frameworks: ["react"], languages: ["TypeScript"] },
       metadata: {
         description,
+        publisher: "anthropic",
+        trustLevel: "official",
+        license: "MIT",
+        lastUpdatedIso: "2026-05-30T00:00:00.000Z",
         hasScripts: false,
         hasBinaries: false,
         hasPackageManifests: false,
-        trustLevel: "official",
         pinnedRef: "1.0.0"
       },
       risk: { score: 100, level: "low", signals: [], requiresOverride: false }
@@ -150,7 +153,7 @@ afterEach(() => {
 });
 
 describe("recommend/go output descriptions", () => {
-  it("prints skill description in recommend output", async () => {
+  it("renders card-style recommendations in recommend output", async () => {
     const result = makePipelineResult([makeRecommendation("API skill description from provider")]);
     buildRecommendationsMock.mockResolvedValue(result);
 
@@ -158,8 +161,21 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("Frontend Design");
+    const cardStart = output.indexOf("1) Frontend Design [anthropic]");
+    expect(cardStart).toBeGreaterThanOrEqual(0);
+    expect(output.indexOf("score:", cardStart)).toBeGreaterThan(cardStart);
+    expect(output.indexOf("description:", cardStart)).toBeGreaterThan(output.indexOf("score:", cardStart));
+    expect(output.indexOf("why:", cardStart)).toBeGreaterThan(output.indexOf("description:", cardStart));
+    expect(output.indexOf("targets:", cardStart)).toBeGreaterThan(output.indexOf("why:", cardStart));
+    expect(output).toContain("score:");
+    expect(output).toContain("risk:");
+    expect(output).toContain("status: ELIGIBLE");
     expect(output).toContain("description: API skill description from provider");
+    expect(output).toContain("why:");
+    expect(output).toContain("targets:");
+    expect(output).toContain("meta:");
+    expect(output).toContain("publisher=anthropic");
+    expect(output).toContain("license=MIT");
   });
 
   it("prints fallback summary when description is missing", async () => {
@@ -181,11 +197,11 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("Frontend Design");
+    expect(output).toContain("1) Frontend Design [anthropic]");
     expect(output).not.toContain("description:");
   });
 
-  it("prints skill description in go ranking section", async () => {
+  it("renders the same card layout in go ranking section", async () => {
     const recommendations = [makeRecommendation("Go output description")];
     const result = makePipelineResult(recommendations);
 
@@ -204,6 +220,24 @@ describe("recommend/go output descriptions", () => {
     });
 
     expect(output).toContain("[3/5] Ranking recommendations...");
+    expect(output).toContain("1) Frontend Design [anthropic]");
+    expect(output).toContain("status: ELIGIBLE");
     expect(output).toContain("description: Go output description");
+  });
+
+  it("shows blocked status and blocked reason in recommend output", async () => {
+    const blocked = makeRecommendation("Blocked skill");
+    blocked.blocked = true;
+    blocked.blockReasons = ["Risk 90% exceeds required threshold"];
+
+    const result = makePipelineResult([blocked]);
+    buildRecommendationsMock.mockResolvedValue(result);
+
+    const output = await captureStdout(async () => {
+      await runRecommend(baseFlags);
+    });
+
+    expect(output).toContain("status: BLOCKED");
+    expect(output).toContain("blocked: Risk 90% exceeds required threshold");
   });
 });

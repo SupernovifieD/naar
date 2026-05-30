@@ -7,11 +7,9 @@ import { runInstallFlow } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
 import {
   colorAssistantStatus,
-  colorRisk,
   colorScore,
   formatList,
-  formatReason,
-  resolveSkillDescription,
+  renderRecommendationCards,
   warningHeader,
   warningLine
 } from "../utils/output.js";
@@ -150,21 +148,7 @@ function renderRankingSummary(
     process.stdout.write(`  ${warningLine("No recommendations available for this run.")}\n`);
   }
 
-  for (const [index, recommendation] of recommendations.entries()) {
-    process.stdout.write(
-      `  ${index + 1}) ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-      + `[score ${colorScore(recommendation.score, { percent: true })}, risk ${colorRisk(recommendation.candidate.risk.score, { percent: true })}]\n`
-    );
-    const description = resolveSkillDescription(recommendation.candidate);
-    if (description) {
-      process.stdout.write(`     ${pc.blue("description")}: ${pc.white(description)}\n`);
-    }
-    const reasons = recommendation.reasons
-      .slice(0, 2)
-      .map((reason) => formatReason(reason))
-      .join(`${pc.dim("; ")} `);
-    process.stdout.write(`     ${pc.magenta("Why")}: ${reasons}\n`);
-  }
+  process.stdout.write(renderRecommendationCards(recommendations, { indent: "  ", reasonLimit: 2 }));
 
   const blocked = recommendations.filter((recommendation) => recommendation.blocked);
   const warnings: string[] = [];
