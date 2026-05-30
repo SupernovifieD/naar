@@ -140,7 +140,11 @@ async function captureStdout(run: () => Promise<void>): Promise<string> {
     (process.stdout.write as any) = originalWrite;
   }
 
-  return buffer;
+  return stripAnsi(buffer);
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "");
 }
 
 beforeEach(() => {
