@@ -1,0 +1,79 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate tag and package version match
+        id: version_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          echo "tag_version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "package_version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+
+          if [[ "$TAG_VERSION" != "$PKG_VERSION" ]]; then
+            echo "Tag/package version mismatch: tag=$TAG_VERSION package.json=$PKG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Check if version is already published
+        id: published_check
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          TAG_VERSION="${{ steps.version_gate.outputs.tag_version }}"
+
+          if npm view "$PKG_NAME@$TAG_VERSION" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Package $PKG_NAME@$TAG_VERSION is already on npm. Skipping publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish prerelease (next dist-tag)
+        if: steps.published_check.outputs.already_published != 'true' && contains(steps.version_gate.outputs.tag_version, '-')
+        run: npm publish --access public --tag next
+
+      - name: Publish stable (latest dist-tag)
+        if: steps.published_check.outputs.already_published != 'true' && !contains(steps.version_gate.outputs.tag_version, '-')
+        run: npm publish --access public
