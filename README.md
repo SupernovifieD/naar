@@ -17,6 +17,29 @@ It scans your repository, detects your stack and AI-assistant setup, recommends 
 
 ## Quick Start
 
+Prerequisite: Node.js `>=20`.
+
+Global install:
+
+```bash
+npm i -g naar
+naar --help
+```
+
+Use in any project repo:
+
+```bash
+naar go
+```
+
+Ephemeral run without global install:
+
+```bash
+npx -y naar@latest go
+```
+
+Development/local run:
+
 ```bash
 npm install
 npm run build
@@ -115,6 +138,39 @@ Provider runtime tuning:
 npm run typecheck
 npm test
 npm run build
+```
+
+## Manual npm Release (Maintainers)
+
+One-time setup:
+
+```bash
+npm login
+```
+
+Release sequence:
+
+```bash
+npm run typecheck
+npm test
+npm run build
+npm pack --dry-run
+npm publish
+```
+
+Post-publish smoke:
+
+```bash
+npm i -g naar
+naar --version
+naar --help
+```
+
+In a sample repository:
+
+```bash
+naar scan --json
+naar go --dry-run
 ```
 
 ## Current MVP Notes
