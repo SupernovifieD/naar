@@ -1,5 +1,5 @@
 {
-  "name": "naar",
+  "name": "naar-cli",
   "version": "0.1.0",
   "description": "Repo-aware Agent Skill recommender and safe installer",
   "type": "module",

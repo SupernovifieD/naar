@@ -22,7 +22,7 @@ Prerequisite: Node.js `>=20`.
 Global install:
 
 ```bash
-npm i -g naar
+npm i -g naar-cli
 naar --help
 ```
 
@@ -35,7 +35,7 @@ naar go
 Ephemeral run without global install:
 
 ```bash
-npx -y naar@latest go
+npx -y naar-cli@latest go
 ```
 
 Development/local run:
@@ -161,7 +161,7 @@ npm publish
 Post-publish smoke:
 
 ```bash
-npm i -g naar
+npm i -g naar-cli
 naar --version
 naar --help
 ```
