@@ -220,6 +220,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
 
   process.stdout.write(`\n${pc.green("✔ Installation complete.")}\n`);
+  renderInstallLocations(repoRoot, plan.actions);
   process.stdout.write(`${pc.cyan("Next")}: run ${pc.bold("naar list")} to review installed skills.\n`);
 
   // Keep config synced with explicit runtime flags when used.
@@ -475,6 +476,34 @@ function dedupe(values: string[]): string[] {
 
 function dedupeInstallTargets(targets: InstallTarget[]): InstallTarget[] {
   return [...new Set(targets)];
+}
+
+function renderInstallLocations(repoRoot: string, actions: InstallAction[]): void {
+  const locations = collectInstallLocations(repoRoot, actions);
+  process.stdout.write(`${pc.bold("Install locations")}:\n`);
+  for (const location of locations) {
+    process.stdout.write(`- ${pc.dim(location)}\n`);
+  }
+  process.stdout.write("\n");
+}
+
+function collectInstallLocations(repoRoot: string, actions: InstallAction[]): string[] {
+  const locations = new Set<string>();
+
+  for (const action of actions) {
+    if (action.type === "append") {
+      locations.add(path.resolve(repoRoot, action.path));
+      continue;
+    }
+
+    const directory = path.dirname(action.path);
+    locations.add(path.resolve(repoRoot, directory));
+  }
+
+  locations.add(path.resolve(repoRoot, ".naar/installed.json"));
+  locations.add(path.resolve(repoRoot, "naar.lock.json"));
+
+  return [...locations].sort((left, right) => left.localeCompare(right));
 }
 
 async function runPromptWithQuitShortcut<T>(
