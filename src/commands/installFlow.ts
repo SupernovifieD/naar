@@ -73,6 +73,18 @@ const INSTALL_TARGET_LABELS: Record<InstallTarget, { name: string; pathHint: str
   }
 };
 
+const CHECKBOX_THEME_WITH_QUIT_HINT = {
+  style: {
+    keysHelpTip: (keys: [string, string][]): string => {
+      const entries = [...keys];
+      if (!entries.some(([key]) => key.toLowerCase() === "q")) {
+        entries.push(["q", "quit"]);
+      }
+      return entries.map(([key, action]) => `${pc.cyan(key)} ${action}`).join(pc.dim(" · "));
+    }
+  }
+};
+
 export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOptions = {}): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
   const config = await loadConfig(repoRoot);
@@ -265,6 +277,7 @@ async function chooseRecommendations(
     checkbox<string>(
       {
         message: "Select skills to install (press q to quit)",
+        theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: eligible.map((recommendation, index) => ({
           name: formatChoiceLabel(recommendation),
           value: recommendation.candidate.canonicalSkillId,
@@ -306,6 +319,7 @@ async function chooseInstallTargets(
     checkbox<InstallTarget>(
       {
         message: "Select coding assistant rules/skills to install (press q to quit)",
+        theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: INSTALL_TARGET_ORDER.map((target) => {
           const compatibilityCount = compatibilityCountByTarget.get(target) ?? 0;
           const targetLabel = INSTALL_TARGET_LABELS[target];
