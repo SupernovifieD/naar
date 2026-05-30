@@ -1,7 +1,8 @@
 import type { CliFlags } from "../types/index.js";
+import ora from "ora";
 import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
-import { buildRecommendations } from "./pipeline.js";
+import { buildRecommendations, type PipelinePhaseEvent } from "./pipeline.js";
 import { runInstallFlow } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
 import {
@@ -16,9 +17,8 @@ import {
 
 export async function runGo(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
-  const pipeline = await buildRecommendations(repoRoot, flags);
-
   if (flags.json) {
+    const pipeline = await buildRecommendations(repoRoot, flags);
     printJson({
       repoRoot,
       repoFacts: pipeline.repoFacts,
@@ -29,30 +29,90 @@ export async function runGo(flags: CliFlags): Promise<void> {
     if (flags.apply === false) {
       return;
     }
-  } else {
-    renderSummary(
-      repoRoot,
-      pipeline.repoFacts,
-      pipeline.recommendations,
-      pipeline.providerWarnings,
-      pipeline.providerSummaries
-    );
+    await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
+    return;
   }
+
+  const progress = createGoProgressRenderer(repoRoot);
+  await buildRecommendations(repoRoot, flags, { onPhase: (event) => progress(event) });
 
   await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
 }
 
-function renderSummary(
-  repoRoot: string,
-  repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
-  recommendations: Awaited<ReturnType<typeof buildRecommendations>>["recommendations"],
-  providerWarnings: string[],
-  providerSummaries: Awaited<ReturnType<typeof buildRecommendations>>["providerSummaries"]
-): void {
+function createGoProgressRenderer(repoRoot: string): (event: PipelinePhaseEvent) => void {
+  let activeSpinner: ReturnType<typeof ora> | null = null;
+
   process.stdout.write(`${pc.bold("Naar")} v0.1\n`);
   process.stdout.write(`Repo: ${pc.dim(repoRoot)}\n\n`);
 
-  process.stdout.write(`${pc.bold("[1/5]")} Scanning repository...\n`);
+  return (event: PipelinePhaseEvent): void => {
+    if (event.phase.endsWith(":start")) {
+      activeSpinner?.stop();
+    }
+
+    switch (event.phase) {
+      case "scan:start": {
+        process.stdout.write(`${pc.bold("[1/5]")} Scanning repository...\n`);
+        activeSpinner = ora("Detecting stack and project topology").start();
+        return;
+      }
+      case "scan:done": {
+        activeSpinner?.succeed("Scan complete");
+        activeSpinner = null;
+        if (!event.repoFacts) return;
+        renderScanSummary(event.repoFacts);
+        return;
+      }
+      case "providers:start": {
+        process.stdout.write(`${pc.bold("[2/5]")} Fetching skill candidates...\n`);
+        if (event.providerIds && event.providerIds.length > 0) {
+          process.stdout.write(`  Providers: ${event.providerIds.map((id) => pc.cyan(id)).join(pc.dim(", "))}\n`);
+        }
+        activeSpinner = ora("Fetching from providers").start();
+        return;
+      }
+      case "providers:done": {
+        activeSpinner?.succeed("Provider fetch complete");
+        activeSpinner = null;
+        const providerResults = event.providerResults ?? [];
+        const hasWarnings = providerResults.some((result) => (result.warnings ?? []).length > 0);
+        if (hasWarnings) {
+          process.stdout.write(`  Mode: ${pc.yellow("degraded (partial provider failures)")}\n`);
+        }
+        if (providerResults.length > 0) {
+          process.stdout.write("\n");
+          for (const provider of providerResults) {
+            const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
+            process.stdout.write(
+              `    - ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidates.length))}\n`
+            );
+          }
+        }
+        process.stdout.write("\n");
+        return;
+      }
+      case "rank:start": {
+        process.stdout.write(`${pc.bold("[3/5]")} Ranking recommendations...\n`);
+        activeSpinner = ora("Scoring and filtering candidates").start();
+        return;
+      }
+      case "rank:done": {
+        activeSpinner?.succeed("Ranking complete");
+        activeSpinner = null;
+        if (!event.result) return;
+        renderRankingSummary(event.result);
+        process.stdout.write(`\n${pc.bold("[4/5]")} Select skills to install\n\n`);
+        return;
+      }
+      default:
+        return;
+    }
+  };
+}
+
+function renderScanSummary(
+  repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"]
+): void {
   process.stdout.write(`  Languages: ${formatList(repoFacts.languages)}\n`);
   process.stdout.write(
     `  Package manager: ${formatList(repoFacts.packageManagers.map((packageManager) => packageManager.id), "unknown")}\n`
@@ -78,23 +138,17 @@ function renderSummary(
   process.stdout.write(
     `  Readiness score: ${colorScore(repoFacts.readiness.score)}/100 (${pc.bold(repoFacts.readiness.grade)})\n\n`
   );
+}
 
-  process.stdout.write(`${pc.bold("[2/5]")} Fetching skill candidates...\n`);
-  if (providerWarnings.length === 0) {
-    process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")}\n\n`);
-  } else {
-    process.stdout.write(`  Providers: ${pc.cyan("anthropic")}, ${pc.cyan("clawhub")} ${pc.yellow("(degraded mode)")}\n\n`);
+function renderRankingSummary(
+  result: Awaited<ReturnType<typeof buildRecommendations>>
+): void {
+  const { recommendations, providerWarnings } = result;
+
+  if (recommendations.length === 0) {
+    process.stdout.write(`  ${warningLine("No recommendations available for this run.")}\n`);
   }
 
-  if (providerSummaries.length > 0) {
-    for (const provider of providerSummaries) {
-      const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
-      process.stdout.write(`    - ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}\n`);
-    }
-    process.stdout.write("\n");
-  }
-
-  process.stdout.write(`${pc.bold("[3/5]")} Ranking recommendations...\n`);
   for (const [index, recommendation] of recommendations.entries()) {
     process.stdout.write(
       `  ${index + 1}) ${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
@@ -120,8 +174,6 @@ function renderSummary(
       process.stdout.write(`  ${warningLine(warning)}\n`);
     }
   }
-
-  process.stdout.write(`\n${pc.bold("[4/5]")} Select skills to install\n\n`);
 }
 
 function groupFrameworks(

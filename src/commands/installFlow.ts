@@ -173,6 +173,9 @@ async function chooseRecommendations(
   }
 
   const eligible = recommendations.filter((recommendation) => !recommendation.blocked);
+  if (eligible.length === 0) {
+    return [];
+  }
 
   if (flags.allCompatible || flags.nonInteractive || flags.yes || flags.json) {
     return eligible;

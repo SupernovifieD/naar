@@ -3,7 +3,7 @@ import { buildProviders, queryProviders } from "../providers/orchestrator.js";
 import { recommendSkills } from "../recommend/recommend.js";
 import { scanRepo } from "../scanner/scanRepo.js";
 import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
-import type { CliFlags, RepoFacts, SkillCandidate, SkillRecommendation } from "../types/index.js";
+import type { CliFlags, RepoFacts, SkillCandidate, SkillRecommendation, SkillProviderResult } from "../types/index.js";
 import { loadRecommendationCache, loadScanCache, saveRecommendationCache, saveScanCache } from "./cache.js";
 
 export interface PipelineResult {
@@ -18,6 +18,26 @@ export interface PipelineResult {
   }>;
 }
 
+export type PipelinePhase =
+  | "scan:start"
+  | "scan:done"
+  | "providers:start"
+  | "providers:done"
+  | "rank:start"
+  | "rank:done";
+
+export interface PipelinePhaseEvent {
+  phase: PipelinePhase;
+  repoFacts?: RepoFacts;
+  providerIds?: string[];
+  providerResults?: SkillProviderResult[];
+  result?: PipelineResult;
+}
+
+export interface PipelineBuildHooks {
+  onPhase?: (event: PipelinePhaseEvent) => void | Promise<void>;
+}
+
 export async function ensureScan(repoRoot: string, useCache = true): Promise<RepoFacts> {
   if (useCache) {
     const cached = await loadScanCache(repoRoot);
@@ -29,18 +49,26 @@ export async function ensureScan(repoRoot: string, useCache = true): Promise<Rep
   return facts;
 }
 
-export async function buildRecommendations(repoRoot: string, flags: CliFlags): Promise<PipelineResult> {
+export async function buildRecommendations(
+  repoRoot: string,
+  flags: CliFlags,
+  hooks: PipelineBuildHooks = {}
+): Promise<PipelineResult> {
   const config = await loadConfig(repoRoot);
+  await hooks.onPhase?.({ phase: "scan:start" });
   const repoFacts = await ensureScan(repoRoot, true);
+  await hooks.onPhase?.({ phase: "scan:done", repoFacts });
   const installedIds = await getInstalledSkillIds(repoRoot);
 
   const providerIds = flags.provider.length > 0 ? flags.provider : config.defaultProviders;
+  await hooks.onPhase?.({ phase: "providers:start", providerIds });
   const providers = buildProviders(providerIds);
   const providerResults = await queryProviders(providers, {
     repoFacts,
     targets: flags.target,
     limit: 200
   });
+  await hooks.onPhase?.({ phase: "providers:done", providerIds, providerResults });
 
   const candidates: SkillCandidate[] = providerResults
     .flatMap((result) => result.candidates)
@@ -49,6 +77,7 @@ export async function buildRecommendations(repoRoot: string, flags: CliFlags): P
       return !installedIds.has(candidateScopedId);
     });
 
+  await hooks.onPhase?.({ phase: "rank:start" });
   const recommendations = recommendSkills(repoFacts, candidates, {
     minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
     noScripts: flags.noScripts,
@@ -65,6 +94,13 @@ export async function buildRecommendations(repoRoot: string, flags: CliFlags): P
     warnings: result.warnings
   }));
 
+  const pipelineResult: PipelineResult = {
+    repoFacts,
+    recommendations: filteredRecommendations,
+    providerWarnings: warnings,
+    providerSummaries
+  };
+
   await saveRecommendationCache(repoRoot, {
     repoFacts,
     recommendations: filteredRecommendations,
@@ -72,12 +108,8 @@ export async function buildRecommendations(repoRoot: string, flags: CliFlags): P
     generatedAtIso: new Date().toISOString()
   });
 
-  return {
-    repoFacts,
-    recommendations: filteredRecommendations,
-    providerWarnings: warnings,
-    providerSummaries
-  };
+  await hooks.onPhase?.({ phase: "rank:done", result: pipelineResult });
+  return pipelineResult;
 }
 
 export async function loadOrBuildRecommendations(repoRoot: string, flags: CliFlags): Promise<PipelineResult> {
