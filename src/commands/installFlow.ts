@@ -35,6 +35,37 @@ export interface InstallFlowOptions {
   printHeader?: boolean;
 }
 
+const INSTALL_TARGET_ORDER: InstallTarget[] = [
+  "claude_project_skills",
+  "cursor_project_rules",
+  "copilot_repo_instructions",
+  "codex_repo_skills",
+  "generic_agent_skills"
+];
+
+const INSTALL_TARGET_LABELS: Record<InstallTarget, { name: string; pathHint: string }> = {
+  claude_project_skills: {
+    name: "Claude Code project skills",
+    pathHint: ".claude/skills/"
+  },
+  cursor_project_rules: {
+    name: "Cursor rules",
+    pathHint: ".cursor/rules/"
+  },
+  copilot_repo_instructions: {
+    name: "GitHub Copilot instructions",
+    pathHint: ".github/copilot-instructions.md"
+  },
+  codex_repo_skills: {
+    name: "OpenAI Codex repo skills",
+    pathHint: ".agents/skills/"
+  },
+  generic_agent_skills: {
+    name: "Generic agent skills",
+    pathHint: ".agents/skills/"
+  }
+};
+
 export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOptions = {}): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
   const config = await loadConfig(repoRoot);
@@ -51,7 +82,12 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     return;
   }
 
-  const targets = flags.target.length > 0 ? flags.target : config.defaultTargets;
+  const targets = await chooseInstallTargets(flags, config.defaultTargets, selectedRecommendations);
+  if (targets.length === 0) {
+    process.stdout.write(`${warningLine("No coding assistant targets selected. Installation canceled.")}\n`);
+    return;
+  }
+
   const spinner = flags.json ? null : ora("Preparing install plan").start();
   const resolvedSkills = await resolveBundles(selectedRecommendations, targets);
 
@@ -191,6 +227,47 @@ async function chooseRecommendations(
   });
 
   return eligible.filter((recommendation) => selectedIds.includes(recommendation.candidate.canonicalSkillId));
+}
+
+async function chooseInstallTargets(
+  flags: CliFlags,
+  defaultTargets: InstallTarget[],
+  selectedRecommendations: SkillRecommendation[]
+): Promise<InstallTarget[]> {
+  const configuredTargets = dedupeInstallTargets(flags.target.length > 0 ? flags.target : defaultTargets);
+
+  if (flags.target.length > 0 || flags.nonInteractive || flags.yes || flags.json) {
+    return configuredTargets;
+  }
+
+  const compatibilityCountByTarget = new Map<InstallTarget, number>();
+  for (const target of INSTALL_TARGET_ORDER) {
+    const compatibleCount = selectedRecommendations.filter((recommendation) =>
+      targetCompatible(recommendation.candidate, target)
+    ).length;
+    compatibilityCountByTarget.set(target, compatibleCount);
+  }
+
+  const hasAnyCompatibleTarget = [...compatibilityCountByTarget.values()].some((count) => count > 0);
+  if (!hasAnyCompatibleTarget) {
+    return [];
+  }
+
+  const selectedTargets = await checkbox<InstallTarget>({
+    message: "Select coding assistant rules/skills to install",
+    choices: INSTALL_TARGET_ORDER.map((target) => {
+      const compatibilityCount = compatibilityCountByTarget.get(target) ?? 0;
+      const targetLabel = INSTALL_TARGET_LABELS[target];
+      return {
+        name: `${pc.bold(targetLabel.name)} (${pc.dim(targetLabel.pathHint)}) ${pc.cyan(`[${compatibilityCount} compatible skills]`)}`,
+        value: target,
+        checked: configuredTargets.includes(target),
+        disabled: compatibilityCount === 0 ? "No selected skills are compatible with this target" : false
+      };
+    })
+  });
+
+  return dedupeInstallTargets(selectedTargets);
 }
 
 function selectFromReference(
@@ -341,6 +418,10 @@ async function persistInstallationState(
 
 function dedupe(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function dedupeInstallTargets(targets: InstallTarget[]): InstallTarget[] {
+  return [...new Set(targets)];
 }
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
