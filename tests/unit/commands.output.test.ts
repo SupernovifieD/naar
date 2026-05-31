@@ -181,13 +181,15 @@ describe("recommend/go output descriptions", () => {
     const cardStart = output.indexOf("1) Frontend Design [anthropic]");
     expect(cardStart).toBeGreaterThanOrEqual(0);
     expect(output.indexOf("Publisher:", cardStart)).toBeGreaterThan(cardStart);
-    expect(output.indexOf("Score:", cardStart)).toBeGreaterThan(output.indexOf("Publisher:", cardStart));
-    expect(output.indexOf("Description:", cardStart)).toBeGreaterThan(output.indexOf("Score:", cardStart));
+    expect(output.indexOf("Match score:", cardStart)).toBeGreaterThan(output.indexOf("Publisher:", cardStart));
+    expect(output.indexOf("Description:", cardStart)).toBeGreaterThan(output.indexOf("Match score:", cardStart));
     expect(output.indexOf("Why:", cardStart)).toBeGreaterThan(output.indexOf("Description:", cardStart));
     expect(output.indexOf("Targets:", cardStart)).toBeGreaterThan(output.indexOf("Why:", cardStart));
-    expect(output).toContain("Score:");
-    expect(output).toContain("Risk:");
-    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Match score:");
+    expect(output).toContain("Pre-fetch risk estimate:");
+    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).not.toContain("Score: 91%");
+    expect(output).not.toContain("Status: ELIGIBLE");
     expect(output).toContain("Description: API skill description from provider");
     expect(output).toContain("Why:");
     expect(output).toContain("Targets:");
@@ -261,7 +263,7 @@ describe("recommend/go output descriptions", () => {
 
     expect(output).toContain("[3/5] Ranking recommendations...");
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
     expect(output).toContain("Description: Go output description");
   });
 
@@ -277,7 +279,7 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("Status: BLOCKED");
+    expect(output).toContain("Status: PRELIMINARILY BLOCKED");
     expect(output).toContain("Blocked:");
     expect(output).toContain("Risk 90% exceeds required threshold");
   });
@@ -291,9 +293,10 @@ describe("recommend/go output descriptions", () => {
     });
 
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("Score:");
-    expect(output).toContain("Risk:");
-    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Match score:");
+    expect(output).toContain("Pre-fetch risk estimate:");
+    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).not.toContain("Score: 91%");
     expect(output).toContain("Why:");
     expect(output).not.toContain("Description:");
     expect(output).not.toContain("Targets:");
@@ -360,7 +363,7 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Matched Facts:");
     expect(output).toContain("Score Breakdown:");
     expect(output).toContain("Caps Applied:");
-    expect(output).toContain("Score Model:");
+    expect(output).toContain("Match Score Model:");
     expect(output).toContain("Cap Summary:");
   });
 });

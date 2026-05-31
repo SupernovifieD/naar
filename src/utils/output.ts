@@ -165,9 +165,9 @@ export function renderRecommendationCard(
     ?? recommendation.candidate.source.providerId;
   lines.push(
     `${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`
-    + `   ${pc.blue("Score")}: ${colorScore(recommendation.score, { percent: true })}`
-    + `   ${pc.blue("Risk")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
-    + `   ${pc.blue("Status")}: ${colorRecommendationStatus(status)}`
+    + `   ${pc.blue("Match score")}: ${colorScore(recommendation.score, { percent: true })}`
+    + `   ${pc.blue("Pre-fetch risk estimate")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
+    + `   ${pc.blue("Status")}: ${colorPreliminaryRecommendationStatus(status)}`
   );
 
   if (!compact) {
@@ -223,7 +223,7 @@ export function renderRecommendationCard(
     appendWrappedField(lines, {
       cardWidth,
       indent,
-      label: "Score Model",
+      label: "Match Score Model",
       value: `final=${recommendation.score} raw=${recommendation.rawScore ?? recommendation.score}`
         + ` relevanceRaw=${recommendation.relevanceRaw ?? recommendation.score}`
         + ` qualityRaw=${recommendation.qualityRaw ?? 0}`
@@ -368,12 +368,12 @@ export function formatRecommendationChoiceDescription(recommendation: SkillRecom
   const reasons = recommendation.reasons.slice(0, DEFAULT_REASON_LIMIT).map((reason) => reason.trim()).filter(Boolean);
   const why = reasons.length > 0 ? reasons.join("; ") : "n/a";
   const targets = formatTargets(recommendation.candidate.compatibility.assistants);
-  const status = resolveRecommendationStatus(recommendation).toUpperCase();
+  const status = formatPreliminaryRecommendationStatus(resolveRecommendationStatus(recommendation));
   const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
   const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
   const security = (recommendation.blockReasons ?? []).slice(0, 1).join("; ");
   return [
-    `- Status: ${status}`,
+    `- Preliminary status: ${status}`,
     `- Why: ${why}`,
     ...(security ? [`- Security: ${security}`] : []),
     `- Targets: ${targets}`,
@@ -529,11 +529,18 @@ function resolveRecommendationStatus(recommendation: SkillRecommendation): Recom
   return recommendation.blocked ? "blocked" : "eligible";
 }
 
-function colorRecommendationStatus(status: RecommendationStatus): string {
-  if (status === "eligible") return pc.green("ELIGIBLE");
-  if (status === "risky") return pc.yellow("RISKY");
-  if (status === "incompatible") return pc.red("INCOMPATIBLE");
-  return pc.red("BLOCKED");
+function colorPreliminaryRecommendationStatus(status: RecommendationStatus): string {
+  const label = formatPreliminaryRecommendationStatus(status);
+  if (status === "eligible") return pc.green(label);
+  if (status === "risky") return pc.yellow(label);
+  return pc.red(label);
+}
+
+function formatPreliminaryRecommendationStatus(status: RecommendationStatus): string {
+  if (status === "eligible") return "PRELIMINARILY ELIGIBLE";
+  if (status === "risky") return "PRELIMINARILY RISKY";
+  if (status === "incompatible") return "PRELIMINARILY INCOMPATIBLE";
+  return "PRELIMINARILY BLOCKED";
 }
 
 function formatValue(value: number, asPercent: boolean): string {

@@ -144,6 +144,14 @@ Recommendation/install status semantics:
 - `BLOCKED`: hard-blocked or policy-blocked; not installable by default.
 - `INCOMPATIBLE`: does not match the selected target compatibility set.
 
+Recommendation output is a preliminary, pre-fetch view:
+
+- `Match score` shows repo relevance/ranking.
+- `Pre-fetch risk estimate` is based on provider metadata before bundle download.
+- Recommendation statuses are rendered as preliminary labels.
+
+During installation, Naar fetches bundle files and performs a second, final security analysis. That stage reports `Security score` and final status, which can differ from the pre-fetch estimate.
+
 ## Security Model
 
 Naar's security model, vetting pipeline, privacy boundaries, token-cost considerations, and user-responsibility notes are documented in [SECURITY.md](./SECURITY.md).

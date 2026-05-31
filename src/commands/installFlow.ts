@@ -190,11 +190,11 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
     process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
     for (const [index, entry] of blockedAfterFetch.entries()) {
-      const statusLabel = entry.decision.hardBlocked ? "blocked (hard)" : "blocked";
+      const finalStatus = entry.decision.hardBlocked ? "hard-blocked" : entry.decision.status;
       process.stderr.write(
         `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)} `
-        + `${pc.blue("status")}=${colorSecurityStatus(statusLabel)} `
-        + `${pc.blue("score")}=${colorScore(entry.risk.score, { percent: true })} `
+        + `${pc.blue("status")}=${colorFinalSecurityStatus(finalStatus)} `
+        + `${pc.blue("security_score")}=${colorSecurityScore(entry.risk.score)} `
         + `${pc.blue("risk")}=${colorRisk(entry.risk.score, { percent: true })} `
         + `${pc.blue("level")}=${colorSecurityLevel(entry.risk.level)}\n`
       );
@@ -651,7 +651,13 @@ async function runRiskyInstallChallenge(
   process.stdout.write("You are about to install skills with explicit security risk overrides.\n");
   process.stdout.write(`Type the confirmation code within ${Math.round(RISK_CONFIRMATION_TIMEOUT_MS / 1000)} seconds to continue.\n\n`);
   for (const entry of riskyAfterFetch) {
-    process.stdout.write(`- ${pc.bold(entry.skillName)} [${entry.providerId}] score=${colorScore(entry.risk.score, { percent: true })} level=${entry.risk.level}\n`);
+    process.stdout.write(
+      `- ${pc.bold(entry.skillName)} [${entry.providerId}] `
+      + `status=${colorFinalSecurityStatus("risky")} `
+      + `security_score=${colorSecurityScore(entry.risk.score)} `
+      + `risk=${colorRisk(entry.risk.score, { percent: true })} `
+      + `level=${colorSecurityLevel(entry.risk.level)}\n`
+    );
     for (const reason of entry.decision.reasons.slice(0, 3)) {
       process.stdout.write(`  - ${reason}\n`);
     }
@@ -748,20 +754,25 @@ function formatSecurityEvidence(evidence: { path: string; line?: number; excerpt
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
   const status = resolveRecommendationStatus(recommendation);
-  const statusLabel = status === "eligible"
-    ? pc.green("ELIGIBLE")
-    : status === "risky"
-      ? pc.yellow("RISKY")
-      : status === "incompatible"
-        ? pc.red("INCOMPATIBLE")
-        : pc.red("BLOCKED");
+  const statusLabel = colorPreliminaryRecommendationStatus(status);
   return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-    + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })} status=${statusLabel}`;
+    + `match=${colorScore(recommendation.score, { percent: true })} `
+    + `pre-fetch-risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })} `
+    + `status=${statusLabel}`;
 }
 
-function colorSecurityStatus(label: string): string {
-  if (label.includes("hard")) return pc.red(label);
-  return pc.yellow(label);
+function colorFinalSecurityStatus(status: "eligible" | "risky" | "blocked" | "hard-blocked"): string {
+  if (status === "eligible") return pc.green(status);
+  if (status === "risky") return pc.yellow(status);
+  return pc.red(status);
+}
+
+function colorSecurityScore(score: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const label = `${clamped}/100`;
+  if (clamped >= 80) return pc.green(label);
+  if (clamped >= 60) return pc.yellow(label);
+  return pc.red(label);
 }
 
 function colorSecurityLevel(level: string): string {
@@ -810,4 +821,22 @@ function capitalizeSentence(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return value;
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
+function colorPreliminaryRecommendationStatus(
+  status: "eligible" | "risky" | "blocked" | "incompatible"
+): string {
+  const label = formatPreliminaryRecommendationStatus(status);
+  if (status === "eligible") return pc.green(label);
+  if (status === "risky") return pc.yellow(label);
+  return pc.red(label);
+}
+
+function formatPreliminaryRecommendationStatus(
+  status: "eligible" | "risky" | "blocked" | "incompatible"
+): string {
+  if (status === "eligible") return "PRELIMINARILY ELIGIBLE";
+  if (status === "risky") return "PRELIMINARILY RISKY";
+  if (status === "incompatible") return "PRELIMINARILY INCOMPATIBLE";
+  return "PRELIMINARILY BLOCKED";
 }

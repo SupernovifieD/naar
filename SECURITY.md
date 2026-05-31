@@ -180,6 +180,11 @@ Interpretation:
 - A skill can be lower risk but weakly relevant.
 - Installation decisions should consider both fit and risk.
 
+Output wording intentionally reflects two stages:
+
+- Recommendation stage (before bundle fetch): `Match score`, `Pre-fetch risk estimate`, and preliminary status labels.
+- Install stage (after bundle fetch and content scan): final `Security score` and final status (`eligible`, `risky`, `blocked`, `hard-blocked`).
+
 ## 5. Installation Safety Flow
 
 Naar avoids silent writes:
