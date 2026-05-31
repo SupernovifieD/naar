@@ -2,41 +2,32 @@
 
 Naar is a repo-aware CLI that helps developers discover, evaluate, and safely install AI agent skills from different marketplaces.
 
-It scans your repository, detects your stack and AI-assistant setup, recommends compatible skills, applies security scoring, previews the install plan, and installs only the skills you approve.
+It solves the "which skills should I trust and install for this repo?" problem by scanning your project, recommending compatible skills, and enforcing safety checks before writing files.
 
 ## What It Does
 
-- Scans repo stack and structure (JS/TS + Python focused for MVP)
+- Scans repository stack and structure (JS/TS + Python focused for MVP)
 - Detects AI-assistant config readiness (Claude, Cursor, Copilot, Codex, generic)
 - Recommends skills from external providers (Anthropic + ClawHub in MVP)
 - Applies security scoring and blocks risky skills by default
-- Previews install plan before any write
-- Installs project-local skills and tracks provenance in:
-  - `.naar/installed.json`
-  - `naar.lock.json`
+- Previews install plans before any write
+- Installs only approved, compatible skills
 
 ## Quick Start
 
 Prerequisite: Node.js `>=20`.
 
-Global install:
+Install globally:
 
 ```bash
 npm i -g naar-cli
 naar --help
 ```
 
-Use in any project repo:
+Run in any project repository:
 
 ```bash
 naar go
-```
-
-Power-user compact mode:
-
-```bash
-naar recommend --compact
-naar go --compact
 ```
 
 Ephemeral run without global install:
@@ -45,18 +36,11 @@ Ephemeral run without global install:
 npx -y naar-cli@latest go
 ```
 
-Development/local run:
+Compact output mode:
 
 ```bash
-npm install
-npm run build
-./dist/cli.js go
-```
-
-Development mode:
-
-```bash
-npm run dev -- go
+naar recommend --compact
+naar go --compact
 ```
 
 ## Commands
@@ -67,25 +51,30 @@ naar scan
 naar recommend
 naar install
 naar list
-naar uninstall
+naar uninstall [skills...]
 naar config
 ```
 
 ## Important Flags
 
 ```bash
---json
---compact
---apply
 --repo <path>
 --provider <id>
 --target <id>
+--json
+--compact
 --dry-run
+--apply
 --all-compatible
 --min-security-score <n>
 --no-scripts
 --allow-scripts
 --force
+--from <provider:skill@version>
+--from-plan <file>
+--non-interactive
+--yes
+--verbose
 ```
 
 `--compact` keeps recommendation output dense by removing description/targets/meta sections while preserving score, risk, status, and concise rationale.
@@ -108,12 +97,10 @@ Naar uses real provider APIs by default and supports degraded fallback modes.
   - Optional: `ANTHROPIC_API_VERSION` (default `2023-06-01`)
   - Optional: `ANTHROPIC_BETA_HEADERS` (comma-separated; default includes skills/code-exec/files betas)
   - If key is missing or API fails, Naar falls back to Anthropic GitHub skills catalog.
-
 - ClawHub:
   - Public read endpoints work without auth.
   - Optional: `CLAWHUB_API_TOKEN` enables token-auth mode for auth-required endpoints.
   - Optional: `CLAWHUB_API_BASE_URL` (default `https://clawhub.ai`)
-  
 - GitHub fallback headroom:
   - Optional: `GITHUB_TOKEN` for higher rate-limit headroom when Anthropic fallback uses GitHub.
   - Optional: `GITHUB_API_BASE_URL` (default `https://api.github.com`)
@@ -125,13 +112,19 @@ Provider runtime tuning:
 
 `naar recommend --json` and `naar go --json` include provider mode hints (`api`, `github_fallback`, `public`, `token`) and provider warnings.
 
-## Install Targets (MVP)
+## Install Targets
 
 - Claude: `.claude/skills/<skill>/SKILL.md`
 - Cursor: `.cursor/rules/naar-<skill>.mdc`
 - Copilot: `.github/copilot-instructions.md` (appended managed blocks)
 - Codex: `.agents/skills/<skill>/SKILL.md`
 - Generic: `.agents/skills/<skill>/SKILL.md`
+
+## Files Naar Writes
+
+- `.naar/installed.json` (installed skill tracking + provenance)
+- `naar.lock.json` (lock data for resolved installs)
+- Target-specific install files listed above
 
 ## Safety Defaults
 
@@ -142,52 +135,12 @@ Provider runtime tuning:
 - `--json` mode is non-writing unless `--apply`
 - No repository source files are uploaded to providers
 
-## Testing
-
-```bash
-npm run typecheck
-npm test
-npm run build
-```
-
-## Release (Maintainers)
-
-Naar uses GitHub Actions + npm Trusted Publishing for automated npm release on tag push.
-
-Release sequence:
-
-```bash
-npm run typecheck
-npm test
-npm run build
-npm version <patch|minor|major>
-git push origin main --follow-tags
-```
-
-Publish behavior:
-
-- Push tag `v*` triggers publish workflow.
-- Stable versions publish to npm `latest`.
-- Prerelease versions (for example `1.2.3-rc.1`) publish to npm `next`.
-- Workflow fails if tag version != `package.json` version.
-
-Post-publish smoke:
-
-```bash
-npm i -g naar-cli
-naar --version
-naar --help
-```
-
-In a sample repository:
-
-```bash
-naar scan --json
-naar go --dry-run
-```
-
 ## Current MVP Notes
 
 - Provider discovery/recommendation uses live provider APIs.
 - Fail-open on provider availability (partial results + warnings).
 - Fail-closed on install security policy.
+
+## Contributing
+
+Development setup, testing, local CLI usage, and release notes are documented in [CONTRIBUTING.md](./CONTRIBUTING.md).
