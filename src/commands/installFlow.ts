@@ -189,7 +189,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     }
 
     process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
-    for (const entry of blockedAfterFetch) {
+    for (const [index, entry] of blockedAfterFetch.entries()) {
       const statusLabel = entry.decision.hardBlocked ? "blocked (hard)" : "blocked";
       process.stderr.write(
         `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)} `
@@ -198,7 +198,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
         + `${pc.blue("risk")}=${colorRisk(entry.risk.score, { percent: true })} `
         + `${pc.blue("level")}=${colorSecurityLevel(entry.risk.level)}\n`
       );
-      process.stderr.write(`  ${pc.blue("reasons")}:\n`);
+      process.stderr.write(`  ${pc.blue("Reasons")}:\n\n`);
       for (const reason of entry.decision.reasons.slice(0, 5)) {
         process.stderr.write(`  - ${colorSecurityReason(reason)}\n`);
       }
@@ -207,17 +207,19 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
       let evidencePrinted = 0;
       for (const signal of signalLines) {
         process.stderr.write(
-          `  ${pc.blue("signal")}: ${pc.cyan(signal.id)} `
+          `  ${pc.blue("Signal")}: ${pc.cyan(toDisplayLabel(signal.id))} `
           + `[${colorSignalSeverity(signal.severity)}] `
-          + `${pc.white(signal.detail)} `
-          + `${pc.dim(`(penalty=${signal.penalty})`)}\n`
+          + `${pc.white(capitalizeSentence(signal.detail))}\n\n`
         );
         const evidences = signal.evidence ?? [];
         for (const evidence of evidences) {
           if (evidencePrinted >= 3) break;
-          process.stderr.write(`  ${pc.blue("evidence")}: ${pc.white(formatSecurityEvidence(evidence))}\n`);
+          process.stderr.write(`  ${pc.blue("Evidence")}: ${pc.white(formatSecurityEvidence(evidence))}\n`);
           evidencePrinted += 1;
         }
+      }
+      if (index < blockedAfterFetch.length - 1) {
+        process.stderr.write("\n\n");
       }
     }
     return;
@@ -769,27 +771,43 @@ function colorSecurityLevel(level: string): string {
 }
 
 function colorSignalSeverity(severity: string): string {
-  if (severity === "low") return pc.green(severity);
-  if (severity === "medium") return pc.yellow(severity);
-  return pc.red(severity);
+  const label = capitalizeSentence(severity);
+  if (severity === "low") return pc.green(label);
+  if (severity === "medium") return pc.yellow(label);
+  return pc.red(label);
 }
 
 function colorSecurityReason(reason: string): string {
   if (reason.includes("--allow-risky")) {
-    return `${pc.white("Use")} ${pc.cyan("--allow-risky")} ${pc.white("to explicitly acknowledge and install overrideable risky skills.")}`;
+    return `${pc.yellow("⚠ Use")} ${pc.cyan("--allow-risky")} ${pc.white("to explicitly acknowledge and install overrideable risky skills.")}`;
   }
 
   const signalReason = reason.match(/^([a-z0-9_/-]+)\s+\[([a-z]+)\]:\s+(.+)$/i);
   if (signalReason) {
     const [, signalId, severity, detail] = signalReason;
-    return `${pc.cyan(signalId)} [${colorSignalSeverity(severity.toLowerCase())}]: ${pc.white(detail)}`;
+    return `${pc.cyan(toDisplayLabel(signalId))} [${colorSignalSeverity(severity.toLowerCase())}]: ${pc.white(capitalizeSentence(detail))}`;
   }
 
   if (reason.toLowerCase().includes("hard block")) {
-    return pc.red(reason);
+    return pc.red(capitalizeSentence(reason));
   }
   if (reason.toLowerCase().includes("exceeds required threshold")) {
-    return pc.yellow(reason);
+    return pc.yellow(capitalizeSentence(reason));
   }
-  return pc.white(reason);
+  return pc.white(capitalizeSentence(reason));
+}
+
+function toDisplayLabel(value: string): string {
+  const withSpaces = value.replace(/[_-]+/g, " ").trim();
+  return withSpaces
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function capitalizeSentence(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
