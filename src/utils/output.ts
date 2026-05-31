@@ -174,11 +174,11 @@ export function renderRecommendationCard(
   }
 
   const reasons = recommendation.reasons.slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
-  appendWrappedField(lines, {
+  appendWrappedReasonsField(lines, {
     cardWidth,
     indent,
     label: "why",
-    value: reasons.length > 0 ? reasons.join("; ") : "n/a"
+    reasons
   });
 
   if (!compact) {
@@ -189,13 +189,13 @@ export function renderRecommendationCard(
       value: formatTargets(recommendation.candidate.compatibility.assistants)
     });
 
-    const metadataLine = formatRecommendationMeta(recommendation);
-    if (metadataLine) {
-      appendWrappedField(lines, {
+    const metadataFields = formatRecommendationMetaFields(recommendation);
+    if (metadataFields.length > 0) {
+      appendMetaFields(lines, {
         cardWidth,
         indent,
         label: "meta",
-        value: metadataLine
+        fields: metadataFields
       });
     }
   }
@@ -241,31 +241,107 @@ function appendWrappedField(
   }
 }
 
+function appendWrappedReasonsField(
+  lines: string[],
+  options: { cardWidth: number; indent: string; label: string; reasons: string[] }
+): void {
+  const plainPrefix = `${options.indent}${options.label}: `;
+  const continuationPrefix = `${options.indent}${" ".repeat(options.label.length + 2)}`;
+  const availableWidth = Math.max(12, options.cardWidth - plainPrefix.length);
+
+  if (options.reasons.length === 0) {
+    appendWrappedField(lines, {
+      cardWidth: options.cardWidth,
+      indent: options.indent,
+      label: options.label,
+      value: "n/a"
+    });
+    return;
+  }
+
+  let printedAny = false;
+
+  for (const reason of options.reasons) {
+    const wrapped = wrapForTerminal(reason, availableWidth);
+    if (wrapped.length === 0) {
+      continue;
+    }
+
+    const firstSegment = wrapped[0];
+    if (!printedAny) {
+      lines.push(`${options.indent}${pc.blue(options.label)}: ${formatReason(firstSegment)}`);
+      printedAny = true;
+    } else {
+      lines.push(`${continuationPrefix}${formatReason(firstSegment)}`);
+    }
+
+    for (const segment of wrapped.slice(1)) {
+      lines.push(`${continuationPrefix}${pc.white(segment)}`);
+    }
+  }
+
+  if (!printedAny) {
+    appendWrappedField(lines, {
+      cardWidth: options.cardWidth,
+      indent: options.indent,
+      label: options.label,
+      value: "n/a"
+    });
+  }
+}
+
+function appendMetaFields(
+  lines: string[],
+  options: { cardWidth: number; indent: string; label: string; fields: Array<{ key: string; value: string }> }
+): void {
+  if (options.fields.length === 0) {
+    return;
+  }
+
+  lines.push(`${options.indent}${pc.blue(options.label)}:`);
+
+  for (const field of options.fields) {
+    const plainPrefix = `${options.indent}  ${field.key}: `;
+    const continuationPrefix = `${options.indent}  ${" ".repeat(field.key.length + 2)}`;
+    const availableWidth = Math.max(12, options.cardWidth - plainPrefix.length);
+    const wrapped = wrapForTerminal(field.value, availableWidth);
+
+    if (wrapped.length === 0) {
+      continue;
+    }
+
+    lines.push(`${options.indent}  ${pc.blue(field.key)}: ${pc.white(wrapped[0])}`);
+    for (const segment of wrapped.slice(1)) {
+      lines.push(`${continuationPrefix}${pc.white(segment)}`);
+    }
+  }
+}
+
 function formatTargets(assistants: AssistantId[]): string {
   const unique = [...new Set(assistants)];
   const sorted = unique.sort((left, right) => assistantRank(left) - assistantRank(right));
   return sorted.join(", ");
 }
 
-function formatRecommendationMeta(recommendation: SkillRecommendation): string | null {
+function formatRecommendationMetaFields(recommendation: SkillRecommendation): Array<{ key: string; value: string }> {
   const metadata = recommendation.candidate.metadata;
-  const parts: string[] = [];
+  const parts: Array<{ key: string; value: string }> = [];
 
   const publisher = metadata.publisher;
   if (publisher) {
-    parts.push(`publisher=${publisher}`);
+    parts.push({ key: "publisher", value: publisher });
   }
   if (metadata.trustLevel) {
-    parts.push(`trust=${metadata.trustLevel}`);
+    parts.push({ key: "trust", value: metadata.trustLevel });
   }
   if (metadata.license) {
-    parts.push(`license=${metadata.license}`);
+    parts.push({ key: "license", value: metadata.license });
   }
   if (metadata.lastUpdatedIso) {
-    parts.push(`updated=${formatUpdated(metadata.lastUpdatedIso)}`);
+    parts.push({ key: "updated", value: formatUpdated(metadata.lastUpdatedIso) });
   }
 
-  return parts.length > 0 ? parts.join("; ") : null;
+  return parts;
 }
 
 function formatUpdated(value: string): string {

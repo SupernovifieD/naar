@@ -179,8 +179,8 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("why:");
     expect(output).toContain("targets:");
     expect(output).toContain("meta:");
-    expect(output).toContain("publisher=anthropic");
-    expect(output).toContain("license=MIT");
+    expect(output).toContain("publisher: anthropic");
+    expect(output).toContain("license: MIT");
   });
 
   it("prints fallback summary when description is missing", async () => {

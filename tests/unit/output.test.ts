@@ -109,7 +109,11 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("1) Frontend Design Pro [anthropic]");
     expect(output).toContain("score: 88%");
     expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("meta: publisher=anthropic; trust=official; license=MIT; updated=2026-05-30");
+    expect(output).toContain("meta:");
+    expect(output).toContain("publisher: anthropic");
+    expect(output).toContain("trust: official");
+    expect(output).toContain("license: MIT");
+    expect(output).toContain("updated: 2026-05-30");
   });
 
   it("omits meta when metadata fields are not available", () => {
