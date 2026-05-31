@@ -131,8 +131,13 @@ describe("scanRepo ecosystem coverage", () => {
     expect(ids(pythonFixtureOnly.secondaryFacts?.languages ?? [])).toContain("Python");
 
     const scopePollution = await scanRepo(path.resolve("tests/fixtures/scope-pollution"));
-    expect(ids(scopePollution.frameworks)).not.toEqual(expect.arrayContaining(["react", "nextjs", "fastify", "laravel"]));
-    expect(ids(scopePollution.secondaryFacts?.frameworks ?? [])).toEqual(expect.arrayContaining(["react", "nextjs", "docusaurus", "fastify", "laravel"]));
+    const secondaryFrameworkIds = ids(scopePollution.secondaryFacts?.frameworks ?? []);
+    expect(secondaryFrameworkIds).toEqual(
+      expect.arrayContaining(["react", "nextjs", "docusaurus", "fastify", "laravel"])
+    );
+    expect(ids(scopePollution.frameworks)).not.toEqual(
+      expect.arrayContaining(["react", "nextjs", "docusaurus", "fastify", "laravel"])
+    );
   });
 
   it("retains Naar self-scan identity as TS npm cli/package", async () => {
