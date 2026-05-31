@@ -56,18 +56,18 @@ export function analyzeSkill(skill: SkillCandidate): SkillSecurityReport {
     push("suspicious_behavior", "critical", "Skill contains suspicious command patterns.", 100);
   }
 
-  const penalty = signals.reduce((sum, signal) => sum + signal.penalty, 0);
-  const score = Math.max(0, 100 - penalty);
+  return buildSecurityReport(signals);
+}
 
-  const level: SkillSecurityReport["level"] =
-    score >= 85 ? "low" : score >= 70 ? "medium" : score >= 40 ? "high" : "critical";
-
-  return {
-    score,
-    level,
-    signals,
-    requiresOverride: score < 80 || signals.some((signal) => signal.severity === "critical")
-  };
+export function mergeSecuritySignals(
+  baseReport: SkillSecurityReport,
+  contentSignals: SecuritySignal[]
+): SkillSecurityReport {
+  if (contentSignals.length === 0) {
+    return baseReport;
+  }
+  const mergedSignals = dedupeSignals([...baseReport.signals, ...contentSignals]);
+  return buildSecurityReport(mergedSignals);
 }
 
 function stalePenaltyFromDate(lastUpdatedIso?: string): number {
@@ -97,8 +97,13 @@ export function isInstallAllowed(report: SkillSecurityReport, policy: SecurityPo
   if (policy.noScripts && hasScripts) {
     reasons.push("Skill includes scripts and --no-scripts is enabled.");
   }
-  if (report.signals.some((signal) => signal.id === "suspicious_behavior")) {
-    reasons.push("Suspicious behavior signal detected.");
+  const criticalSignals = report.signals.filter((signal) => signal.severity === "critical");
+  if (criticalSignals.length > 0) {
+    if (criticalSignals.some((signal) => CONTENT_CRITICAL_SIGNAL_IDS.has(signal.id))) {
+      reasons.push("Suspicious executable content detected in skill files.");
+    } else {
+      reasons.push("Critical security signal detected.");
+    }
   }
   if (report.signals.some((signal) => signal.id === "unpinned_source")) {
     reasons.push("Install source is not pinned to an immutable version/ref.");
@@ -114,3 +119,85 @@ function toRiskPercent(safetyScore: number): number {
   const clampedSafety = Math.max(0, Math.min(100, Math.round(safetyScore)));
   return 100 - clampedSafety;
 }
+
+function buildSecurityReport(signals: SecuritySignal[]): SkillSecurityReport {
+  const dedupedSignals = dedupeSignals(signals);
+  const penalty = dedupedSignals.reduce((sum, signal) => sum + signal.penalty, 0);
+  const score = Math.max(0, 100 - penalty);
+
+  const level: SkillSecurityReport["level"] =
+    score >= 85 ? "low" : score >= 70 ? "medium" : score >= 40 ? "high" : "critical";
+
+  return {
+    score,
+    level,
+    signals: dedupedSignals,
+    requiresOverride: score < 80 || dedupedSignals.some((signal) => signal.severity === "critical")
+  };
+}
+
+function dedupeSignals(signals: SecuritySignal[]): SecuritySignal[] {
+  const byId = new Map<string, SecuritySignal>();
+  for (const signal of signals) {
+    const existing = byId.get(signal.id);
+    if (!existing) {
+      byId.set(signal.id, {
+        id: signal.id,
+        severity: signal.severity,
+        detail: signal.detail,
+        penalty: signal.penalty,
+        evidence: signal.evidence ? [...signal.evidence] : undefined
+      });
+      continue;
+    }
+
+    existing.severity = highestSeverity(existing.severity, signal.severity);
+    existing.penalty = Math.max(existing.penalty, signal.penalty);
+    if (existing.detail.length === 0 && signal.detail.length > 0) {
+      existing.detail = signal.detail;
+    }
+
+    const mergedEvidence = mergeEvidence(existing.evidence, signal.evidence);
+    if (mergedEvidence.length > 0) {
+      existing.evidence = mergedEvidence;
+    }
+  }
+
+  return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function mergeEvidence(
+  left: SecuritySignal["evidence"],
+  right: SecuritySignal["evidence"]
+): NonNullable<SecuritySignal["evidence"]> {
+  const merged: NonNullable<SecuritySignal["evidence"]> = [];
+  const seen = new Set<string>();
+  for (const evidence of [...(left ?? []), ...(right ?? [])]) {
+    const key = `${evidence.path}:${evidence.line ?? 0}:${evidence.excerpt ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(evidence);
+  }
+  return merged;
+}
+
+function highestSeverity(
+  left: SecuritySignal["severity"],
+  right: SecuritySignal["severity"]
+): SecuritySignal["severity"] {
+  const rank = (value: SecuritySignal["severity"]): number => {
+    if (value === "critical") return 4;
+    if (value === "high") return 3;
+    if (value === "medium") return 2;
+    return 1;
+  };
+  return rank(left) >= rank(right) ? left : right;
+}
+
+const CONTENT_CRITICAL_SIGNAL_IDS = new Set([
+  "remote_pipe_to_shell",
+  "destructive_filesystem_command",
+  "credential_or_secret_exfiltration",
+  "reverse_shell_pattern",
+  "encoded_or_eval_execution"
+]);

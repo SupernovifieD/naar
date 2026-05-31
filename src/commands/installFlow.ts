@@ -34,7 +34,8 @@ import {
   warningHeader,
   warningLine
 } from "../utils/output.js";
-import { analyzeSkill, isInstallAllowed } from "../security/analyzeSkill.js";
+import { analyzeSkill, isInstallAllowed, mergeSecuritySignals } from "../security/analyzeSkill.js";
+import { analyzeSkillContent } from "../security/analyzeSkillContent.js";
 
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
@@ -137,7 +138,9 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
   const blockedAfterFetch = resolvedSkills
     .map((resolved) => {
-      const risk = analyzeSkill(resolved.bundle.skill);
+      const metadataRisk = analyzeSkill(resolved.bundle.skill);
+      const contentSignals = analyzeSkillContent(resolved.bundle.files);
+      const risk = mergeSecuritySignals(metadataRisk, contentSignals);
       resolved.bundle.skill.risk = risk;
       const allowed = isInstallAllowed(risk, {
         minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
@@ -154,11 +157,42 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
   if (blockedAfterFetch.length > 0) {
     spinner?.stop();
+    if (flags.json) {
+      printJson({
+        repoRoot,
+        error: "Security: fetched bundles failed policy checks.",
+        blockedSkills: blockedAfterFetch.map((entry) => ({
+          skillName: entry.skillName,
+          reasons: entry.allowed.reasons,
+          risk: {
+            ...entry.risk,
+            signals: entry.risk.signals.map((signal) => ({
+              ...signal,
+              evidence: (signal.evidence ?? []).slice(0, 3)
+            }))
+          }
+        }))
+      });
+      return;
+    }
+
     process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
     for (const entry of blockedAfterFetch) {
       process.stderr.write(
         `- ${entry.skillName} risk=${colorRisk(entry.risk.score, { percent: true })} reason=${entry.allowed.reasons.join("; ")}\n`
       );
+
+      const signalLines = entry.risk.signals.slice(0, 3);
+      let evidencePrinted = 0;
+      for (const signal of signalLines) {
+        process.stderr.write(`  signal: ${signal.id}\n`);
+        const evidences = signal.evidence ?? [];
+        for (const evidence of evidences) {
+          if (evidencePrinted >= 3) break;
+          process.stderr.write(`  evidence: ${formatSecurityEvidence(evidence)}\n`);
+          evidencePrinted += 1;
+        }
+      }
     }
     return;
   }
@@ -557,6 +591,14 @@ async function runPromptWithQuitShortcut<T>(
 function isPromptAbortError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.name === "AbortPromptError" || error.name === "ExitPromptError";
+}
+
+function formatSecurityEvidence(evidence: { path: string; line?: number; excerpt?: string }): string {
+  const location = evidence.line ? `${evidence.path}:${evidence.line}` : evidence.path;
+  if (!evidence.excerpt) {
+    return location;
+  }
+  return `${location} \`${evidence.excerpt}\``;
 }
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {

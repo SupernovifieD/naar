@@ -382,6 +382,13 @@ export interface SecuritySignal {
   severity: "low" | "medium" | "high" | "critical";
   detail: string;
   penalty: number;
+  evidence?: SecuritySignalEvidence[];
+}
+
+export interface SecuritySignalEvidence {
+  path: string;
+  line?: number;
+  excerpt?: string;
 }
 
 export interface SkillSecurityReport {
