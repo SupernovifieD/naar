@@ -121,7 +121,6 @@ const FRAMEWORK_DEPENDENCY_MAP: Record<string, { id: string; category: Framework
   "@angular/core": { id: "angular", category: "frontend", confidence: 0.98 },
   vite: { id: "vite", category: "build", confidence: 0.95 },
   tailwindcss: { id: "tailwind", category: "styling", confidence: 0.95 },
-  typescript: { id: "typescript", category: "build", confidence: 0.9 },
   flask: { id: "flask", category: "backend", confidence: 0.95 },
   fastapi: { id: "fastapi", category: "backend", confidence: 0.95 },
   django: { id: "django", category: "backend", confidence: 0.95 },
@@ -161,7 +160,7 @@ export async function scanRepo(repoRoot: string, options: ScanOptions = {}): Pro
   const packageJsonData = await loadPackageJsonData(repoRoot, scopedFiles);
   const dependencySignals = await collectDependencySignals(repoRoot, scopedFiles, packageJsonData);
 
-  const frameworkSignals = detectFrameworkSignals(scopedFiles, fileSet, dependencySignals);
+  const frameworkSignals = detectFrameworkSignals(scopedFiles, dependencySignals);
   const frameworkSplit = splitSignalsByPrimaryScope(frameworkSignals);
   const primaryFrameworks = aggregateFrameworkSignals(frameworkSplit.primary);
   const secondaryFrameworks = aggregateFrameworkSignals(frameworkSplit.secondary);
@@ -196,6 +195,14 @@ export async function scanRepo(repoRoot: string, options: ScanOptions = {}): Pro
   const secondaryBuildTools = aggregateToolSignals(buildToolSplit.secondary);
   const primaryTestTools = aggregateToolSignals(testToolSplit.primary);
   const secondaryTestTools = aggregateToolSignals(testToolSplit.secondary);
+  const ciSignals = detectCiSignals(scopedFiles);
+  const infraSignals = detectInfraSignals(scopedFiles);
+  const ciSplit = splitSignalsByPrimaryScope(ciSignals);
+  const infraSplit = splitSignalsByPrimaryScope(infraSignals);
+  const primaryCi = aggregateToolSignals(ciSplit.primary);
+  const secondaryCi = aggregateToolSignals(ciSplit.secondary);
+  const primaryInfra = aggregateToolSignals(infraSplit.primary);
+  const secondaryInfra = aggregateToolSignals(infraSplit.secondary);
 
   const commands = detectCommandFacts(packageJsonData);
   const commandSplit = splitCommandFactsByPrimaryScope(commands);
@@ -213,7 +220,7 @@ export async function scanRepo(repoRoot: string, options: ScanOptions = {}): Pro
 
   const topology = detectTopology(scopedFiles);
   const aiAssistants = detectAssistants(scopedFiles);
-  const findings = detectFindings(scopedFiles, primaryFrameworks, aiAssistants, topology, primaryTestTools);
+  const findings = detectFindings(scopedFiles, primaryFrameworks, aiAssistants, topology, primaryTestTools, primaryCi, primaryInfra);
   const readiness = calculateReadiness(findings);
 
   const primaryFacts: RepoPrimaryFacts = {
@@ -223,6 +230,8 @@ export async function scanRepo(repoRoot: string, options: ScanOptions = {}): Pro
     packageManagers: primaryPackageManagers,
     buildTools: primaryBuildTools,
     testTools: primaryTestTools,
+    ci: primaryCi,
+    infra: primaryInfra,
     commands: commandSplit.primary
   };
 
@@ -233,6 +242,8 @@ export async function scanRepo(repoRoot: string, options: ScanOptions = {}): Pro
     packageManagers: secondaryPackageManagers,
     buildTools: secondaryBuildTools,
     testTools: secondaryTestTools,
+    ci: secondaryCi,
+    infra: secondaryInfra,
     commands: commandSplit.secondary
   };
 
@@ -376,7 +387,6 @@ function parsePyprojectDependencies(raw: string): string[] {
 
 function detectFrameworkSignals(
   files: ScopedFile[],
-  fileSet: Set<string>,
   dependencySignals: DependencySignal[]
 ): FrameworkSignal[] {
   const signals: FrameworkSignal[] = [];
@@ -416,16 +426,6 @@ function detectFrameworkSignals(
     if (base === "angular.json") {
       signals.push(frameworkSignal("angular", "frontend", file, "angular.json is present", 0.95));
     }
-    if (base === "dockerfile" || base === "docker-compose.yml" || base === "compose.yml") {
-      signals.push(frameworkSignal("docker", "infra", file, `${base} is present`, 0.95));
-    }
-    if (file.path.startsWith(".github/workflows/")) {
-      signals.push(frameworkSignal("github-actions", "infra", file, ".github/workflows file is present", 0.95));
-    }
-    if (base === "tsconfig.json") {
-      signals.push(frameworkSignal("typescript", "build", file, "tsconfig.json is present", 0.9));
-    }
-
     if (/\.(tsx|jsx)$/i.test(file.path)) {
       signals.push(frameworkSignal("react", "frontend", file, "TSX/JSX file is present", 0.7));
     }
@@ -450,8 +450,70 @@ function detectFrameworkSignals(
     }
   }
 
-  if (fileSet.has("docker-compose.yml") || fileSet.has("compose.yml") || fileSet.has("Dockerfile")) {
-    // no-op: covered by per-file loop
+  return signals;
+}
+
+function detectCiSignals(files: ScopedFile[]): ToolSignal[] {
+  const signals: ToolSignal[] = [];
+
+  for (const file of files) {
+    const lowerPath = file.path.toLowerCase();
+    const base = path.basename(lowerPath);
+
+    if (lowerPath.startsWith(".github/workflows/")) {
+      signals.push(toolSignal("github-actions", file, ".github/workflows file is present", 0.95));
+      continue;
+    }
+    if (base === ".gitlab-ci.yml") {
+      signals.push(toolSignal("gitlab-ci", file, ".gitlab-ci.yml is present", 0.95));
+      continue;
+    }
+    if (lowerPath.startsWith(".circleci/")) {
+      signals.push(toolSignal("circleci", file, ".circleci config is present", 0.95));
+      continue;
+    }
+    if (base === "jenkinsfile") {
+      signals.push(toolSignal("jenkins", file, "Jenkinsfile is present", 0.95));
+    }
+  }
+
+  return signals;
+}
+
+function detectInfraSignals(files: ScopedFile[]): ToolSignal[] {
+  const signals: ToolSignal[] = [];
+
+  for (const file of files) {
+    const lowerPath = file.path.toLowerCase();
+    const base = path.basename(lowerPath);
+
+    if (base === "dockerfile") {
+      signals.push(toolSignal("docker", file, "Dockerfile is present", 0.95));
+      continue;
+    }
+    if (base === "docker-compose.yml" || base === "compose.yml") {
+      signals.push(toolSignal("docker-compose", file, `${base} is present`, 0.95));
+      continue;
+    }
+    if (base === "vercel.json") {
+      signals.push(toolSignal("vercel", file, "vercel.json is present", 0.9));
+      continue;
+    }
+    if (base === "netlify.toml") {
+      signals.push(toolSignal("netlify", file, "netlify.toml is present", 0.9));
+      continue;
+    }
+    if (base === "fly.toml") {
+      signals.push(toolSignal("fly.io", file, "fly.toml is present", 0.9));
+      continue;
+    }
+    if (base.endsWith(".tf") || base.endsWith(".tfvars")) {
+      signals.push(toolSignal("terraform", file, `${base} is present`, 0.85));
+      continue;
+    }
+    if (/(^|\/)(k8s|kubernetes)\//.test(lowerPath) && (base.endsWith(".yml") || base.endsWith(".yaml"))) {
+      signals.push(toolSignal("kubernetes", file, "k8s/kubernetes manifest is present", 0.8));
+    }
   }
 
   return signals;
@@ -924,10 +986,14 @@ function detectFindings(
   frameworks: FrameworkDetection[],
   assistants: AIAssistantDetection[],
   topology: RepoTopology,
-  testTools: ToolDetection[]
+  testTools: ToolDetection[],
+  ciTools: ToolDetection[],
+  infraTools: ToolDetection[]
 ): RepoFinding[] {
   const findings: RepoFinding[] = [];
   const frameworkIds = new Set(frameworks.map((framework) => framework.id));
+  const ciIds = new Set(ciTools.map((tool) => tool.id));
+  const infraIds = new Set(infraTools.map((tool) => tool.id));
 
   const hasReadme = files.some((file) => {
     if (file.scope === "vendor" || file.scope === "generated" || file.scope === "fixture" || file.scope === "example") {
@@ -947,7 +1013,7 @@ function detectFindings(
   }
 
   const hasPrimaryTests = topology.testDirs.length > 0 || testTools.length > 0 || frameworkIds.has("pytest");
-  const hasCi = frameworkIds.has("github-actions");
+  const hasCi = ciIds.size > 0;
   if (!hasPrimaryTests && !hasCi) {
     findings.push({
       code: "missing_testing_setup",
@@ -965,7 +1031,7 @@ function detectFindings(
       severity: "info",
       message: "GitHub Copilot repository instructions are missing.",
       category: "ai-config",
-      evidence: [makeEvidence(".github/copilot-instructions.md", "root", "Copilot instruction files were not found in primary scopes", 0.85)]
+      evidence: [makeMissingEvidence(".github/copilot-instructions.md", "root", "Expected Copilot repository instructions were not found in primary scopes", 0.85)]
     });
   }
 
@@ -976,17 +1042,18 @@ function detectFindings(
       severity: "info",
       message: "Claude Code project configuration is missing.",
       category: "ai-config",
-      evidence: [makeEvidence("CLAUDE.md", "root", "CLAUDE.md or .claude config was not found in primary scopes", 0.85)]
+      evidence: [makeMissingEvidence("CLAUDE.md", "root", "Expected CLAUDE.md or .claude config was not found in primary scopes", 0.85)]
     });
   }
 
-  if (!frameworkIds.has("docker") && !frameworkIds.has("github-actions")) {
+  const hasContainer = infraIds.has("docker") || infraIds.has("docker-compose");
+  if (!hasContainer && !hasCi) {
     findings.push({
       code: "missing_ci_or_container",
       severity: "info",
       message: "No CI workflows or container manifests detected.",
       category: "stack",
-      evidence: [makeEvidence(".github/workflows", "root", "No Dockerfile/compose/workflow files found in primary scopes", 0.8)]
+      evidence: [makeMissingEvidence(".github/workflows", "root", "No Dockerfile/compose/workflow files were found in primary scopes", 0.8)]
     });
   }
 
@@ -1170,7 +1237,7 @@ function dedupeEvidence(evidence: FactEvidence[]): FactEvidence[] {
   const output: FactEvidence[] = [];
 
   for (const item of evidence) {
-    const key = `${item.path}::${item.scope}::${item.reason}`;
+    const key = `${item.path}::${item.scope}::${item.reason}::${String(item.exists)}::${item.kind ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     output.push(item);
@@ -1184,7 +1251,20 @@ function makeEvidence(pathValue: string, scope: ScanScope, reason: string, confi
     path: normalizePath(pathValue),
     scope,
     reason,
-    confidence
+    confidence,
+    exists: true,
+    kind: "found_path"
+  };
+}
+
+function makeMissingEvidence(pathValue: string, scope: ScanScope, reason: string, confidence = 0.9): FactEvidence {
+  return {
+    path: normalizePath(pathValue),
+    scope,
+    reason,
+    confidence,
+    exists: false,
+    kind: "missing_expected_path"
   };
 }
 
@@ -1204,6 +1284,14 @@ function frameworkSignal(
 }
 
 function languageSignal(id: string, file: ScopedFile, reason: string, confidence: number): LanguageSignal {
+  return {
+    id,
+    confidence,
+    evidence: makeEvidence(file.path, file.scope, reason, confidence)
+  };
+}
+
+function toolSignal(id: string, file: ScopedFile, reason: string, confidence: number): ToolSignal {
   return {
     id,
     confidence,

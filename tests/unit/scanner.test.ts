@@ -11,14 +11,19 @@ describe("scanRepo", () => {
     expect(ids).toContain("nextjs");
     expect(ids).toContain("react");
     expect(ids).toContain("tailwind");
+    expect(ids).not.toContain("typescript");
+    expect(ids).not.toContain("github-actions");
 
     const managers = facts.packageManagers.map((manager) => manager.id);
     expect(managers).toContain("pnpm");
     expect(facts.frameworks[0]?.evidence[0]).toMatchObject({
       path: expect.any(String),
       scope: expect.any(String),
-      reason: expect.any(String)
+      reason: expect.any(String),
+      exists: true,
+      kind: "found_path"
     });
+    expect(facts.primaryFacts?.ci.map((tool) => tool.id)).toContain("github-actions");
 
     expect(facts.readiness.score).toBeGreaterThan(0);
   });
@@ -40,7 +45,8 @@ describe("scanRepo", () => {
     expect(primaryFrameworkIds).not.toContain("nextjs");
     expect(primaryFrameworkIds).not.toContain("tailwind");
     expect(primaryFrameworkIds).not.toContain("fastapi");
-    expect(primaryFrameworkIds).toContain("typescript");
+    expect(primaryFrameworkIds).not.toContain("typescript");
+    expect(primaryFrameworkIds).not.toContain("github-actions");
 
     expect(facts.languages).toContain("TypeScript");
     expect(facts.languages).not.toContain("Python");
@@ -50,8 +56,11 @@ describe("scanRepo", () => {
     expect(primaryFacts?.projectTypes.map((projectType) => projectType.id)).toEqual(
       expect.arrayContaining(["cli", "package"])
     );
+    expect(primaryFacts?.languages.map((language) => language.id)).toContain("TypeScript");
     expect(primaryFacts?.buildTools.map((tool) => tool.id)).toContain("tsup");
+    expect(primaryFacts?.buildTools.map((tool) => tool.id)).toContain("tsc");
     expect(primaryFacts?.testTools.map((tool) => tool.id)).toContain("vitest");
+    expect(primaryFacts?.ci).toHaveLength(0);
 
     const commandRoles = new Map((primaryFacts?.commands ?? []).map((command) => [command.name, command.role]));
     expect(commandRoles.get("build")).toBe("build");
@@ -64,7 +73,9 @@ describe("scanRepo", () => {
     const buildCommand = primaryFacts?.commands.find((command) => command.name === "build");
     expect(buildCommand?.evidence[0]).toMatchObject({
       path: "package.json",
-      scope: "root"
+      scope: "root",
+      exists: true,
+      kind: "found_path"
     });
 
     const secondaryFacts = facts.secondaryFacts;
@@ -78,7 +89,25 @@ describe("scanRepo", () => {
     expect(fixtureNext?.evidence[0]).toMatchObject({
       path: expect.stringContaining("tests/fixtures/next-tailwind"),
       scope: "fixture",
-      reason: expect.any(String)
+      reason: expect.any(String),
+      exists: true,
+      kind: "found_path"
+    });
+
+    const missingCopilot = facts.findings.find((finding) => finding.code === "missing_copilot_instructions");
+    expect(missingCopilot?.evidence?.[0]).toMatchObject({
+      path: ".github/copilot-instructions.md",
+      scope: "root",
+      exists: false,
+      kind: "missing_expected_path"
+    });
+
+    const missingClaude = facts.findings.find((finding) => finding.code === "missing_claude_config");
+    expect(missingClaude?.evidence?.[0]).toMatchObject({
+      path: "CLAUDE.md",
+      scope: "root",
+      exists: false,
+      kind: "missing_expected_path"
     });
   });
 });

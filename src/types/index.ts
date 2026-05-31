@@ -21,6 +21,8 @@ export interface FactEvidence {
   scope: ScanScope;
   reason: string;
   confidence?: number;
+  exists?: boolean;
+  kind?: "found_path" | "missing_expected_path";
 }
 
 export interface LanguageDetection {
@@ -89,6 +91,8 @@ export interface RepoPrimaryFacts {
   packageManagers: PackageManagerDetection[];
   buildTools: ToolDetection[];
   testTools: ToolDetection[];
+  ci: ToolDetection[];
+  infra: ToolDetection[];
   commands: CommandFact[];
 }
 
@@ -99,6 +103,8 @@ export interface RepoSecondaryFacts {
   packageManagers: PackageManagerDetection[];
   buildTools: ToolDetection[];
   testTools: ToolDetection[];
+  ci: ToolDetection[];
+  infra: ToolDetection[];
   commands: CommandFact[];
 }
 

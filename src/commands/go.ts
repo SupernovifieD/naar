@@ -118,17 +118,13 @@ function renderScanSummary(
   );
 
   const byCategory = groupFrameworks(repoFacts.frameworks);
+  const ciTools = repoFacts.primaryFacts?.ci?.map((tool) => tool.id)
+    ?? (repoFacts.frameworks.some((framework) => framework.id === "github-actions") ? ["github-actions"] : []);
   process.stdout.write(`  Frontend: ${formatList(byCategory.frontend)}\n`);
   process.stdout.write(`  Backend: ${formatList(byCategory.backend)}\n`);
   process.stdout.write(`  Tests: ${formatList(byCategory.testing)}\n`);
   process.stdout.write(`  Styling: ${formatList(byCategory.styling)}\n`);
-  process.stdout.write(
-    `  CI/CD: ${
-      repoFacts.frameworks.some((framework) => framework.id === "github-actions")
-        ? pc.cyan("github-actions")
-        : pc.dim("none")
-    }\n`
-  );
+  process.stdout.write(`  CI/CD: ${formatList(ciTools)}\n`);
 
   process.stdout.write("  AI config:\n");
   for (const assistant of repoFacts.aiAssistants) {
