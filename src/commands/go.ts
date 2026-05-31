@@ -1,4 +1,5 @@
 import type { CliFlags } from "../types/index.js";
+import { readFileSync } from "node:fs";
 import ora from "ora";
 import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
@@ -13,6 +14,8 @@ import {
   warningHeader,
   warningLine
 } from "../utils/output.js";
+
+const CLI_VERSION = readCliVersion();
 
 export async function runGo(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -42,7 +45,7 @@ export async function runGo(flags: CliFlags): Promise<void> {
 function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: PipelinePhaseEvent) => void {
   let activeSpinner: ReturnType<typeof ora> | null = null;
 
-  process.stdout.write(`${pc.bold("Naar")} v0.1\n`);
+  process.stdout.write(`${pc.bold("Naar")} v${CLI_VERSION}\n`);
   process.stdout.write(`Repo: ${pc.dim(repoRoot)}\n\n`);
 
   return (event: PipelinePhaseEvent): void => {
@@ -189,6 +192,19 @@ function groupFrameworks(
   }
 
   return grouped;
+}
+
+function readCliVersion(): string {
+  try {
+    const raw = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
+    const parsed = JSON.parse(raw) as { version?: unknown };
+    if (typeof parsed.version === "string" && parsed.version.trim().length > 0) {
+      return parsed.version.trim();
+    }
+  } catch {
+    // Fallback keeps go output usable even if package metadata is unavailable.
+  }
+  return "unknown";
 }
 
 function resolveRecommendationStatus(recommendation: { status?: string; blocked: boolean }): string {
