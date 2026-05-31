@@ -149,7 +149,6 @@ export function renderRecommendationCard(
   const reasonLimit = compact
     ? 1
     : (options.reasonLimit ?? DEFAULT_REASON_LIMIT);
-  const penaltyLimit = compact ? 1 : 3;
   const cardWidth = resolveRecommendationCardWidth(options.columns);
   const divider = `${indent}${pc.dim("-".repeat(cardWidth))}`;
 
@@ -158,10 +157,14 @@ export function renderRecommendationCard(
   lines.push(
     `${indent}${pc.bold(`${rank}) ${recommendation.candidate.name}`)} ${pc.cyan(`[${recommendation.candidate.source.providerId}]`)}`
   );
+  const publisher = recommendation.candidate.metadata.publisher
+    ?? recommendation.candidate.source.publisher
+    ?? recommendation.candidate.source.providerId;
+  lines.push(`${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`);
   lines.push(
-    `${indent}${pc.blue("score")}: ${colorScore(recommendation.score, { percent: true })}`
-    + `   ${pc.blue("risk")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
-    + `   ${pc.blue("status")}: ${recommendation.blocked ? pc.red("BLOCKED") : pc.green("ELIGIBLE")}`
+    `${indent}${pc.blue("Score")}: ${colorScore(recommendation.score, { percent: true })}`
+    + `   ${pc.blue("Risk")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
+    + `   ${pc.blue("Status")}: ${recommendation.blocked ? pc.red("BLOCKED") : pc.green("ELIGIBLE")}`
   );
 
   if (!compact) {
@@ -170,7 +173,7 @@ export function renderRecommendationCard(
       appendWrappedField(lines, {
         cardWidth,
         indent,
-        label: "description",
+        label: "Description",
         value: description
       });
     }
@@ -180,7 +183,7 @@ export function renderRecommendationCard(
   appendWrappedReasonsField(lines, {
     cardWidth,
     indent,
-    label: "why",
+    label: "Why",
     reasons
   });
 
@@ -189,37 +192,16 @@ export function renderRecommendationCard(
     appendWrappedReasonsField(lines, {
       cardWidth,
       indent,
-      label: "eligibility",
+      label: "Eligibility",
       reasons: compact ? eligibilityReasons.slice(0, 1) : eligibilityReasons
     });
-  }
-
-  const penalties = (recommendation.penalties ?? []).map((reason) => reason.trim()).filter(Boolean);
-  if (penalties.length > 0) {
-    if (compact && !verbose) {
-      const first = penalties[0];
-      const more = penalties.length > 1 ? ` (+${penalties.length - 1} more)` : "";
-      appendWrappedField(lines, {
-        cardWidth,
-        indent,
-        label: "penalties",
-        value: `${first}${more}`
-      });
-    } else {
-      appendWrappedReasonsField(lines, {
-        cardWidth,
-        indent,
-        label: "penalties",
-        reasons: penalties.slice(0, penaltyLimit)
-      });
-    }
   }
 
   if (!compact) {
     appendWrappedField(lines, {
       cardWidth,
       indent,
-      label: "targets",
+      label: "Targets",
       value: formatTargets(recommendation.candidate.compatibility.assistants)
     });
 
@@ -228,7 +210,7 @@ export function renderRecommendationCard(
       appendMetaFields(lines, {
         cardWidth,
         indent,
-        label: "meta",
+        label: "Meta",
         fields: metadataFields
       });
     }
@@ -238,7 +220,7 @@ export function renderRecommendationCard(
     appendWrappedField(lines, {
       cardWidth,
       indent,
-      label: "scoreModel",
+      label: "Score Model",
       value: `final=${recommendation.score} raw=${recommendation.rawScore ?? recommendation.score}`
         + ` relevanceRaw=${recommendation.relevanceRaw ?? recommendation.score}`
         + ` qualityRaw=${recommendation.qualityRaw ?? 0}`
@@ -252,7 +234,7 @@ export function renderRecommendationCard(
       appendWrappedField(lines, {
         cardWidth,
         indent,
-        label: "capSummary",
+        label: "Cap Summary",
         value: `strictest=${strictestCap}; ${reasonSummary}`
       });
     }
@@ -262,7 +244,7 @@ export function renderRecommendationCard(
       appendWrappedField(lines, {
         cardWidth,
         indent,
-        label: "skillCategories",
+        label: "Skill Categories",
         value: categories.join(", ")
       });
     }
@@ -272,7 +254,7 @@ export function renderRecommendationCard(
       appendWrappedField(lines, {
         cardWidth,
         indent,
-        label: "domainSignals",
+        label: "Domain Signals",
         value: domainSignals.join(", ")
       });
     }
@@ -282,7 +264,7 @@ export function renderRecommendationCard(
       appendWrappedField(lines, {
         cardWidth,
         indent,
-        label: "matchedNeeds",
+        label: "Matched Needs",
         value: matchedNeeds.join(", ")
       });
     }
@@ -298,7 +280,7 @@ export function renderRecommendationCard(
       appendWrappedReasonsField(lines, {
         cardWidth,
         indent,
-        label: "matchedNeedDetails",
+        label: "Matched Need Details",
         reasons: matchedNeedDetails
       });
     }
@@ -311,7 +293,7 @@ export function renderRecommendationCard(
       appendWrappedReasonsField(lines, {
         cardWidth,
         indent,
-        label: "matchedFacts",
+        label: "Matched Facts",
         reasons: matchedFacts
       });
     }
@@ -328,7 +310,7 @@ export function renderRecommendationCard(
       appendWrappedReasonsField(lines, {
         cardWidth,
         indent,
-        label: "scoreBreakdown",
+        label: "Score Breakdown",
         reasons: breakdown
       });
     }
@@ -340,7 +322,7 @@ export function renderRecommendationCard(
       appendWrappedReasonsField(lines, {
         cardWidth,
         indent,
-        label: "capsApplied",
+        label: "Caps Applied",
         reasons: capsApplied
       });
     }
@@ -350,7 +332,7 @@ export function renderRecommendationCard(
     appendWrappedField(lines, {
       cardWidth,
       indent,
-      label: "blocked",
+      label: "Blocked",
       value: recommendation.blockReasons.join("; ")
     });
   }
@@ -379,8 +361,9 @@ function appendWrappedField(
   lines: string[],
   options: { cardWidth: number; indent: string; label: string; value: string }
 ): void {
-  const plainPrefix = `${options.indent}${options.label}: `;
-  const continuationPrefix = `${options.indent}${" ".repeat(options.label.length + 2)}`;
+  const displayLabel = toDisplayLabel(options.label);
+  const plainPrefix = `${options.indent}${displayLabel}: `;
+  const continuationPrefix = `${options.indent}${" ".repeat(displayLabel.length + 2)}`;
   const availableWidth = Math.max(12, options.cardWidth - plainPrefix.length);
   const wrapped = wrapForTerminal(options.value, availableWidth);
 
@@ -388,7 +371,7 @@ function appendWrappedField(
     return;
   }
 
-  lines.push(`${options.indent}${pc.blue(options.label)}: ${pc.white(wrapped[0])}`);
+  lines.push(`${options.indent}${pc.blue(displayLabel)}: ${pc.white(wrapped[0])}`);
   for (const segment of wrapped.slice(1)) {
     lines.push(`${continuationPrefix}${pc.white(segment)}`);
   }
@@ -398,10 +381,11 @@ function appendWrappedReasonsField(
   lines: string[],
   options: { cardWidth: number; indent: string; label: string; reasons: string[] }
 ): void {
+  const displayLabel = toDisplayLabel(options.label);
   const reasonPrefix = `${options.indent}  `;
   const availableWidth = Math.max(12, options.cardWidth - reasonPrefix.length);
 
-  lines.push(`${options.indent}${pc.blue(options.label)}:`);
+  lines.push(`${options.indent}${pc.blue(displayLabel)}:`);
 
   for (const reason of options.reasons) {
     const wrapped = wrapForTerminal(reason, availableWidth);
@@ -429,11 +413,13 @@ function appendMetaFields(
     return;
   }
 
-  lines.push(`${options.indent}${pc.blue(options.label)}:`);
+  const displayLabel = toDisplayLabel(options.label);
+  lines.push(`${options.indent}${pc.blue(displayLabel)}:`);
 
   for (const field of options.fields) {
-    const plainPrefix = `${options.indent}  ${field.key}: `;
-    const continuationPrefix = `${options.indent}  ${" ".repeat(field.key.length + 2)}`;
+    const displayKey = toDisplayLabel(field.key);
+    const plainPrefix = `${options.indent}  ${displayKey}: `;
+    const continuationPrefix = `${options.indent}  ${" ".repeat(displayKey.length + 2)}`;
     const availableWidth = Math.max(12, options.cardWidth - plainPrefix.length);
     const wrapped = wrapForTerminal(field.value, availableWidth);
 
@@ -441,11 +427,23 @@ function appendMetaFields(
       continue;
     }
 
-    lines.push(`${options.indent}  ${pc.blue(field.key)}: ${pc.white(wrapped[0])}`);
+    lines.push(`${options.indent}  ${pc.blue(displayKey)}: ${pc.white(wrapped[0])}`);
     for (const segment of wrapped.slice(1)) {
       lines.push(`${continuationPrefix}${pc.white(segment)}`);
     }
   }
+}
+
+function toDisplayLabel(value: string): string {
+  const withSpaces = value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return withSpaces
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatTargets(assistants: AssistantId[]): string {

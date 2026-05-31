@@ -179,19 +179,20 @@ describe("recommend/go output descriptions", () => {
 
     const cardStart = output.indexOf("1) Frontend Design [anthropic]");
     expect(cardStart).toBeGreaterThanOrEqual(0);
-    expect(output.indexOf("score:", cardStart)).toBeGreaterThan(cardStart);
-    expect(output.indexOf("description:", cardStart)).toBeGreaterThan(output.indexOf("score:", cardStart));
-    expect(output.indexOf("why:", cardStart)).toBeGreaterThan(output.indexOf("description:", cardStart));
-    expect(output.indexOf("targets:", cardStart)).toBeGreaterThan(output.indexOf("why:", cardStart));
-    expect(output).toContain("score:");
-    expect(output).toContain("risk:");
-    expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("description: API skill description from provider");
-    expect(output).toContain("why:");
-    expect(output).toContain("targets:");
-    expect(output).toContain("meta:");
-    expect(output).toContain("publisher: anthropic");
-    expect(output).toContain("license: MIT");
+    expect(output.indexOf("Publisher:", cardStart)).toBeGreaterThan(cardStart);
+    expect(output.indexOf("Score:", cardStart)).toBeGreaterThan(output.indexOf("Publisher:", cardStart));
+    expect(output.indexOf("Description:", cardStart)).toBeGreaterThan(output.indexOf("Score:", cardStart));
+    expect(output.indexOf("Why:", cardStart)).toBeGreaterThan(output.indexOf("Description:", cardStart));
+    expect(output.indexOf("Targets:", cardStart)).toBeGreaterThan(output.indexOf("Why:", cardStart));
+    expect(output).toContain("Score:");
+    expect(output).toContain("Risk:");
+    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Description: API skill description from provider");
+    expect(output).toContain("Why:");
+    expect(output).toContain("Targets:");
+    expect(output).toContain("Meta:");
+    expect(output).toContain("Publisher: anthropic");
+    expect(output).toContain("License: MIT");
   });
 
   it("shows at most three reasons in card why block", async () => {
@@ -209,7 +210,7 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("why:");
+    expect(output).toContain("Why:");
     expect(output).toContain("Matched stack: React");
     expect(output).toContain("Matched language: TypeScript");
     expect(output).toContain("Addresses missing capability: Testing guidance");
@@ -224,7 +225,7 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("description: Fallback summary text");
+    expect(output).toContain("Description: Fallback summary text");
   });
 
   it("prints no description line when both description and summary are empty", async () => {
@@ -236,7 +237,7 @@ describe("recommend/go output descriptions", () => {
     });
 
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).not.toContain("description:");
+    expect(output).not.toContain("Description:");
   });
 
   it("renders the same card layout in go ranking section", async () => {
@@ -259,8 +260,8 @@ describe("recommend/go output descriptions", () => {
 
     expect(output).toContain("[3/5] Ranking recommendations...");
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("description: Go output description");
+    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Description: Go output description");
   });
 
   it("shows blocked status and blocked reason in recommend output", async () => {
@@ -275,8 +276,8 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("status: BLOCKED");
-    expect(output).toContain("blocked: Risk 90% exceeds required threshold");
+    expect(output).toContain("Status: BLOCKED");
+    expect(output).toContain("Blocked: Risk 90% exceeds required threshold");
   });
 
   it("renders compact recommendation cards without description/targets/meta", async () => {
@@ -288,13 +289,13 @@ describe("recommend/go output descriptions", () => {
     });
 
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("score:");
-    expect(output).toContain("risk:");
-    expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("why:");
-    expect(output).not.toContain("description:");
-    expect(output).not.toContain("targets:");
-    expect(output).not.toContain("meta:");
+    expect(output).toContain("Score:");
+    expect(output).toContain("Risk:");
+    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Why:");
+    expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Targets:");
+    expect(output).not.toContain("Meta:");
   });
 
   it("renders compact cards in go ranking section", async () => {
@@ -317,10 +318,10 @@ describe("recommend/go output descriptions", () => {
 
     expect(output).toContain("[3/5] Ranking recommendations...");
     expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("why:");
-    expect(output).not.toContain("description:");
-    expect(output).not.toContain("targets:");
-    expect(output).not.toContain("meta:");
+    expect(output).toContain("Why:");
+    expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Targets:");
+    expect(output).not.toContain("Meta:");
   });
 
   it("renders verbose explainability fields in recommend output when enabled", async () => {
@@ -350,14 +351,14 @@ describe("recommend/go output descriptions", () => {
       await runRecommend({ ...baseFlags, verbose: true });
     });
 
-    expect(output).toContain("eligibility:");
-    expect(output).toContain("penalties:");
-    expect(output).toContain("matchedNeeds:");
-    expect(output).toContain("matchedNeedDetails:");
-    expect(output).toContain("matchedFacts:");
-    expect(output).toContain("scoreBreakdown:");
-    expect(output).toContain("capsApplied:");
-    expect(output).toContain("scoreModel:");
-    expect(output).toContain("capSummary:");
+    expect(output).toContain("Eligibility:");
+    expect(output).not.toContain("Penalties:");
+    expect(output).toContain("Matched Needs:");
+    expect(output).toContain("Matched Need Details:");
+    expect(output).toContain("Matched Facts:");
+    expect(output).toContain("Score Breakdown:");
+    expect(output).toContain("Caps Applied:");
+    expect(output).toContain("Score Model:");
+    expect(output).toContain("Cap Summary:");
   });
 });

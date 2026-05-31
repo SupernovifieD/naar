@@ -122,13 +122,14 @@ describe("recommendation card helpers", () => {
   it("renders card with meta line and eligible status", () => {
     const output = stripAnsi(renderRecommendationCard(makeRecommendation(), 1, { indent: "  ", columns: 80 }));
     expect(output).toContain("1) Frontend Design Pro [anthropic]");
-    expect(output).toContain("score: 88%");
-    expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("meta:");
-    expect(output).toContain("publisher: anthropic");
-    expect(output).toContain("trust: official");
-    expect(output).toContain("license: MIT");
-    expect(output).toContain("updated: 2026-05-30");
+    expect(output).toContain("Publisher: anthropic");
+    expect(output).toContain("Score: 88%");
+    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Meta:");
+    expect(output).toContain("Publisher: anthropic");
+    expect(output).toContain("Trust: official");
+    expect(output).toContain("License: MIT");
+    expect(output).toContain("Updated: 2026-05-30");
   });
 
   it("omits meta when metadata fields are not available", () => {
@@ -139,7 +140,7 @@ describe("recommendation card helpers", () => {
     recommendation.candidate.metadata.lastUpdatedIso = undefined;
 
     const output = stripAnsi(renderRecommendationCard(recommendation, 1, { columns: 80 }));
-    expect(output).not.toContain("meta:");
+    expect(output).not.toContain("Meta:");
   });
 
   it("renders blocked status and blocked reason line", () => {
@@ -148,8 +149,8 @@ describe("recommendation card helpers", () => {
       blockReasons: ["Risk 80% exceeds threshold"]
     }), 1, { columns: 80 }));
 
-    expect(output).toContain("status: BLOCKED");
-    expect(output).toContain("blocked: Risk 80% exceeds threshold");
+    expect(output).toContain("Status: BLOCKED");
+    expect(output).toContain("Blocked: Risk 80% exceeds threshold");
   });
 
   it("renders compact card without description/targets/meta", () => {
@@ -159,25 +160,25 @@ describe("recommendation card helpers", () => {
     }));
 
     expect(output).toContain("1) Frontend Design Pro [anthropic]");
-    expect(output).toContain("score: 88%");
-    expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("why:");
+    expect(output).toContain("Score: 88%");
+    expect(output).toContain("Status: ELIGIBLE");
+    expect(output).toContain("Why:");
     expect(output).toContain("  Matched stack: Next.js");
-    expect(output).not.toContain("description:");
-    expect(output).not.toContain("targets:");
-    expect(output).not.toContain("meta:");
+    expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Targets:");
+    expect(output).not.toContain("Meta:");
   });
 
-  it("renders eligibility and penalties sections as multi-line reason lists", () => {
+  it("renders eligibility section and hides penalties from card output", () => {
     const output = stripAnsi(renderRecommendationCard(makeRecommendation({
       eligibilityReasons: ["Eligible for target: claude"],
       penalties: ["Language-only match; no deeper project need match"]
     }), 1, { columns: 80 }));
 
-    expect(output).toContain("eligibility:");
+    expect(output).toContain("Eligibility:");
     expect(output).toContain("  Eligible for target: claude");
-    expect(output).toContain("penalties:");
-    expect(output).toContain("  Language-only match; no deeper project need match");
+    expect(output).not.toContain("Penalties:");
+    expect(output).not.toContain("Language-only match; no deeper project need match");
   });
 
   it("renders verbose recommendation explainability sections", () => {
@@ -208,21 +209,21 @@ describe("recommendation card helpers", () => {
       ]
     }), 1, { columns: 80, verbose: true }));
 
-    expect(output).toContain("skillCategories:");
-    expect(output).toContain("domainSignals:");
-    expect(output).toContain("scoreModel:");
+    expect(output).toContain("Skill Categories:");
+    expect(output).toContain("Domain Signals:");
+    expect(output).toContain("Score Model:");
     expect(output).toContain("relevanceRaw=");
-    expect(output).toContain("matchedNeeds:");
+    expect(output).toContain("Matched Needs:");
     expect(output).toContain("node_cli_development, vitest_testing");
-    expect(output).toContain("matchedNeedDetails:");
+    expect(output).toContain("Matched Need Details:");
     expect(output).toContain("node_cli_development [strong] +28");
-    expect(output).toContain("matchedFacts:");
+    expect(output).toContain("Matched Facts:");
     expect(output).toContain("primaryFacts: tool:vitest");
-    expect(output).toContain("scoreBreakdown:");
+    expect(output).toContain("Score Breakdown:");
     expect(output).toContain("+30 repo_need_match [strong]: node_cli_development");
-    expect(output).toContain("capsApplied:");
+    expect(output).toContain("Caps Applied:");
     expect(output).toContain("weak_only_cap: cap=45");
-    expect(output).toContain("capSummary:");
+    expect(output).toContain("Cap Summary:");
   });
 
   it("builds focused install choice description", () => {
