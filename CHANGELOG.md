@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0] - 2026-05-31
+
+### Added
+- Added install-time full bundle content security scanning for fetched skill files, including markdown comments, code blocks, and inline instructions.
+- Added hard blocking for critical executable-content patterns (for example remote pipe-to-shell and destructive command signatures) before install plan creation.
+- Added structured security evidence (file path, line number, excerpt) to risk signals for safer debugging and policy transparency.
+- Added scoped primary/secondary repository facts with richer path-based evidence, project type detection, and command classification for recommendation context.
+
+### Changed
+- Refactored recommendation relevance scoring to a repo-needs pipeline with strict need matching, anti-triggers, specialized gates, and normalized scoring.
+- Expanded scanner coverage with modular deterministic multi-ecosystem detectors and clearer CI/infra fact separation.
+- Improved recommendation/install UX with multiline `Why` output (up to 3 reasons) in recommendation cards.
+- Simplified step-4 install details into concise bullet summaries (`Status`, `Why`, `Targets`, `Publisher`, `Trust`).
+- Updated recommendation cards to place `Publisher` inline with `Score`/`Risk`/`Status`, hide penalties, and use title-cased labels.
+
+### Security
+- Strengthened fetched-bundle policy enforcement and blocked-output reporting with signal IDs and concise evidence for suspicious content findings.
+
+### Docs
+- Split end-user README content from contributor-focused docs.
+
 ## [0.1.2] - 2026-05-30
 
 ### Fixed

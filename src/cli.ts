@@ -26,8 +26,8 @@ program.configureOutput({
 
 program
   .name("naar")
-  .description("Naar: repo-aware Agent Skill recommender and safe installer")
-  .version("0.1.0");
+  .description("Naar: a repo-aware package manager for AI-agent skills, rules, and instructions")
+  .version("0.2.0");
 
 applySharedOptions(program
   .command("go")
