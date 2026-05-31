@@ -135,6 +135,10 @@ Provider runtime tuning:
 - `--json` mode is non-writing unless `--apply`
 - No repository source files are uploaded to providers
 
+## Security Model
+
+Naar's security model, vetting pipeline, privacy boundaries, token-cost considerations, and user-responsibility notes are documented in [SECURITY.md](./SECURITY.md).
+
 ## Current MVP Notes
 
 - Provider discovery/recommendation uses live provider APIs.

@@ -17,6 +17,7 @@
   "files": [
     "dist/**",
     "README.md",
+    "SECURITY.md",
     "LICENSE",
     "package.json"
   ],
