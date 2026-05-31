@@ -109,15 +109,18 @@ Current defaults and policy checks:
 - Minimum security score target: `80`
 - Script-bearing skills blocked by default behavior (`--no-scripts`)
 - Hard block below safety score `60`
-- Block when score is below required threshold
-- Block when critical signals are present
-- Block when source is unpinned
+- Hard block when critical signals are present
+- Block when score is below required threshold unless explicitly overridden
+- Block when source is unpinned unless explicitly overridden
+- Missing license is surfaced explicitly as `No license declared` and treated as risky
+- Unknown publisher/stale/other non-critical warnings are treated as risky override cases
 
 Flag behavior:
 
 - `--min-security-score <n>` sets the required threshold for that run.
 - `--no-scripts` enforces script blocking.
 - `--allow-scripts` disables `--no-scripts` for that run.
+- `--allow-risky` allows only overrideable risky skills (never hard-blocked skills).
 
 ### 4.4 Fetched Content Analysis
 
@@ -159,6 +162,8 @@ Naar has two checkpoints:
 - Selected bundles are fetched.
 - Fetched content is scanned.
 - Policy failures block installation before install-plan application.
+- If selected skills are overrideably risky and `--allow-risky` is used in interactive mode, Naar requires a short timed typed confirmation code before any file writes.
+- Wrong code, timeout, or cancel aborts install and writes nothing.
 
 This protects against incomplete metadata and content drift between listing and fetched bundle.
 
@@ -184,6 +189,8 @@ Naar avoids silent writes:
 - `--dry-run` performs no writes.
 - `--json` outputs plan data and does not write unless `--apply` is also set.
 - `--non-interactive` requires explicit apply behavior to write.
+- `--yes` alone does not bypass risky security policy.
+- In non-interactive mode, risky installs still require explicit `--allow-risky`.
 - Interactive mode prompts for confirmation.
 - Conflict detection blocks overwrite cases unless `--force` is used.
 

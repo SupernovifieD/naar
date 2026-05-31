@@ -1,5 +1,5 @@
 import path from "node:path";
-import { checkbox, confirm } from "@inquirer/prompts";
+import { checkbox, confirm, input } from "@inquirer/prompts";
 import ora from "ora";
 import pc from "picocolors";
 import { readFile } from "node:fs/promises";
@@ -34,7 +34,7 @@ import {
   warningHeader,
   warningLine
 } from "../utils/output.js";
-import { analyzeSkill, isInstallAllowed, mergeSecuritySignals } from "../security/analyzeSkill.js";
+import { analyzeSkill, evaluateInstallDecision, mergeSecuritySignals } from "../security/analyzeSkill.js";
 import { analyzeSkillContent } from "../security/analyzeSkillContent.js";
 
 export interface InstallFlowOptions {
@@ -92,11 +92,13 @@ const CHECKBOX_THEME_WITH_QUIT_HINT = {
   }
 };
 
+const RISK_CONFIRMATION_TIMEOUT_MS = 20_000;
+
 export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOptions = {}): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
   const config = await loadConfig(repoRoot);
 
-  const pipeline = flowOptions.forceFreshRecommendations
+  const pipeline = flowOptions.forceFreshRecommendations || flags.allowRisky
     ? await buildRecommendations(repoRoot, flags)
     : await loadOrBuildRecommendations(repoRoot, flags);
 
@@ -136,24 +138,29 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   const spinner = flags.json ? null : ora("Preparing install plan").start();
   const resolvedSkills = await resolveBundles(selectedRecommendations, targets);
 
-  const blockedAfterFetch = resolvedSkills
+  const evaluatedAfterFetch = resolvedSkills
     .map((resolved) => {
       const metadataRisk = analyzeSkill(resolved.bundle.skill);
       const contentSignals = analyzeSkillContent(resolved.bundle.files);
       const risk = mergeSecuritySignals(metadataRisk, contentSignals);
       resolved.bundle.skill.risk = risk;
-      const allowed = isInstallAllowed(risk, {
+      const decision = evaluateInstallDecision(risk, {
         minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
-        noScripts: flags.noScripts
+        noScripts: flags.noScripts,
+        allowRisky: flags.allowRisky
       }, !!resolved.bundle.skill.metadata.hasScripts);
 
       return {
+        skill: resolved.bundle.skill,
         skillName: resolved.bundle.skill.name,
-        allowed,
+        providerId: resolved.bundle.skill.source.providerId,
+        decision,
         risk
       };
-    })
-    .filter((entry) => !entry.allowed.allowed);
+    });
+
+  const blockedAfterFetch = evaluatedAfterFetch.filter((entry) => !entry.decision.allowed);
+  const riskyAfterFetch = evaluatedAfterFetch.filter((entry) => entry.decision.status === "risky");
 
   if (blockedAfterFetch.length > 0) {
     spinner?.stop();
@@ -163,14 +170,19 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
         error: "Security: fetched bundles failed policy checks.",
         blockedSkills: blockedAfterFetch.map((entry) => ({
           skillName: entry.skillName,
-          reasons: entry.allowed.reasons,
+          providerId: entry.providerId,
+          status: entry.decision.status,
+          hardBlocked: entry.decision.hardBlocked,
+          overrideable: entry.decision.overrideable,
+          reasons: entry.decision.reasons,
           risk: {
             ...entry.risk,
             signals: entry.risk.signals.map((signal) => ({
               ...signal,
               evidence: (signal.evidence ?? []).slice(0, 3)
             }))
-          }
+          },
+          decisionDetails: entry.decision.details.slice(0, 12)
         }))
       });
       return;
@@ -178,14 +190,22 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
     process.stderr.write(`${warningHeader("Security")}: fetched bundles failed policy checks.\n`);
     for (const entry of blockedAfterFetch) {
+      const statusLabel = entry.decision.hardBlocked ? "blocked (hard)" : "blocked";
       process.stderr.write(
-        `- ${entry.skillName} risk=${colorRisk(entry.risk.score, { percent: true })} reason=${entry.allowed.reasons.join("; ")}\n`
+        `- ${pc.bold(entry.skillName)} [${entry.providerId}] status=${pc.red(statusLabel)} `
+        + `score=${colorScore(entry.risk.score, { percent: true })} `
+        + `risk=${colorRisk(entry.risk.score, { percent: true })} `
+        + `level=${entry.risk.level}\n`
       );
+      process.stderr.write("  reasons:\n");
+      for (const reason of entry.decision.reasons.slice(0, 5)) {
+        process.stderr.write(`  - ${reason}\n`);
+      }
 
-      const signalLines = entry.risk.signals.slice(0, 3);
+      const signalLines = entry.risk.signals.slice(0, 5);
       let evidencePrinted = 0;
       for (const signal of signalLines) {
-        process.stderr.write(`  signal: ${signal.id}\n`);
+        process.stderr.write(`  signal: ${signal.id} [${signal.severity}] ${signal.detail} (penalty=${signal.penalty})\n`);
         const evidences = signal.evidence ?? [];
         for (const evidence of evidences) {
           if (evidencePrinted >= 3) break;
@@ -268,6 +288,13 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     return;
   }
 
+  if (riskyAfterFetch.length > 0 && !flags.nonInteractive) {
+    const confirmed = await runRiskyInstallChallenge(riskyAfterFetch);
+    if (!confirmed) {
+      return;
+    }
+  }
+
   await applyInstallPlan(repoRoot, plan);
   await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
 
@@ -291,26 +318,35 @@ async function chooseRecommendations(
   flags: CliFlags,
   recommendations: SkillRecommendation[]
 ): Promise<SkillRecommendation[]> {
+  const isSelectable = (recommendation: SkillRecommendation): boolean => {
+    const status = resolveRecommendationStatus(recommendation);
+    if (status === "eligible") return true;
+    if (status === "risky" && flags.allowRisky) return true;
+    return false;
+  };
+
   if (flags.from) {
     const match = selectFromReference(flags.from, recommendations);
-    return match ? [match] : [];
+    if (!match) return [];
+    return isSelectable(match) ? [match] : [];
   }
 
   if (flags.fromPlan) {
     const requested = await readPlanSelections(flags.fromPlan);
     return recommendations.filter((recommendation) =>
-      requested.includes(recommendation.candidate.canonicalSkillId)
-      || requested.includes(recommendation.candidate.providerSkillId)
+      (requested.includes(recommendation.candidate.canonicalSkillId)
+      || requested.includes(recommendation.candidate.providerSkillId))
+      && isSelectable(recommendation)
     );
   }
 
-  const eligible = recommendations.filter((recommendation) => !recommendation.blocked);
-  if (eligible.length === 0) {
+  const selectable = recommendations.filter((recommendation) => isSelectable(recommendation));
+  if (selectable.length === 0) {
     return [];
   }
 
   if (flags.allCompatible || flags.nonInteractive || flags.yes || flags.json) {
-    return eligible;
+    return selectable;
   }
 
   const selectedIds = await runPromptWithQuitShortcut((context) =>
@@ -318,18 +354,23 @@ async function chooseRecommendations(
       {
         message: "Select skills to install (press q to quit)",
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
-        choices: eligible.map((recommendation, index) => ({
-          name: formatChoiceLabel(recommendation),
-          description: flags.compact ? undefined : formatRecommendationChoiceDescription(recommendation),
-          value: recommendation.candidate.canonicalSkillId,
-          checked: index < 2
-        }))
+        choices: recommendations.map((recommendation, index) => {
+          const disabled = resolveRecommendationDisabledReason(recommendation, flags.allowRisky);
+          const shouldPrecheck = disabled === false && index < 2;
+          return {
+            name: formatChoiceLabel(recommendation),
+            description: flags.compact ? undefined : formatRecommendationChoiceDescription(recommendation),
+            value: recommendation.candidate.canonicalSkillId,
+            checked: shouldPrecheck,
+            disabled
+          };
+        })
       },
       context
     )
   );
 
-  return eligible.filter((recommendation) => selectedIds.includes(recommendation.candidate.canonicalSkillId));
+  return selectable.filter((recommendation) => selectedIds.includes(recommendation.candidate.canonicalSkillId));
 }
 
 async function chooseInstallTargets(
@@ -561,8 +602,104 @@ function collectInstallLocations(repoRoot: string, actions: InstallAction[]): st
   return [...locations].sort((left, right) => left.localeCompare(right));
 }
 
+function resolveRecommendationStatus(recommendation: SkillRecommendation): NonNullable<SkillRecommendation["status"]> {
+  if (recommendation.status) {
+    return recommendation.status;
+  }
+  return recommendation.blocked ? "blocked" : "eligible";
+}
+
+function resolveRecommendationDisabledReason(
+  recommendation: SkillRecommendation,
+  allowRisky: boolean
+): string | false {
+  const status = resolveRecommendationStatus(recommendation);
+  if (status === "eligible") return false;
+  if (status === "risky") {
+    return allowRisky ? false : "Requires --allow-risky.";
+  }
+  if (status === "incompatible") {
+    return recommendation.blockReasons?.[0] ?? "Incompatible with selected targets.";
+  }
+  if (recommendation.overrideable && !recommendation.hardBlocked && allowRisky) {
+    return false;
+  }
+  if (recommendation.hardBlocked) {
+    return recommendation.blockReasons?.[0] ?? "Hard-blocked by security policy.";
+  }
+  return recommendation.blockReasons?.[0] ?? "Blocked by security policy.";
+}
+
+async function runRiskyInstallChallenge(
+  riskyAfterFetch: Array<{
+    skillName: string;
+    providerId: string;
+    risk: { score: number; level: string };
+    decision: { reasons: string[] };
+  }>
+): Promise<boolean> {
+  const confirmationCode = generateRiskConfirmationCode();
+  process.stdout.write(`\n${warningHeader("Security confirmation required")}\n`);
+  process.stdout.write("You are about to install skills with explicit security risk overrides.\n");
+  process.stdout.write(`Type the confirmation code within ${Math.round(RISK_CONFIRMATION_TIMEOUT_MS / 1000)} seconds to continue.\n\n`);
+  for (const entry of riskyAfterFetch) {
+    process.stdout.write(`- ${pc.bold(entry.skillName)} [${entry.providerId}] score=${colorScore(entry.risk.score, { percent: true })} level=${entry.risk.level}\n`);
+    for (const reason of entry.decision.reasons.slice(0, 3)) {
+      process.stdout.write(`  - ${reason}\n`);
+    }
+  }
+  process.stdout.write(`\nConfirmation code: ${pc.bold(pc.yellow(confirmationCode))}\n`);
+
+  let timedOut = false;
+  const timeoutController = new AbortController();
+  const timer = setTimeout(() => {
+    timedOut = true;
+    timeoutController.abort();
+  }, RISK_CONFIRMATION_TIMEOUT_MS);
+
+  try {
+    const value = await runPromptWithQuitShortcut(
+      (context) => input(
+        { message: `Type ${confirmationCode} to continue (press q to quit)` },
+        { signal: AbortSignal.any([context.signal, timeoutController.signal]) }
+      ),
+      { abortAsExit: false }
+    );
+
+    if (value.trim() !== confirmationCode) {
+      process.stdout.write(`${warningLine("Incorrect confirmation code. Installation canceled. No files were written.")}\n`);
+      return false;
+    }
+
+    process.stdout.write(`${pc.green("Security confirmation accepted.")}\n`);
+    return true;
+  } catch (error) {
+    if (error instanceof PromptExitRequestedError) {
+      process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
+      return false;
+    }
+    if (timedOut && isPromptAbortError(error)) {
+      process.stdout.write(`${warningLine("Security confirmation expired. Installation canceled. No files were written.")}\n`);
+      return false;
+    }
+    if (isPromptAbortError(error)) {
+      process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
+      return false;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function generateRiskConfirmationCode(): string {
+  const value = Math.floor(Math.random() * 9000) + 1000;
+  return `NAAR-${value}`;
+}
+
 async function runPromptWithQuitShortcut<T>(
-  runner: (context: { signal: AbortSignal }) => Promise<T>
+  runner: (context: { signal: AbortSignal }) => Promise<T>,
+  options: { abortAsExit?: boolean } = {}
 ): Promise<T> {
   const controller = new AbortController();
   let quitPressed = false;
@@ -579,7 +716,7 @@ async function runPromptWithQuitShortcut<T>(
   try {
     return await runner({ signal: controller.signal });
   } catch (error) {
-    if (quitPressed || isPromptAbortError(error)) {
+    if (quitPressed || (options.abortAsExit !== false && isPromptAbortError(error))) {
       throw new PromptExitRequestedError();
     }
     throw error;
@@ -602,6 +739,14 @@ function formatSecurityEvidence(evidence: { path: string; line?: number; excerpt
 }
 
 function formatChoiceLabel(recommendation: SkillRecommendation): string {
+  const status = resolveRecommendationStatus(recommendation);
+  const statusLabel = status === "eligible"
+    ? pc.green("ELIGIBLE")
+    : status === "risky"
+      ? pc.yellow("RISKY")
+      : status === "incompatible"
+        ? pc.red("INCOMPATIBLE")
+        : pc.red("BLOCKED");
   return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
-    + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })}`;
+    + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })} status=${statusLabel}`;
 }

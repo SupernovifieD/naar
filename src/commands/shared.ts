@@ -48,6 +48,7 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     yes: Boolean(raw.yes),
     nonInteractive: Boolean(raw.nonInteractive),
     noScripts,
+    allowRisky: Boolean(raw.allowRisky),
     minSecurityScore: Number(raw.minSecurityScore ?? 80),
     force: Boolean(raw.force),
     verbose: Boolean(raw.verbose),

@@ -3,6 +3,28 @@ import type { SecuritySignal, SkillCandidate, SkillSecurityReport } from "../typ
 export interface SecurityPolicy {
   minSecurityScore: number;
   noScripts: boolean;
+  allowRisky?: boolean;
+}
+
+export type SecurityInstallStatus = "eligible" | "risky" | "blocked";
+
+export interface SecurityPolicyDecisionDetail {
+  code: string;
+  message: string;
+  hardBlock: boolean;
+  signalId?: string;
+  severity?: SecuritySignal["severity"];
+}
+
+export interface SecurityPolicyDecision {
+  allowed: boolean;
+  status: SecurityInstallStatus;
+  hardBlocked: boolean;
+  overrideable: boolean;
+  reasons: string[];
+  hardBlockReasons: string[];
+  overrideReasons: string[];
+  details: SecurityPolicyDecisionDetail[];
 }
 
 export function analyzeSkill(skill: SkillCandidate): SkillSecurityReport {
@@ -83,35 +105,141 @@ function stalePenaltyFromDate(lastUpdatedIso?: string): number {
 }
 
 export function isInstallAllowed(report: SkillSecurityReport, policy: SecurityPolicy, hasScripts: boolean): { allowed: boolean; reasons: string[] } {
-  const reasons: string[] = [];
+  const decision = evaluateInstallDecision(report, policy, hasScripts);
+  return {
+    allowed: decision.allowed,
+    reasons: decision.allowed ? [] : decision.reasons
+  };
+}
+
+export function evaluateInstallDecision(
+  report: SkillSecurityReport,
+  policy: SecurityPolicy,
+  hasScripts: boolean
+): SecurityPolicyDecision {
+  const hardReasonsByCode = new Map<string, SecurityPolicyDecisionDetail>();
+  const overrideReasonsByCode = new Map<string, SecurityPolicyDecisionDetail>();
   const riskPercent = toRiskPercent(report.score);
-  const hardBlockThreshold = toRiskPercent(60);
+  const hardBlockThreshold = toRiskPercent(HARD_BLOCK_SECURITY_SCORE);
   const requiredRiskThreshold = toRiskPercent(policy.minSecurityScore);
 
-  if (report.score < 60) {
-    reasons.push(`Risk ${riskPercent}% exceeds hard block threshold (>${hardBlockThreshold}%).`);
+  const addReason = (
+    target: Map<string, SecurityPolicyDecisionDetail>,
+    detail: SecurityPolicyDecisionDetail
+  ): void => {
+    if (!target.has(detail.code)) {
+      target.set(detail.code, detail);
+    }
+  };
+
+  if (report.score < HARD_BLOCK_SECURITY_SCORE) {
+    addReason(hardReasonsByCode, {
+      code: "hard_risk_threshold",
+      hardBlock: true,
+      message: `Risk ${riskPercent}% exceeds hard block threshold (>${hardBlockThreshold}%).`
+    });
   }
   if (report.score < policy.minSecurityScore) {
-    reasons.push(`Risk ${riskPercent}% exceeds required threshold (>${requiredRiskThreshold}%).`);
+    addReason(overrideReasonsByCode, {
+      code: "policy_risk_threshold",
+      hardBlock: false,
+      message: `Risk ${riskPercent}% exceeds required threshold (>${requiredRiskThreshold}%).`
+    });
   }
   if (policy.noScripts && hasScripts) {
-    reasons.push("Skill includes scripts and --no-scripts is enabled.");
-  }
-  const criticalSignals = report.signals.filter((signal) => signal.severity === "critical");
-  if (criticalSignals.length > 0) {
-    if (criticalSignals.some((signal) => CONTENT_CRITICAL_SIGNAL_IDS.has(signal.id))) {
-      reasons.push("Suspicious executable content detected in skill files.");
-    } else {
-      reasons.push("Critical security signal detected.");
-    }
-  }
-  if (report.signals.some((signal) => signal.id === "unpinned_source")) {
-    reasons.push("Install source is not pinned to an immutable version/ref.");
+    addReason(hardReasonsByCode, {
+      code: "scripts_disallowed",
+      hardBlock: true,
+      message: "Skill includes scripts and --no-scripts is enabled."
+    });
   }
 
+  const criticalSignals = report.signals.filter((signal) => signal.severity === "critical");
+  if (criticalSignals.length > 0) {
+    const hasCriticalContentSignal = criticalSignals.some((signal) => CONTENT_CRITICAL_SIGNAL_IDS.has(signal.id));
+    if (hasCriticalContentSignal) {
+      addReason(hardReasonsByCode, {
+        code: "critical_content_signal",
+        hardBlock: true,
+        message: "Suspicious executable content detected in skill files."
+      });
+    } else {
+      addReason(hardReasonsByCode, {
+        code: "critical_signal",
+        hardBlock: true,
+        message: "Critical security signal detected."
+      });
+    }
+  }
+
+  for (const signal of report.signals) {
+    const message = `${signal.id} [${signal.severity}]: ${signal.detail}`;
+    if (signal.severity === "critical") {
+      addReason(hardReasonsByCode, {
+        code: `critical_signal:${signal.id}`,
+        hardBlock: true,
+        message,
+        signalId: signal.id,
+        severity: signal.severity
+      });
+      continue;
+    }
+
+    addReason(overrideReasonsByCode, {
+      code: `signal:${signal.id}`,
+      hardBlock: false,
+      message,
+      signalId: signal.id,
+      severity: signal.severity
+    });
+  }
+
+  if (report.signals.some((signal) => signal.id === "unpinned_source")) {
+    addReason(overrideReasonsByCode, {
+      code: "unpinned_source",
+      hardBlock: false,
+      message: "Install source is not pinned to an immutable version/ref.",
+      signalId: "unpinned_source",
+      severity: "medium"
+    });
+  }
+
+  const hardBlockReasons = [...hardReasonsByCode.values()].map((detail) => detail.message);
+  const overrideReasons = [...overrideReasonsByCode.values()].map((detail) => detail.message);
+  const hardBlocked = hardBlockReasons.length > 0;
+  const hasOverrideRisk = overrideReasons.length > 0;
+  const allowRisky = policy.allowRisky === true;
+
+  let status: SecurityInstallStatus = "eligible";
+  if (hardBlocked) {
+    status = "blocked";
+  } else if (hasOverrideRisk) {
+    status = allowRisky ? "risky" : "blocked";
+  }
+
+  const reasons = hardBlocked
+    ? hardBlockReasons
+    : hasOverrideRisk
+      ? allowRisky
+        ? overrideReasons
+        : [
+            ...overrideReasons,
+            "Use --allow-risky to explicitly acknowledge and install overrideable risky skills."
+          ]
+      : [];
+
   return {
-    allowed: reasons.length === 0,
-    reasons
+    allowed: status === "eligible" || status === "risky",
+    status,
+    hardBlocked,
+    overrideable: !hardBlocked && hasOverrideRisk,
+    reasons,
+    hardBlockReasons,
+    overrideReasons,
+    details: [
+      ...hardReasonsByCode.values(),
+      ...overrideReasonsByCode.values()
+    ]
   };
 }
 
@@ -119,6 +247,8 @@ function toRiskPercent(safetyScore: number): number {
   const clampedSafety = Math.max(0, Math.min(100, Math.round(safetyScore)));
   return 100 - clampedSafety;
 }
+
+const HARD_BLOCK_SECURITY_SCORE = 60;
 
 function buildSecurityReport(signals: SecuritySignal[]): SkillSecurityReport {
   const dedupedSignals = dedupeSignals(signals);

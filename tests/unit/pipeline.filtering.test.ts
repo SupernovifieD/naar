@@ -126,6 +126,7 @@ describe("pipeline installed filtering", () => {
       yes: false,
       nonInteractive: false,
       noScripts: true,
+      allowRisky: false,
       minSecurityScore: 80,
       force: false,
       verbose: false,

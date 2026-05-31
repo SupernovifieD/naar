@@ -57,6 +57,9 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
     }
     parsed.recommendations = parsed.recommendations.map((recommendation) => ({
       ...recommendation,
+      status: recommendation.status ?? (recommendation.blocked ? "blocked" : "eligible"),
+      overrideable: recommendation.overrideable ?? false,
+      hardBlocked: recommendation.hardBlocked ?? false,
       rawScore: recommendation.rawScore ?? recommendation.score,
       relevanceRaw: recommendation.relevanceRaw ?? recommendation.score,
       qualityRaw: recommendation.qualityRaw ?? 0,

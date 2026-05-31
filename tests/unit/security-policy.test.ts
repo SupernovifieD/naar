@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeSkill, isInstallAllowed, mergeSecuritySignals } from "../../src/security/analyzeSkill.js";
+import { analyzeSkill, evaluateInstallDecision, isInstallAllowed, mergeSecuritySignals } from "../../src/security/analyzeSkill.js";
 import type { SecuritySignal, SkillCandidate, SkillSecurityReport } from "../../src/types/index.js";
 
 function makeCandidate(overrides?: Partial<SkillCandidate["metadata"]>): SkillCandidate {
@@ -99,5 +99,27 @@ describe("security policy", () => {
     const signal = merged.signals.find((entry) => entry.id === "network_download_reference");
     expect(signal).toBeDefined();
     expect(signal?.evidence?.length).toBe(2);
+  });
+
+  it("treats missing license as overrideable risk and allows only with --allow-risky", () => {
+    const report = analyzeSkill(makeCandidate({ license: "" }));
+
+    const blockedDecision = evaluateInstallDecision(report, {
+      minSecurityScore: 80,
+      noScripts: true,
+      allowRisky: false
+    }, false);
+    expect(blockedDecision.status).toBe("blocked");
+    expect(blockedDecision.overrideable).toBe(true);
+    expect(blockedDecision.hardBlocked).toBe(false);
+    expect(blockedDecision.reasons.some((reason) => reason.includes("missing_license"))).toBe(true);
+
+    const riskyDecision = evaluateInstallDecision(report, {
+      minSecurityScore: 80,
+      noScripts: true,
+      allowRisky: true
+    }, false);
+    expect(riskyDecision.status).toBe("risky");
+    expect(riskyDecision.allowed).toBe(true);
   });
 });

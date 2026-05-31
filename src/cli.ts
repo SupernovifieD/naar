@@ -130,7 +130,8 @@ function applySharedOptions(command: Command): Command {
     .option("--from <provider:skill@version>", "Install a specific provider skill reference")
     .option("--from-plan <file>", "Load install selections from plan JSON")
     .option("--no-scripts", "Disallow script-bearing skills")
-    .option("--allow-scripts", "Allow script-bearing skills (unsafe)");
+    .option("--allow-scripts", "Allow script-bearing skills (unsafe)")
+    .option("--allow-risky", "Allow overrideable risky skills (unsafe)");
 }
 
 function colorizeCommanderOutput(content: string): string {

@@ -69,6 +69,7 @@ naar config
 --min-security-score <n>
 --no-scripts
 --allow-scripts
+--allow-risky
 --force
 --from <provider:skill@version>
 --from-plan <file>
@@ -131,9 +132,17 @@ Provider runtime tuning:
 - Block high-risk skills by default
 - Minimum security score: `80`
 - Do not run scripts by default (`--no-scripts`)
+- Overrideable risky skills require explicit `--allow-risky`
 - No write before preview + confirmation
 - `--json` mode is non-writing unless `--apply`
 - No repository source files are uploaded to providers
+
+Recommendation/install status semantics:
+
+- `ELIGIBLE`: compatible and installable under current policy.
+- `RISKY`: overrideable security concerns; install requires `--allow-risky` and interactive typed confirmation.
+- `BLOCKED`: hard-blocked or policy-blocked; not installable by default.
+- `INCOMPATIBLE`: does not match the selected target compatibility set.
 
 ## Security Model
 

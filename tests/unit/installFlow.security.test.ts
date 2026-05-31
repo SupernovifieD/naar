@@ -9,6 +9,7 @@ const buildProvidersMock = vi.hoisted(() => vi.fn());
 const createInstallPlanMock = vi.hoisted(() => vi.fn());
 const applyInstallPlanMock = vi.hoisted(() => vi.fn());
 const printJsonMock = vi.hoisted(() => vi.fn());
+const inputMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/config/store.js", () => ({
   loadConfig: loadConfigMock,
@@ -61,7 +62,8 @@ vi.mock("ora", () => ({
 
 vi.mock("@inquirer/prompts", () => ({
   checkbox: vi.fn(),
-  confirm: vi.fn()
+  confirm: vi.fn(),
+  input: inputMock
 }));
 
 import { runInstallFlow } from "../../src/commands/installFlow.js";
@@ -77,6 +79,7 @@ const baseFlags: CliFlags = {
   yes: false,
   nonInteractive: true,
   noScripts: true,
+  allowRisky: false,
   minSecurityScore: 80,
   force: false,
   verbose: false,
@@ -100,7 +103,7 @@ const repoFacts: RepoFacts = {
   readiness: { score: 90, grade: "Excellent", missingCapabilities: [] }
 };
 
-function makeCandidate(): SkillCandidate {
+function makeCandidate(metadataOverrides: Partial<SkillCandidate["metadata"]> = {}): SkillCandidate {
   return {
     providerScopedId: "test:secure-skill",
     providerSkillId: "secure-skill",
@@ -128,7 +131,8 @@ function makeCandidate(): SkillCandidate {
       hasPackageManifests: false,
       requiresApiKeys: false,
       requiresEnvVars: false,
-      pinnedRef: "1.0.0"
+      pinnedRef: "1.0.0",
+      ...metadataOverrides
     },
     risk: {
       score: 100,
@@ -162,6 +166,7 @@ beforeEach(() => {
   createInstallPlanMock.mockReset();
   applyInstallPlanMock.mockReset();
   printJsonMock.mockReset();
+  inputMock.mockReset();
 
   loadConfigMock.mockResolvedValue({
     defaultProviders: ["test"],
@@ -245,5 +250,187 @@ describe("runInstallFlow security enforcement", () => {
     const payload = printJsonMock.mock.calls[0][0] as { plan?: unknown; blockedSkills?: unknown };
     expect(payload.plan).toBeDefined();
     expect(payload.blockedSkills).toBeUndefined();
+  });
+
+  it("requires --allow-risky for overrideable risky bundles in non-interactive mode", async () => {
+    const candidate = makeCandidate({ license: "" });
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({
+        skill: candidate,
+        files: {
+          "SKILL.md": "# Skill\n\nUse this safely."
+        }
+      }))
+    }]);
+
+    await runInstallFlow({ ...baseFlags, allowRisky: false });
+
+    expect(createInstallPlanMock).not.toHaveBeenCalled();
+    expect(printJsonMock).toHaveBeenCalledTimes(1);
+    const payload = printJsonMock.mock.calls[0][0] as {
+      blockedSkills?: Array<{ status: string; hardBlocked: boolean; reasons: string[] }>;
+    };
+    expect(payload.blockedSkills?.[0]?.status).toBe("blocked");
+    expect(payload.blockedSkills?.[0]?.hardBlocked).toBe(false);
+    expect(payload.blockedSkills?.[0]?.reasons.some((reason) => reason.includes("--allow-risky"))).toBe(true);
+  });
+
+  it("allows overrideable risky bundles with --allow-risky in non-interactive mode", async () => {
+    const candidate = makeCandidate({ license: "" });
+    buildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({
+        skill: candidate,
+        files: {
+          "SKILL.md": "# Skill\n\nUse this safely."
+        }
+      }))
+    }]);
+
+    await runInstallFlow({ ...baseFlags, allowRisky: true });
+
+    expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(printJsonMock).toHaveBeenCalledTimes(1);
+    const payload = printJsonMock.mock.calls[0][0] as { plan?: unknown; blockedSkills?: unknown };
+    expect(payload.plan).toBeDefined();
+    expect(payload.blockedSkills).toBeUndefined();
+  });
+
+  it("cancels risky interactive install when confirmation code is wrong", async () => {
+    const candidate = makeCandidate({ license: "" });
+    buildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({
+        skill: candidate,
+        files: {
+          "SKILL.md": "# Skill\n\nUse this safely."
+        }
+      }))
+    }]);
+
+    inputMock.mockResolvedValue("WRONG");
+
+    await runInstallFlow({
+      ...baseFlags,
+      json: false,
+      nonInteractive: false,
+      yes: true,
+      allowRisky: true
+    });
+
+    expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(applyInstallPlanMock).not.toHaveBeenCalled();
+  });
+
+  it("cancels risky interactive install when confirmation expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const candidate = makeCandidate({ license: "" });
+      buildRecommendationsMock.mockResolvedValue({
+        repoFacts,
+        repoNeeds: [],
+        recommendations: [makeRecommendation(candidate)],
+        providerWarnings: [],
+        providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+      });
+
+      buildProvidersMock.mockReturnValue([{
+        id: "test",
+        fetchFiles: vi.fn(async () => ({
+          skill: candidate,
+          files: {
+            "SKILL.md": "# Skill\n\nUse this safely."
+          }
+        }))
+      }]);
+
+      inputMock.mockImplementation((_prompt: { message: string }, context: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          context.signal.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortPromptError";
+            reject(error);
+          });
+        })
+      );
+
+      const runPromise = runInstallFlow({
+        ...baseFlags,
+        json: false,
+        nonInteractive: false,
+        yes: true,
+        allowRisky: true
+      });
+
+      await vi.advanceTimersByTimeAsync(20_001);
+      await runPromise;
+
+      expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+      expect(applyInstallPlanMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows risky interactive install when confirmation code is correct", async () => {
+    const candidate = makeCandidate({ license: "" });
+    buildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({
+        skill: candidate,
+        files: {
+          "SKILL.md": "# Skill\n\nUse this safely."
+        }
+      }))
+    }]);
+
+    inputMock.mockImplementation(async (prompt: { message: string }) => {
+      const matched = prompt.message.match(/Type (NAAR-\d{4}) to continue/);
+      return matched ? matched[1] : "";
+    });
+
+    await runInstallFlow({
+      ...baseFlags,
+      json: false,
+      nonInteractive: false,
+      yes: true,
+      allowRisky: true
+    });
+
+    expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
   });
 });

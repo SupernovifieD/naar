@@ -140,7 +140,8 @@ describe("recommendation card helpers", () => {
     recommendation.candidate.metadata.lastUpdatedIso = undefined;
 
     const output = stripAnsi(renderRecommendationCard(recommendation, 1, { columns: 80 }));
-    expect(output).not.toContain("Meta:");
+    expect(output).toContain("Meta:");
+    expect(output).toContain("License: No license declared");
   });
 
   it("renders blocked status and blocked reason line", () => {
@@ -150,7 +151,8 @@ describe("recommendation card helpers", () => {
     }), 1, { columns: 80 }));
 
     expect(output).toContain("Status: BLOCKED");
-    expect(output).toContain("Blocked: Risk 80% exceeds threshold");
+    expect(output).toContain("Blocked:");
+    expect(output).toContain("Risk 80% exceeds threshold");
   });
 
   it("renders compact card without description/targets/meta", () => {
@@ -234,5 +236,17 @@ describe("recommendation card helpers", () => {
     expect(text).toContain("- Publisher: anthropic");
     expect(text).toContain("- Trust: official");
     expect(text).not.toContain("desc:");
+  });
+
+  it("renders risky status and security details", () => {
+    const output = stripAnsi(renderRecommendationCard(makeRecommendation({
+      status: "risky",
+      blocked: true,
+      blockReasons: ["missing_license [medium]: License is not declared."]
+    }), 1, { columns: 80 }));
+
+    expect(output).toContain("Status: RISKY");
+    expect(output).toContain("Risky:");
+    expect(output).toContain("missing_license [medium]");
   });
 });

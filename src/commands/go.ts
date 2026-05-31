@@ -153,10 +153,14 @@ function renderRankingSummary(
     verbose: flags.verbose
   }));
 
-  const blocked = recommendations.filter((recommendation) => recommendation.blocked);
+  const blocked = recommendations.filter((recommendation) => resolveRecommendationStatus(recommendation) === "blocked");
+  const risky = recommendations.filter((recommendation) => resolveRecommendationStatus(recommendation) === "risky");
   const warnings: string[] = [];
   if (blocked.length > 0) {
     warnings.push(`${blocked.length} candidates blocked by security policy`);
+  }
+  if (risky.length > 0) {
+    warnings.push(`${risky.length} candidates require explicit risky override`);
   }
   warnings.push(...providerWarnings);
 
@@ -185,4 +189,9 @@ function groupFrameworks(
   }
 
   return grouped;
+}
+
+function resolveRecommendationStatus(recommendation: { status?: string; blocked: boolean }): string {
+  if (recommendation.status) return recommendation.status;
+  return recommendation.blocked ? "blocked" : "eligible";
 }

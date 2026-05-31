@@ -4,6 +4,7 @@ import type {
   AssistantId,
   MatchedNeedDetail,
   MatchedFact,
+  RecommendationStatus,
   RecommendationCapApplied,
   RecommendationScoreComponent,
   RepoFacts,
@@ -15,7 +16,7 @@ import type {
   SkillRecommendation,
   ToolDetection
 } from "../types/index.js";
-import { analyzeSkill, isInstallAllowed, type SecurityPolicy } from "../security/analyzeSkill.js";
+import { analyzeSkill, evaluateInstallDecision, type SecurityPolicy } from "../security/analyzeSkill.js";
 import { getNeedMatchProfile, matchNeedProfile, type NeedMatchLexicon } from "./needProfiles.js";
 import {
   classifySkillCategories,
@@ -542,7 +543,30 @@ export function recommendSkills(
       });
     }
 
-    const allowance = isInstallAllowed(risk, options, !!candidate.metadata.hasScripts);
+    const securityDecision = evaluateInstallDecision(risk, {
+      minSecurityScore: options.minSecurityScore,
+      noScripts: options.noScripts,
+      allowRisky: options.allowRisky
+    }, !!candidate.metadata.hasScripts);
+
+    const blockReasons: string[] = [];
+    let status: RecommendationStatus = securityDecision.status;
+
+    if (assistantMatches.length === 0) {
+      status = "incompatible";
+      blockReasons.push("Incompatible with preferred targets.");
+    }
+
+    if (status === "incompatible") {
+      blockReasons.push(...securityDecision.hardBlockReasons);
+      if (securityDecision.hardBlockReasons.length === 0) {
+        blockReasons.push(...securityDecision.overrideReasons);
+      }
+    } else {
+      blockReasons.push(...securityDecision.reasons);
+    }
+
+    const normalizedBlockReasons = dedupeStrings(blockReasons).filter(Boolean);
 
     const normalizedReasons = dedupeStrings(reasons).slice(0, 8);
     const normalizedPenalties = dedupeStrings(penalties);
@@ -554,6 +578,9 @@ export function recommendSkills(
       rawScore: roundScore(rawScore),
       relevanceRaw: roundScore(relevanceRaw),
       qualityRaw: roundScore(qualityRaw),
+      status,
+      overrideable: securityDecision.overrideable,
+      hardBlocked: securityDecision.hardBlocked,
       reasons: normalizedReasons,
       matchedNeeds: dedupeStrings(matchedNeeds),
       matchedNeedDetails,
@@ -564,8 +591,8 @@ export function recommendSkills(
       skillCategories,
       domainSignals,
       scoreBreakdown,
-      blocked: !allowance.allowed,
-      blockReasons: allowance.reasons
+      blocked: status !== "eligible",
+      blockReasons: normalizedBlockReasons
     };
 
     recommendations.push(recommendation);

@@ -40,6 +40,7 @@ const baseFlags: CliFlags = {
   yes: false,
   nonInteractive: false,
   noScripts: true,
+  allowRisky: false,
   minSecurityScore: 80,
   force: false,
   verbose: false,
@@ -277,7 +278,8 @@ describe("recommend/go output descriptions", () => {
     });
 
     expect(output).toContain("Status: BLOCKED");
-    expect(output).toContain("Blocked: Risk 90% exceeds required threshold");
+    expect(output).toContain("Blocked:");
+    expect(output).toContain("Risk 90% exceeds required threshold");
   });
 
   it("renders compact recommendation cards without description/targets/meta", async () => {

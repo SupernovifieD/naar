@@ -1,5 +1,5 @@
 import pc from "picocolors";
-import type { AssistantId, RepoFinding, SkillCandidate, SkillRecommendation } from "../types/index.js";
+import type { AssistantId, RecommendationStatus, RepoFinding, SkillCandidate, SkillRecommendation } from "../types/index.js";
 
 interface ColorValueOptions {
   percent?: boolean;
@@ -12,6 +12,8 @@ interface RecommendationCardRenderOptions {
   compact?: boolean;
   verbose?: boolean;
 }
+
+type MetaFieldTone = "default" | "warning" | "danger";
 
 const CARD_MIN_WIDTH = 68;
 const CARD_MAX_WIDTH = 96;
@@ -157,6 +159,7 @@ export function renderRecommendationCard(
   lines.push(
     `${indent}${pc.bold(`${rank}) ${recommendation.candidate.name}`)} ${pc.cyan(`[${recommendation.candidate.source.providerId}]`)}`
   );
+  const status = resolveRecommendationStatus(recommendation);
   const publisher = recommendation.candidate.metadata.publisher
     ?? recommendation.candidate.source.publisher
     ?? recommendation.candidate.source.providerId;
@@ -164,7 +167,7 @@ export function renderRecommendationCard(
     `${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`
     + `   ${pc.blue("Score")}: ${colorScore(recommendation.score, { percent: true })}`
     + `   ${pc.blue("Risk")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
-    + `   ${pc.blue("Status")}: ${recommendation.blocked ? pc.red("BLOCKED") : pc.green("ELIGIBLE")}`
+    + `   ${pc.blue("Status")}: ${colorRecommendationStatus(status)}`
   );
 
   if (!compact) {
@@ -328,12 +331,32 @@ export function renderRecommendationCard(
     }
   }
 
-  if (recommendation.blocked && recommendation.blockReasons && recommendation.blockReasons.length > 0) {
-    appendWrappedField(lines, {
+  const securityReasons = (recommendation.blockReasons ?? []).map((reason) => reason.trim()).filter(Boolean);
+  if (status === "blocked" && securityReasons.length > 0) {
+    appendWrappedReasonsField(lines, {
       cardWidth,
       indent,
       label: "Blocked",
-      value: recommendation.blockReasons.join("; ")
+      reasons: securityReasons.slice(0, 3)
+    });
+  } else if (status === "risky" && securityReasons.length > 0) {
+    appendWrappedReasonsField(lines, {
+      cardWidth,
+      indent,
+      label: "Risky",
+      reasons: securityReasons.slice(0, 3)
+    });
+  }
+
+  if ((status === "blocked" || status === "risky") && recommendation.candidate.risk.signals.length > 0) {
+    const signalSummary = recommendation.candidate.risk.signals
+      .slice(0, 3)
+      .map((signal) => `${signal.id} [${signal.severity}]`);
+    appendWrappedField(lines, {
+      cardWidth,
+      indent,
+      label: "Signals",
+      value: signalSummary.join("; ")
     });
   }
 
@@ -345,12 +368,14 @@ export function formatRecommendationChoiceDescription(recommendation: SkillRecom
   const reasons = recommendation.reasons.slice(0, DEFAULT_REASON_LIMIT).map((reason) => reason.trim()).filter(Boolean);
   const why = reasons.length > 0 ? reasons.join("; ") : "n/a";
   const targets = formatTargets(recommendation.candidate.compatibility.assistants);
-  const status = recommendation.blocked ? "BLOCKED" : "ELIGIBLE";
+  const status = resolveRecommendationStatus(recommendation).toUpperCase();
   const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
   const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
+  const security = (recommendation.blockReasons ?? []).slice(0, 1).join("; ");
   return [
     `- Status: ${status}`,
     `- Why: ${why}`,
+    ...(security ? [`- Security: ${security}`] : []),
     `- Targets: ${targets}`,
     `- Publisher: ${publisher}`,
     `- Trust: ${trust}`
@@ -407,7 +432,7 @@ function appendWrappedReasonsField(
 
 function appendMetaFields(
   lines: string[],
-  options: { cardWidth: number; indent: string; label: string; fields: Array<{ key: string; value: string }> }
+  options: { cardWidth: number; indent: string; label: string; fields: Array<{ key: string; value: string; tone?: MetaFieldTone }> }
 ): void {
   if (options.fields.length === 0) {
     return;
@@ -427,9 +452,9 @@ function appendMetaFields(
       continue;
     }
 
-    lines.push(`${options.indent}  ${pc.blue(displayKey)}: ${pc.white(wrapped[0])}`);
+    lines.push(`${options.indent}  ${pc.blue(displayKey)}: ${colorMetaValue(wrapped[0], field.tone)}`);
     for (const segment of wrapped.slice(1)) {
-      lines.push(`${continuationPrefix}${pc.white(segment)}`);
+      lines.push(`${continuationPrefix}${colorMetaValue(segment, field.tone)}`);
     }
   }
 }
@@ -452,21 +477,36 @@ function formatTargets(assistants: AssistantId[]): string {
   return sorted.join(", ");
 }
 
-function formatRecommendationMetaFields(recommendation: SkillRecommendation): Array<{ key: string; value: string }> {
+function formatRecommendationMetaFields(
+  recommendation: SkillRecommendation
+): Array<{ key: string; value: string; tone?: MetaFieldTone }> {
   const metadata = recommendation.candidate.metadata;
-  const parts: Array<{ key: string; value: string }> = [];
+  const parts: Array<{ key: string; value: string; tone?: MetaFieldTone }> = [];
 
   if (metadata.trustLevel) {
     parts.push({ key: "trust", value: metadata.trustLevel });
   }
-  if (metadata.license) {
-    parts.push({ key: "license", value: metadata.license });
-  }
+  const hasLicense = typeof metadata.license === "string" && metadata.license.trim().length > 0;
+  const missingLicense = !hasLicense;
+  const status = resolveRecommendationStatus(recommendation);
+  parts.push({
+    key: "license",
+    value: hasLicense ? metadata.license!.trim() : "No license declared",
+    tone: missingLicense
+      ? (status === "blocked" ? "danger" : "warning")
+      : "default"
+  });
   if (metadata.lastUpdatedIso) {
     parts.push({ key: "updated", value: formatUpdated(metadata.lastUpdatedIso) });
   }
 
   return parts;
+}
+
+function colorMetaValue(value: string, tone: MetaFieldTone | undefined): string {
+  if (tone === "danger") return pc.red(value);
+  if (tone === "warning") return pc.yellow(value);
+  return pc.white(value);
 }
 
 function formatUpdated(value: string): string {
@@ -480,6 +520,20 @@ function formatUpdated(value: string): string {
 function assistantRank(assistant: AssistantId): number {
   const rank = ASSISTANT_ORDER.indexOf(assistant);
   return rank >= 0 ? rank : Number.MAX_SAFE_INTEGER;
+}
+
+function resolveRecommendationStatus(recommendation: SkillRecommendation): RecommendationStatus {
+  if (recommendation.status) {
+    return recommendation.status;
+  }
+  return recommendation.blocked ? "blocked" : "eligible";
+}
+
+function colorRecommendationStatus(status: RecommendationStatus): string {
+  if (status === "eligible") return pc.green("ELIGIBLE");
+  if (status === "risky") return pc.yellow("RISKY");
+  if (status === "incompatible") return pc.red("INCOMPATIBLE");
+  return pc.red("BLOCKED");
 }
 
 function formatValue(value: number, asPercent: boolean): string {

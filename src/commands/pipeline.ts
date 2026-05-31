@@ -93,6 +93,7 @@ export async function buildRecommendations(
   const recommendationResult = recommendSkills(repoFacts, candidates, {
     minSecurityScore: flags.minSecurityScore || config.minSecurityScore,
     noScripts: flags.noScripts,
+    allowRisky: flags.allowRisky,
     eligibleAssistants: eligibility.assistants,
     eligibilitySource: eligibility.source,
     allCompatible: flags.allCompatible,

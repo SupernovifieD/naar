@@ -333,6 +333,8 @@ export interface RepoNeed {
   reason: string;
 }
 
+export type RecommendationStatus = "eligible" | "risky" | "blocked" | "incompatible";
+
 export type SkillCategory =
   | "code"
   | "testing"
@@ -363,6 +365,9 @@ export interface SkillRecommendation {
   rawScore?: number;
   relevanceRaw?: number;
   qualityRaw?: number;
+  status?: RecommendationStatus;
+  overrideable?: boolean;
+  hardBlocked?: boolean;
   reasons: string[];
   matchedNeeds: string[];
   matchedNeedDetails?: MatchedNeedDetail[];
@@ -476,6 +481,7 @@ export interface CliFlags {
   yes: boolean;
   nonInteractive: boolean;
   noScripts: boolean;
+  allowRisky: boolean;
   minSecurityScore: number;
   force: boolean;
   verbose: boolean;
