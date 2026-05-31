@@ -7,7 +7,12 @@ const baseFacts: RepoFacts = {
   scanTimeIso: new Date().toISOString(),
   languages: ["Python"],
   packageManagers: [],
-  frameworks: [{ id: "fastapi", category: "backend", confidence: 1, evidence: ["main.py"] }],
+  frameworks: [{
+    id: "fastapi",
+    category: "backend",
+    confidence: 1,
+    evidence: [{ path: "main.py", scope: "root", reason: "main.py is present", confidence: 1 }]
+  }],
   aiAssistants: [
     {
       id: "claude",

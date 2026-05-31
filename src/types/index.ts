@@ -6,7 +6,104 @@ export type FrameworkCategory =
   | "build"
   | "infra";
 
+export type ScanScope =
+  | "root"
+  | "src"
+  | "test"
+  | "fixture"
+  | "example"
+  | "docs"
+  | "generated"
+  | "vendor";
+
+export interface FactEvidence {
+  path: string;
+  scope: ScanScope;
+  reason: string;
+  confidence?: number;
+}
+
+export interface LanguageDetection {
+  id: string;
+  confidence: number;
+  evidence: FactEvidence[];
+}
+
+export type ProjectTypeId =
+  | "cli"
+  | "library"
+  | "web-app"
+  | "api"
+  | "monorepo"
+  | "docs"
+  | "package";
+
+export interface ProjectTypeDetection {
+  id: ProjectTypeId;
+  confidence: number;
+  evidence: FactEvidence[];
+}
+
+export interface ToolDetection {
+  id: string;
+  confidence: number;
+  evidence: FactEvidence[];
+}
+
+export type CommandRole =
+  | "build"
+  | "dev"
+  | "test"
+  | "typecheck"
+  | "lint"
+  | "format"
+  | "publish"
+  | "release"
+  | "prepack"
+  | "prepublish"
+  | "start"
+  | "e2e"
+  | "unit-test"
+  | "integration-test"
+  | "clean"
+  | "generate"
+  | "migrate"
+  | "docker-up"
+  | "docker-down"
+  | "unknown";
+
+export interface CommandFact {
+  name: string;
+  role: CommandRole;
+  command: string;
+  rawScript: string;
+  scope: ScanScope;
+  confidence: number;
+  evidence: FactEvidence[];
+}
+
+export interface RepoPrimaryFacts {
+  projectTypes: ProjectTypeDetection[];
+  languages: LanguageDetection[];
+  frameworks: FrameworkDetection[];
+  packageManagers: PackageManagerDetection[];
+  buildTools: ToolDetection[];
+  testTools: ToolDetection[];
+  commands: CommandFact[];
+}
+
+export interface RepoSecondaryFacts {
+  projectTypes: ProjectTypeDetection[];
+  languages: LanguageDetection[];
+  frameworks: FrameworkDetection[];
+  packageManagers: PackageManagerDetection[];
+  buildTools: ToolDetection[];
+  testTools: ToolDetection[];
+  commands: CommandFact[];
+}
+
 export interface RepoFacts {
+  scanSchemaVersion?: number;
   repoRoot: string;
   scanTimeIso: string;
   languages: string[];
@@ -16,6 +113,8 @@ export interface RepoFacts {
   findings: RepoFinding[];
   topology: RepoTopology;
   readiness: RepoReadiness;
+  primaryFacts?: RepoPrimaryFacts;
+  secondaryFacts?: RepoSecondaryFacts;
 }
 
 export interface RepoTopology {
@@ -37,7 +136,7 @@ export interface FrameworkDetection {
   id: string;
   category: FrameworkCategory;
   confidence: number;
-  evidence: string[];
+  evidence: FactEvidence[];
   version?: string;
 }
 
@@ -45,6 +144,7 @@ export interface PackageManagerDetection {
   id: "npm" | "pnpm" | "yarn" | "bun" | "pip" | "poetry" | "uv" | "pipenv";
   confidence: number;
   lockfiles: string[];
+  evidence?: FactEvidence[];
   workspaceMode?: boolean;
 }
 
@@ -62,7 +162,7 @@ export interface RepoFinding {
   code: string;
   severity: "info" | "warn" | "error";
   message: string;
-  evidence?: string[];
+  evidence?: FactEvidence[];
   category: "stack" | "testing" | "docs" | "ai-config" | "security";
 }
 

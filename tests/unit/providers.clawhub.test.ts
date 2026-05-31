@@ -9,7 +9,12 @@ const repoFacts: RepoFacts = {
   scanTimeIso: "2026-05-29T00:00:00.000Z",
   languages: ["TypeScript"],
   packageManagers: [],
-  frameworks: [{ id: "nextjs", category: "frontend", confidence: 0.95, evidence: ["next.config.mjs"] }],
+  frameworks: [{
+    id: "nextjs",
+    category: "frontend",
+    confidence: 0.95,
+    evidence: [{ path: "next.config.mjs", scope: "root", reason: "next.config.* file is present", confidence: 0.95 }]
+  }],
   aiAssistants: [],
   findings: [],
   topology: { sourceDirs: [], routeDirs: [], componentDirs: [], apiDirs: [], testDirs: [], docDirs: [] },

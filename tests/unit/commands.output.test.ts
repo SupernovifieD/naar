@@ -51,7 +51,12 @@ const repoFacts: RepoFacts = {
   scanTimeIso: "2026-05-30T00:00:00.000Z",
   languages: ["TypeScript"],
   packageManagers: [{ id: "npm", confidence: 1, lockfiles: ["package-lock.json"] }],
-  frameworks: [{ id: "react", category: "frontend", confidence: 1, evidence: ["package.json"] }],
+  frameworks: [{
+    id: "react",
+    category: "frontend",
+    confidence: 1,
+    evidence: [{ path: "package.json", scope: "root", reason: "dependencies.react is present", confidence: 1 }]
+  }],
   aiAssistants: [{
     id: "claude",
     status: "found",

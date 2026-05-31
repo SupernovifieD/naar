@@ -69,6 +69,7 @@ describe("pipeline installed filtering", () => {
 
     const cache = {
       repoFacts: {
+        scanSchemaVersion: 2,
         repoRoot,
         scanTimeIso: "2026-05-29T00:00:00.000Z",
         languages: ["TypeScript"],
