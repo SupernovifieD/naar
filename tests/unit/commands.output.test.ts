@@ -191,7 +191,7 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Why:");
     expect(output).toContain("Targets:");
     expect(output).toContain("Meta:");
-    expect(output).toContain("Publisher: anthropic");
+    expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
     expect(output).toContain("License: MIT");
   });
 

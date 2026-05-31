@@ -160,9 +160,9 @@ export function renderRecommendationCard(
   const publisher = recommendation.candidate.metadata.publisher
     ?? recommendation.candidate.source.publisher
     ?? recommendation.candidate.source.providerId;
-  lines.push(`${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`);
   lines.push(
-    `${indent}${pc.blue("Score")}: ${colorScore(recommendation.score, { percent: true })}`
+    `${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`
+    + `   ${pc.blue("Score")}: ${colorScore(recommendation.score, { percent: true })}`
     + `   ${pc.blue("Risk")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
     + `   ${pc.blue("Status")}: ${recommendation.blocked ? pc.red("BLOCKED") : pc.green("ELIGIBLE")}`
   );
@@ -349,11 +349,11 @@ export function formatRecommendationChoiceDescription(recommendation: SkillRecom
   const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
   const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
   return [
-    `- status: ${status}`,
-    `- why: ${why}`,
-    `- targets: ${targets}`,
-    `- publisher: ${publisher}`,
-    `- trust: ${trust}`
+    `- Status: ${status}`,
+    `- Why: ${why}`,
+    `- Targets: ${targets}`,
+    `- Publisher: ${publisher}`,
+    `- Trust: ${trust}`
   ].join("\n");
 }
 
@@ -456,10 +456,6 @@ function formatRecommendationMetaFields(recommendation: SkillRecommendation): Ar
   const metadata = recommendation.candidate.metadata;
   const parts: Array<{ key: string; value: string }> = [];
 
-  const publisher = metadata.publisher;
-  if (publisher) {
-    parts.push({ key: "publisher", value: publisher });
-  }
   if (metadata.trustLevel) {
     parts.push({ key: "trust", value: metadata.trustLevel });
   }

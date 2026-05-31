@@ -126,7 +126,7 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("Score: 88%");
     expect(output).toContain("Status: ELIGIBLE");
     expect(output).toContain("Meta:");
-    expect(output).toContain("Publisher: anthropic");
+    expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
     expect(output).toContain("Trust: official");
     expect(output).toContain("License: MIT");
     expect(output).toContain("Updated: 2026-05-30");
@@ -228,11 +228,11 @@ describe("recommendation card helpers", () => {
 
   it("builds focused install choice description", () => {
     const text = formatRecommendationChoiceDescription(makeRecommendation());
-    expect(text).toContain("- status: ELIGIBLE");
-    expect(text).toContain("- why: Matched stack: Next.js; Assistant compatibility: claude");
-    expect(text).toContain("- targets: claude, cursor, copilot");
-    expect(text).toContain("- publisher: anthropic");
-    expect(text).toContain("- trust: official");
+    expect(text).toContain("- Status: ELIGIBLE");
+    expect(text).toContain("- Why: Matched stack: Next.js; Assistant compatibility: claude");
+    expect(text).toContain("- Targets: claude, cursor, copilot");
+    expect(text).toContain("- Publisher: anthropic");
+    expect(text).toContain("- Trust: official");
     expect(text).not.toContain("desc:");
   });
 });
