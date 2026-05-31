@@ -146,7 +146,8 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("1) Frontend Design Pro [anthropic]");
     expect(output).toContain("score: 88%");
     expect(output).toContain("status: ELIGIBLE");
-    expect(output).toContain("why: Matched stack: Next.js");
+    expect(output).toContain("why:");
+    expect(output).toContain("  Matched stack: Next.js");
     expect(output).not.toContain("description:");
     expect(output).not.toContain("targets:");
     expect(output).not.toContain("meta:");

@@ -39,7 +39,7 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
   process.stdout.write(`\n${pc.bold("Recommendations")}:\n`);
   process.stdout.write(renderRecommendationCards(pipeline.recommendations, {
     indent: "  ",
-    reasonLimit: 2,
+    reasonLimit: 3,
     compact: flags.compact
   }));
 }

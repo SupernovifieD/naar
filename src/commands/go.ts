@@ -151,7 +151,7 @@ function renderRankingSummary(
 
   process.stdout.write(renderRecommendationCards(recommendations, {
     indent: "  ",
-    reasonLimit: 2,
+    reasonLimit: 3,
     compact: flags.compact
   }));
 

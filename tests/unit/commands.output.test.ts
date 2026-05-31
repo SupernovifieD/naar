@@ -183,6 +183,28 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("license: MIT");
   });
 
+  it("shows at most three reasons in card why block", async () => {
+    const recommendation = makeRecommendation("API skill description from provider");
+    recommendation.reasons = [
+      "Matched stack: React",
+      "Matched language: TypeScript",
+      "Addresses missing capability: Testing guidance",
+      "Compatible with detected assistants: claude"
+    ];
+    const result = makePipelineResult([recommendation]);
+    buildRecommendationsMock.mockResolvedValue(result);
+
+    const output = await captureStdout(async () => {
+      await runRecommend(baseFlags);
+    });
+
+    expect(output).toContain("why:");
+    expect(output).toContain("Matched stack: React");
+    expect(output).toContain("Matched language: TypeScript");
+    expect(output).toContain("Addresses missing capability: Testing guidance");
+    expect(output).not.toContain("Compatible with detected assistants: claude");
+  });
+
   it("prints fallback summary when description is missing", async () => {
     const result = makePipelineResult([makeRecommendation(undefined, "Fallback summary text")]);
     buildRecommendationsMock.mockResolvedValue(result);

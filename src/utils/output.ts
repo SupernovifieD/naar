@@ -252,21 +252,10 @@ function appendWrappedReasonsField(
   lines: string[],
   options: { cardWidth: number; indent: string; label: string; reasons: string[] }
 ): void {
-  const plainPrefix = `${options.indent}${options.label}: `;
-  const continuationPrefix = `${options.indent}${" ".repeat(options.label.length + 2)}`;
-  const availableWidth = Math.max(12, options.cardWidth - plainPrefix.length);
+  const reasonPrefix = `${options.indent}  `;
+  const availableWidth = Math.max(12, options.cardWidth - reasonPrefix.length);
 
-  if (options.reasons.length === 0) {
-    appendWrappedField(lines, {
-      cardWidth: options.cardWidth,
-      indent: options.indent,
-      label: options.label,
-      value: "n/a"
-    });
-    return;
-  }
-
-  let printedAny = false;
+  lines.push(`${options.indent}${pc.blue(options.label)}:`);
 
   for (const reason of options.reasons) {
     const wrapped = wrapForTerminal(reason, availableWidth);
@@ -274,26 +263,15 @@ function appendWrappedReasonsField(
       continue;
     }
 
-    const firstSegment = wrapped[0];
-    if (!printedAny) {
-      lines.push(`${options.indent}${pc.blue(options.label)}: ${formatReason(firstSegment)}`);
-      printedAny = true;
-    } else {
-      lines.push(`${continuationPrefix}${formatReason(firstSegment)}`);
-    }
+    lines.push(`${reasonPrefix}${formatReason(wrapped[0])}`);
 
     for (const segment of wrapped.slice(1)) {
-      lines.push(`${continuationPrefix}${pc.white(segment)}`);
+      lines.push(`${reasonPrefix}${pc.white(segment)}`);
     }
   }
 
-  if (!printedAny) {
-    appendWrappedField(lines, {
-      cardWidth: options.cardWidth,
-      indent: options.indent,
-      label: options.label,
-      value: "n/a"
-    });
+  if (options.reasons.length === 0) {
+    lines.push(`${reasonPrefix}${pc.white("n/a")}`);
   }
 }
 
