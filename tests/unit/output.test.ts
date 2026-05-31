@@ -154,9 +154,11 @@ describe("recommendation card helpers", () => {
 
   it("builds focused install choice description", () => {
     const text = formatRecommendationChoiceDescription(makeRecommendation());
-    expect(text).toContain("desc: API description");
-    expect(text).toContain("why: Matched stack: Next.js; Assistant compatibility: claude");
-    expect(text).toContain("targets: claude, cursor, copilot");
-    expect(text).toContain("status: ELIGIBLE");
+    expect(text).toContain("- status: ELIGIBLE");
+    expect(text).toContain("- why: Matched stack: Next.js; Assistant compatibility: claude");
+    expect(text).toContain("- targets: claude, cursor, copilot");
+    expect(text).toContain("- publisher: anthropic");
+    expect(text).toContain("- trust: official");
+    expect(text).not.toContain("desc:");
   });
 });

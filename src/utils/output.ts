@@ -214,12 +214,19 @@ export function renderRecommendationCard(
 }
 
 export function formatRecommendationChoiceDescription(recommendation: SkillRecommendation): string {
-  const description = resolveSkillDescription(recommendation.candidate) ?? "No description available.";
   const reasons = recommendation.reasons.slice(0, DEFAULT_REASON_LIMIT).map((reason) => reason.trim()).filter(Boolean);
   const why = reasons.length > 0 ? reasons.join("; ") : "n/a";
   const targets = formatTargets(recommendation.candidate.compatibility.assistants);
   const status = recommendation.blocked ? "BLOCKED" : "ELIGIBLE";
-  return `desc: ${description}\nwhy: ${why}\ntargets: ${targets}\nstatus: ${status}`;
+  const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
+  const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
+  return [
+    `- status: ${status}`,
+    `- why: ${why}`,
+    `- targets: ${targets}`,
+    `- publisher: ${publisher}`,
+    `- trust: ${trust}`
+  ].join("\n");
 }
 
 function appendWrappedField(
