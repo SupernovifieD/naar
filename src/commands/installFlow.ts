@@ -192,24 +192,30 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     for (const entry of blockedAfterFetch) {
       const statusLabel = entry.decision.hardBlocked ? "blocked (hard)" : "blocked";
       process.stderr.write(
-        `- ${pc.bold(entry.skillName)} [${entry.providerId}] status=${pc.red(statusLabel)} `
-        + `score=${colorScore(entry.risk.score, { percent: true })} `
-        + `risk=${colorRisk(entry.risk.score, { percent: true })} `
-        + `level=${entry.risk.level}\n`
+        `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)} `
+        + `${pc.blue("status")}=${colorSecurityStatus(statusLabel)} `
+        + `${pc.blue("score")}=${colorScore(entry.risk.score, { percent: true })} `
+        + `${pc.blue("risk")}=${colorRisk(entry.risk.score, { percent: true })} `
+        + `${pc.blue("level")}=${colorSecurityLevel(entry.risk.level)}\n`
       );
-      process.stderr.write("  reasons:\n");
+      process.stderr.write(`  ${pc.blue("reasons")}:\n`);
       for (const reason of entry.decision.reasons.slice(0, 5)) {
-        process.stderr.write(`  - ${reason}\n`);
+        process.stderr.write(`  - ${colorSecurityReason(reason)}\n`);
       }
 
       const signalLines = entry.risk.signals.slice(0, 5);
       let evidencePrinted = 0;
       for (const signal of signalLines) {
-        process.stderr.write(`  signal: ${signal.id} [${signal.severity}] ${signal.detail} (penalty=${signal.penalty})\n`);
+        process.stderr.write(
+          `  ${pc.blue("signal")}: ${pc.cyan(signal.id)} `
+          + `[${colorSignalSeverity(signal.severity)}] `
+          + `${pc.white(signal.detail)} `
+          + `${pc.dim(`(penalty=${signal.penalty})`)}\n`
+        );
         const evidences = signal.evidence ?? [];
         for (const evidence of evidences) {
           if (evidencePrinted >= 3) break;
-          process.stderr.write(`  evidence: ${formatSecurityEvidence(evidence)}\n`);
+          process.stderr.write(`  ${pc.blue("evidence")}: ${pc.white(formatSecurityEvidence(evidence))}\n`);
           evidencePrinted += 1;
         }
       }
@@ -749,4 +755,41 @@ function formatChoiceLabel(recommendation: SkillRecommendation): string {
         : pc.red("BLOCKED");
   return `${pc.bold(recommendation.candidate.name)} (${pc.cyan(recommendation.candidate.source.providerId)}) `
     + `score=${colorScore(recommendation.score, { percent: true })} risk=${colorRisk(recommendation.candidate.risk.score, { percent: true })} status=${statusLabel}`;
+}
+
+function colorSecurityStatus(label: string): string {
+  if (label.includes("hard")) return pc.red(label);
+  return pc.yellow(label);
+}
+
+function colorSecurityLevel(level: string): string {
+  if (level === "low") return pc.green(level);
+  if (level === "medium") return pc.yellow(level);
+  return pc.red(level);
+}
+
+function colorSignalSeverity(severity: string): string {
+  if (severity === "low") return pc.green(severity);
+  if (severity === "medium") return pc.yellow(severity);
+  return pc.red(severity);
+}
+
+function colorSecurityReason(reason: string): string {
+  if (reason.includes("--allow-risky")) {
+    return `${pc.white("Use")} ${pc.cyan("--allow-risky")} ${pc.white("to explicitly acknowledge and install overrideable risky skills.")}`;
+  }
+
+  const signalReason = reason.match(/^([a-z0-9_/-]+)\s+\[([a-z]+)\]:\s+(.+)$/i);
+  if (signalReason) {
+    const [, signalId, severity, detail] = signalReason;
+    return `${pc.cyan(signalId)} [${colorSignalSeverity(severity.toLowerCase())}]: ${pc.white(detail)}`;
+  }
+
+  if (reason.toLowerCase().includes("hard block")) {
+    return pc.red(reason);
+  }
+  if (reason.toLowerCase().includes("exceeds required threshold")) {
+    return pc.yellow(reason);
+  }
+  return pc.white(reason);
 }
