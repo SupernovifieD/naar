@@ -2,18 +2,27 @@ import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type {
   AssistantId,
-  CommandFact,
+  MatchedNeedDetail,
   MatchedFact,
+  NeedMatchStrength,
+  RecommendationCapApplied,
   RecommendationScoreComponent,
   RepoFacts,
   RepoNeed,
   RepoPrimaryFacts,
   RepoSecondaryFacts,
+  SkillCategory,
   SkillCandidate,
   SkillRecommendation,
   ToolDetection
 } from "../types/index.js";
 import { analyzeSkill, isInstallAllowed, type SecurityPolicy } from "../security/analyzeSkill.js";
+import { getNeedMatchProfile, matchNeedProfile, type NeedMatchLexicon } from "./needProfiles.js";
+import {
+  classifySkillCategories,
+  detectDomainSignals,
+  evaluateSpecializedGates
+} from "./specializedGates.js";
 
 const ALL_ASSISTANTS: AssistantId[] = ["claude", "cursor", "copilot", "codex", "generic"];
 
@@ -76,61 +85,26 @@ interface RecommendationContext {
   primaryToolFacts: Map<string, MatchedFact>;
   repoTokens: Set<string>;
   repoDomains: Set<string>;
+  hasProviderSourcePath: boolean;
+  hasSkillAuthoringPath: boolean;
 }
 
 interface NormalizedCandidate {
+  primaryText: string;
+  primaryTokens: Set<string>;
+  supportingText: string;
+  supportingTokens: Set<string>;
   tokens: Set<string>;
   assistants: Set<AssistantId>;
   frameworks: Set<string>;
   languages: Set<string>;
   domains: Set<string>;
+  domainSignals: string[];
+  categories: SkillCategory[];
   hasAssistantKeyword: boolean;
   isSetupSkill: boolean;
   isGeneralProductivity: boolean;
 }
-
-type NeedDefinition = {
-  id: string;
-  keywords: string[];
-};
-
-const NEED_DEFINITIONS: NeedDefinition[] = [
-  { id: "node_cli_development", keywords: ["cli", "terminal", "command"] },
-  { id: "npm_package_development", keywords: ["npm", "package", "publish"] },
-  { id: "library_development", keywords: ["library", "module", "sdk"] },
-  { id: "web_app_development", keywords: ["web", "frontend", "react", "nextjs", "tailwind"] },
-  { id: "api_development", keywords: ["api", "http", "server", "backend", "fastapi", "flask"] },
-  { id: "monorepo_navigation", keywords: ["monorepo", "workspace", "turborepo"] },
-  { id: "docs_project_support", keywords: ["docs", "documentation", "readme"] },
-  { id: "typescript_refactor_safety", keywords: ["typescript", "refactor", "type-safety", "typecheck"] },
-  { id: "typescript_config_review", keywords: ["tsconfig", "typescript", "compiler"] },
-  { id: "javascript_node_development", keywords: ["javascript", "node", "npm"] },
-  { id: "python_development", keywords: ["python", "pytest", "fastapi", "django", "flask"] },
-  { id: "tsup_build_pipeline", keywords: ["tsup", "build", "bundle"] },
-  { id: "typescript_typecheck", keywords: ["tsc", "typecheck", "typescript"] },
-  { id: "vitest_testing", keywords: ["vitest", "testing", "unit-test", "test"] },
-  { id: "test_generation", keywords: ["test", "testing", "qa", "coverage"] },
-  { id: "test_debugging", keywords: ["debug", "failing-tests", "test"] },
-  { id: "github_actions_ci", keywords: ["github-actions", "ci", "workflow"] },
-  { id: "npm_publish_workflow", keywords: ["publish", "prepack", "prepublish", "release"] },
-  { id: "release_safety", keywords: ["release", "publish", "versioning"] },
-  { id: "cli_command_design", keywords: ["cli", "command", "ux"] },
-  { id: "interactive_cli_ux", keywords: ["interactive", "prompt", "terminal", "inquirer"] },
-  { id: "terminal_output_design", keywords: ["terminal", "output", "console", "cli"] },
-  { id: "safe_file_writes", keywords: ["safe-write", "install", "file", "conflict", "atomic"] },
-  { id: "install_plan_review", keywords: ["install-plan", "plan", "installer", "review"] },
-  { id: "package_security_review", keywords: ["security", "risk", "policy", "review"] },
-  { id: "provenance_tracking", keywords: ["provenance", "pinned", "version", "lockfile"] },
-  { id: "http_api_client", keywords: ["http", "api", "client", "undici", "fetch"] },
-  { id: "provider_integration", keywords: ["provider", "integration", "connector", "orchestrator"] },
-  { id: "json_schema_validation", keywords: ["json", "schema", "validation"] },
-  { id: "zod_validation", keywords: ["zod", "validation", "schema"] },
-  { id: "agent_config_setup", keywords: ["agent", "config", "setup", "instructions"] },
-  { id: "claude_project_setup", keywords: ["claude-code", "claude-md", "claude-config", "project-skill", "project-skill-setup", "claude-project-setup"] },
-  { id: "copilot_instruction_setup", keywords: ["copilot-instructions", "repo-instructions", "copilot-config", "copilot-setup", "copilot-repo-instructions"] },
-  { id: "codex_project_skills", keywords: ["codex", "agents", "skills", "setup"] },
-  { id: "mcp_server_development", keywords: ["mcp", "modelcontextprotocol", "server", "protocol"] }
-];
 
 const PROJECT_TYPE_KEYWORDS: Record<string, string[]> = {
   cli: ["cli", "terminal", "command"],
@@ -207,8 +181,15 @@ export function recommendSkills(
     const eligibilityReasons: string[] = [];
     const matchedFacts: MatchedFact[] = [];
     const matchedNeeds: string[] = [];
+    const matchedNeedDetails: MatchedNeedDetail[] = [];
+    const capsApplied: RecommendationCapApplied[] = [];
     const scoreBreakdown: RecommendationScoreComponent[] = [];
+    const skillCategories = classifySkillCategories(normalized.primaryText, normalized.primaryTokens);
+    const domainSignals = detectDomainSignals(normalized.primaryText, normalized.primaryTokens);
     let score = 0;
+    let sawStrongNeedMatch = false;
+    let sawWeakNeedMatch = false;
+    let sawNeedNegativeMatch = false;
 
     if (assistantMatches.length === 0 && options.allCompatible) {
       score = applyScoreComponent(score, scoreBreakdown, {
@@ -233,24 +214,71 @@ export function recommendSkills(
       }
     }
 
-    const needMatches = matchNeeds(normalized.tokens, repoNeeds);
-    let needPoints = 0;
-    for (const needId of needMatches) {
-      matchedNeeds.push(needId);
-      const limitRemaining = 60 - needPoints;
-      if (limitRemaining <= 0) continue;
-      const points = Math.min(30, limitRemaining);
-      needPoints += points;
+    const needLexicon: NeedMatchLexicon = {
+      primaryText: normalized.primaryText,
+      primaryTokens: normalized.primaryTokens,
+      supportingText: normalized.supportingText,
+      supportingTokens: normalized.supportingTokens
+    };
+    const needMatchStrengths = new Map<string, NeedMatchStrength>();
+    for (const repoNeed of repoNeeds) {
+      const profile = getNeedMatchProfile(repoNeed.id);
+      if (!profile) continue;
+      const match = matchNeedProfile(profile, needLexicon);
+      needMatchStrengths.set(repoNeed.id, match.strength);
+
+      let points = 0;
+      if (match.strength === "exact") points = 35;
+      if (match.strength === "strong") points = 28;
+      if (match.strength === "weak") points = 6;
+      if (match.strength === "negative") points = -30;
+
+      if (match.strength === "none") {
+        if (match.reason && match.matchedTerms.length > 0) {
+          penalties.push(`${repoNeed.id}: ${match.reason}`);
+        }
+        continue;
+      }
+
+      if (match.strength === "exact" || match.strength === "strong") {
+        sawStrongNeedMatch = true;
+        matchedNeeds.push(repoNeed.id);
+        reasons.push(`Matched repo need: ${repoNeed.id} (${match.strength})`);
+        matchedFacts.push({
+          factType: "repoNeed",
+          id: repoNeed.id,
+          source: "repoNeeds"
+        });
+      }
+      if (match.strength === "weak") {
+        sawWeakNeedMatch = true;
+        penalties.push(`Weak repo-need evidence only: ${repoNeed.id}`);
+      }
+      if (match.strength === "negative") {
+        sawNeedNegativeMatch = true;
+        penalties.push(`Need anti-trigger: ${repoNeed.id}`);
+      }
+
+      const breakdownKind = match.strength === "weak"
+        ? "repo_need_weak_match"
+        : (match.strength === "negative" ? "repo_need_negative_match" : "repo_need_match");
       score = applyScoreComponent(score, scoreBreakdown, {
-        kind: "repo_need_match",
+        kind: breakdownKind,
         points,
-        detail: needId
+        detail: repoNeed.id,
+        strength: match.strength,
+        matchedTerms: match.matchedTerms,
+        antiTerms: match.antiTerms,
+        reason: match.reason
       });
-      reasons.push(`Matched repo need: ${needId}`);
-      matchedFacts.push({
-        factType: "repoNeed",
-        id: needId,
-        source: "repoNeeds"
+
+      matchedNeedDetails.push({
+        id: repoNeed.id,
+        strength: match.strength,
+        points,
+        matchedTerms: match.matchedTerms,
+        antiTerms: match.antiTerms,
+        reason: match.reason
       });
     }
 
@@ -296,6 +324,11 @@ export function recommendSkills(
         detail: `Secondary-only framework matches: ${secondaryOnlyFrameworkMatches.slice(0, 3).join(", ")}`
       });
       penalties.push(`Skill targets ${secondaryOnlyFrameworkMatches.slice(0, 3).join(", ")}, but those frameworks are only in fixture/secondary scope`);
+      capsApplied.push({
+        kind: "secondary_only_framework_cap",
+        cap: 40,
+        reason: "Framework relevance is secondary/fixture-only"
+      });
     }
 
     const toolMatches = matchPrimaryTools(context, normalized.tokens);
@@ -330,7 +363,7 @@ export function recommendSkills(
       matchedFacts.push({ factType: "language", id: languageId, source: "primaryFacts" });
     }
 
-    const hasDeepMatch = needMatches.length > 0 || projectTypeMatches.length > 0 || frameworkMatches.length > 0 || toolMatches.length > 0;
+    const hasDeepMatch = matchedNeeds.length > 0 || projectTypeMatches.length > 0 || frameworkMatches.length > 0 || toolMatches.length > 0;
     if (languageMatches.length > 0 && !hasDeepMatch) {
       score = applyScoreComponent(score, scoreBreakdown, {
         kind: "language_only_penalty",
@@ -340,11 +373,18 @@ export function recommendSkills(
       penalties.push("Language-only match; no deeper project need match");
     }
 
-    const missingMismatchPenalty = evaluateMissingCapabilityMismatch(context, normalized, needMatches, penalties, scoreBreakdown);
+    const missingMismatchPenalty = evaluateMissingCapabilityMismatch(context, normalized, matchedNeedDetails, penalties, scoreBreakdown);
     score += missingMismatchPenalty;
 
     const domainPenalty = applyDomainPenalty(context, normalized, penalties, scoreBreakdown);
     score += domainPenalty;
+    if (domainPenalty < 0) {
+      capsApplied.push({
+        kind: "domain_mismatch_cap",
+        cap: 15,
+        reason: "Domain mismatch penalty applied"
+      });
+    }
 
     if (normalized.isGeneralProductivity && !hasDeepMatch) {
       score = applyScoreComponent(score, scoreBreakdown, {
@@ -353,6 +393,11 @@ export function recommendSkills(
         detail: "General productivity skill has no repo-specific evidence"
       });
       penalties.push("General productivity skill with no repo-specific evidence");
+      capsApplied.push({
+        kind: "general_productivity_cap",
+        cap: 35,
+        reason: "General productivity skill with no repo-specific evidence"
+      });
     }
 
     if (candidate.metadata.trustLevel === "official") {
@@ -396,6 +441,78 @@ export function recommendSkills(
       });
     }
 
+    const specializedGateResults = evaluateSpecializedGates({
+      candidateText: normalized.primaryText,
+      candidateTokens: normalized.primaryTokens,
+      skillCategories,
+      domainSignals,
+      repoNeedIds,
+      repoTokens: context.repoTokens,
+      repoDomains: context.repoDomains,
+      primaryFrameworks: new Set(context.primaryFrameworks.keys()),
+      secondaryFrameworks: context.secondaryFrameworks,
+      hasProviderSourcePath: context.hasProviderSourcePath,
+      hasSkillAuthoringPath: context.hasSkillAuthoringPath
+    });
+
+    for (const gate of specializedGateResults) {
+      score = applyScoreComponent(score, scoreBreakdown, {
+        kind: gate.kind,
+        points: gate.penalty,
+        detail: gate.message,
+        reason: gate.message
+      });
+      penalties.push(gate.message);
+      capsApplied.push({
+        kind: "specialized_gate_cap",
+        cap: gate.scoreCap,
+        reason: gate.message
+      });
+    }
+
+    if (sawWeakNeedMatch && !sawStrongNeedMatch) {
+      capsApplied.push({
+        kind: "weak_only_cap",
+        cap: 45,
+        reason: "Only weak repo-need matches were found"
+      });
+    }
+    if (!sawStrongNeedMatch) {
+      capsApplied.push({
+        kind: "no_strong_need_cap",
+        cap: 40,
+        reason: "No strong repo-need match was found"
+      });
+    }
+    if (languageMatches.length > 0 && !hasDeepMatch) {
+      capsApplied.push({
+        kind: "language_only_cap",
+        cap: 35,
+        reason: "Language-only relevance"
+      });
+    }
+    if (sawNeedNegativeMatch && !sawStrongNeedMatch) {
+      capsApplied.push({
+        kind: "negative_need_cap",
+        cap: 35,
+        reason: "Need anti-triggers were matched without strong need evidence"
+      });
+    }
+
+    const effectiveCap = capsApplied.length > 0
+      ? Math.min(...capsApplied.map((cap) => cap.cap))
+      : null;
+    if (effectiveCap !== null && score > effectiveCap) {
+      const beforeCap = score;
+      score = effectiveCap;
+      scoreBreakdown.push({
+        kind: "score_cap_applied",
+        points: effectiveCap - beforeCap,
+        detail: `Score capped at ${effectiveCap}`,
+        reason: capsApplied.find((cap) => cap.cap === effectiveCap)?.reason
+      });
+    }
+
     const allowance = isInstallAllowed(risk, options, !!candidate.metadata.hasScripts);
 
     const normalizedReasons = dedupeStrings(reasons).slice(0, 8);
@@ -407,9 +524,13 @@ export function recommendSkills(
       score: clampScore(score),
       reasons: normalizedReasons,
       matchedNeeds: dedupeStrings(matchedNeeds),
+      matchedNeedDetails,
       matchedFacts: dedupeFacts(matchedFacts),
       eligibilityReasons: normalizedEligibility,
       penalties: normalizedPenalties,
+      capsApplied: dedupeCaps(capsApplied),
+      skillCategories,
+      domainSignals,
       scoreBreakdown,
       blocked: !allowance.allowed,
       blockReasons: allowance.reasons
@@ -503,6 +624,9 @@ function buildRecommendationContext(repoFacts: RepoFacts): RecommendationContext
 
   const repoTokens = gatherRepoTokens(repoFacts.repoRoot, primary, secondary);
   const repoDomains = detectDomains(repoTokens);
+  const hasProviderSourcePath = existsInRepo(repoFacts.repoRoot, "src/providers");
+  const hasSkillAuthoringPath = existsInRepo(repoFacts.repoRoot, ".claude/skills")
+    || existsInRepo(repoFacts.repoRoot, "skills");
 
   return {
     primary,
@@ -515,7 +639,9 @@ function buildRecommendationContext(repoFacts: RepoFacts): RecommendationContext
     primaryProjectTypes,
     primaryToolFacts,
     repoTokens,
-    repoDomains
+    repoDomains,
+    hasProviderSourcePath,
+    hasSkillAuthoringPath
   };
 }
 
@@ -667,19 +793,25 @@ function inferRepoNeeds(repoFacts: RepoFacts, context: RecommendationContext): R
 }
 
 function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
-  const textParts = [
+  const primaryParts = [
     candidate.name,
     candidate.canonicalSkillId,
     candidate.providerSkillId,
     candidate.summary,
     candidate.metadata.description ?? "",
-    ...candidate.tags,
+    ...candidate.tags
+  ];
+  const supportingParts = [
     ...(candidate.compatibility.frameworks ?? []),
     ...(candidate.compatibility.languages ?? []),
     ...candidate.compatibility.assistants
   ];
 
-  const tokens = toTokenSet(textParts.join(" "));
+  const primaryText = normalizeTextForSearch(primaryParts.join(" "));
+  const supportingText = normalizeTextForSearch(supportingParts.join(" "));
+  const primaryTokens = toTokenSet(primaryText);
+  const supportingTokens = toTokenSet(supportingText);
+  const tokens = new Set<string>([...primaryTokens, ...supportingTokens]);
   const assistants = new Set<AssistantId>(candidate.compatibility.assistants);
   const frameworks = new Set<string>((candidate.compatibility.frameworks ?? []).map((item) => normalizeFramework(item)));
   const languages = new Set<string>((candidate.compatibility.languages ?? []).map((item) => item.toLowerCase()));
@@ -692,34 +824,28 @@ function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
   }
 
   const domains = detectDomains(tokens);
+  const categories = classifySkillCategories(primaryText, primaryTokens);
+  const domainSignals = detectDomainSignals(primaryText, primaryTokens);
   const hasAssistantKeyword = ["claude", "copilot", "cursor", "codex", "agent", "assistant"].some((token) => tokens.has(token));
   const isSetupSkill = [...SETUP_KEYWORDS].some((token) => tokens.has(token));
   const isGeneralProductivity = [...PRODUCTIVITY_KEYWORDS].some((token) => tokens.has(token));
 
   return {
+    primaryText,
+    primaryTokens,
+    supportingText,
+    supportingTokens,
     tokens,
     assistants,
     frameworks,
     languages,
     domains,
+    domainSignals,
+    categories,
     hasAssistantKeyword,
     isSetupSkill,
     isGeneralProductivity
   };
-}
-
-function matchNeeds(tokens: Set<string>, repoNeeds: RepoNeed[]): string[] {
-  const matches: string[] = [];
-
-  for (const need of repoNeeds) {
-    const definition = NEED_DEFINITIONS.find((item) => item.id === need.id);
-    if (!definition) continue;
-    if (definition.keywords.some((keyword) => tokens.has(keyword))) {
-      matches.push(need.id);
-    }
-  }
-
-  return matches;
 }
 
 function matchPrimaryProjectTypes(context: RecommendationContext, tokens: Set<string>): MatchedFact[] {
@@ -761,11 +887,15 @@ function matchLanguages(context: RecommendationContext, candidate: NormalizedCan
 function evaluateMissingCapabilityMismatch(
   context: RecommendationContext,
   candidate: NormalizedCandidate,
-  needMatches: string[],
+  needMatches: MatchedNeedDetail[],
   penalties: string[],
   scoreBreakdown: RecommendationScoreComponent[]
 ): number {
-  const matchedNeedSet = new Set(needMatches);
+  const matchedNeedSet = new Set(
+    needMatches
+      .filter((match) => match.strength === "exact" || match.strength === "strong")
+      .map((match) => match.id)
+  );
   let delta = 0;
 
   if (context.missingSet.has("missing_claude_config") && candidate.tokens.has("claude") && !matchedNeedSet.has("claude_project_setup") && !candidate.isSetupSkill) {
@@ -854,6 +984,18 @@ function dedupeStrings(values: string[]): string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function dedupeCaps(values: RecommendationCapApplied[]): RecommendationCapApplied[] {
+  const seen = new Set<string>();
+  const output: RecommendationCapApplied[] = [];
+  for (const value of values) {
+    const key = `${value.kind}:${value.cap}:${value.reason}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(value);
+  }
+  return output;
+}
+
 function dedupeFacts(values: MatchedFact[]): MatchedFact[] {
   const seen = new Set<string>();
   const output: MatchedFact[] = [];
@@ -869,11 +1011,7 @@ function dedupeFacts(values: MatchedFact[]): MatchedFact[] {
 }
 
 function toTokenSet(input: string): Set<string> {
-  const normalized = input
-    .toLowerCase()
-    .replace(/[./:@]/g, " ")
-    .replace(/[^a-z0-9+_-]+/g, " ")
-    .trim();
+  const normalized = normalizeTextForSearch(input);
 
   if (normalized.length === 0) return new Set<string>();
   const tokens = normalized.split(/\s+/).filter(Boolean);
@@ -893,6 +1031,15 @@ function toTokenSet(input: string): Set<string> {
   }
 
   return output;
+}
+
+function normalizeTextForSearch(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[./:@]/g, " ")
+    .replace(/[^a-z0-9+_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeFramework(input: string): string {
@@ -949,6 +1096,22 @@ function gatherRepoTokens(repoRoot: string, primary: RepoPrimaryFacts, secondary
 
   addTokensFromPackageJson(repoRoot, tokens);
   addTokensFromReadme(repoRoot, tokens);
+  if (existsInRepo(repoRoot, "src/providers")) {
+    tokens.add("src/providers");
+    tokens.add("provider-source-path");
+  }
+  if (existsInRepo(repoRoot, "src/providers/anthropic.ts")) {
+    tokens.add("src/providers/anthropic.ts");
+    tokens.add("anthropic-sdk");
+  }
+  if (existsInRepo(repoRoot, ".claude/skills")) {
+    tokens.add(".claude/skills");
+    tokens.add("skill-authoring-path");
+  }
+  if (existsInRepo(repoRoot, "skills")) {
+    tokens.add("skills");
+    tokens.add("skill-authoring-path");
+  }
   return tokens;
 }
 

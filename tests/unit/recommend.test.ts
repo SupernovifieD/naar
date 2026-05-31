@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import path from "node:path";
+import os from "node:os";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { afterEach, describe, expect, it } from "vitest";
 import { recommendSkills } from "../../src/recommend/recommend.js";
 import type {
   AssistantId,
@@ -10,6 +13,12 @@ import type {
 } from "../../src/types/index.js";
 
 const NOW = "2026-05-31T00:00:00.000Z";
+const tempRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true })));
+  tempRoots.length = 0;
+});
 
 function evidence(path = "package.json", scope: FactEvidence["scope"] = "root"): FactEvidence {
   return {
@@ -103,6 +112,29 @@ function makeRepoFacts(options: {
       commands: []
     }
   };
+}
+
+async function makeTempRepo(options: {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  readme?: string;
+  name?: string;
+  description?: string;
+} = {}): Promise<string> {
+  const repoRoot = await mkdtemp(path.join(os.tmpdir(), "naar-recommend-"));
+  tempRoots.push(repoRoot);
+  const packageJson = {
+    name: options.name ?? "naar-recommend-test",
+    version: "1.0.0",
+    description: options.description ?? "test repo",
+    dependencies: options.dependencies ?? {},
+    devDependencies: options.devDependencies ?? {}
+  };
+  await writeFile(path.join(repoRoot, "package.json"), JSON.stringify(packageJson, null, 2), "utf8");
+  if (options.readme) {
+    await writeFile(path.join(repoRoot, "README.md"), options.readme, "utf8");
+  }
+  return repoRoot;
 }
 
 function makeSkill(
@@ -395,6 +427,155 @@ describe("recommendSkills", () => {
     expect(result.recommendations[0].candidate.canonicalSkillId).toBe("cli-tests");
   });
 
+  it("does not treat prompt optimization as interactive CLI UX", async () => {
+    const repoRoot = await makeTempRepo({
+      dependencies: { "@inquirer/prompts": "^7.0.0" }
+    });
+    const repoFacts = makeRepoFacts({ repoRoot });
+    const promptSkill = makeSkill("prompt-optimizer", {
+      name: "AI Prompt Optimization Expert",
+      summary: "CRISP framework for prompt optimization and LLM prompts",
+      tags: ["prompt optimization", "ai prompt", "llm prompt"],
+      assistants: ["claude"],
+      trustLevel: "official",
+      popularity: 2000
+    });
+
+    const result = recommendSkills(repoFacts, [promptSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    expect(result.recommendations).toHaveLength(1);
+    const recommendation = result.recommendations[0];
+    expect(recommendation.matchedNeeds).not.toContain("interactive_cli_ux");
+    const cliUxDetail = recommendation.matchedNeedDetails?.find((detail) => detail.id === "interactive_cli_ux");
+    expect(cliUxDetail?.strength === "negative" || cliUxDetail?.strength === "none").toBe(true);
+    expect(recommendation.score).toBeLessThanOrEqual(35);
+  });
+
+  it("does not match skill-creator/evals skills as software testing needs", () => {
+    const repoFacts = makeRepoFacts();
+    const skillCreator = makeSkill("skill-creator", {
+      summary: "Create skills with evals and benchmark skill performance",
+      tags: ["skill creator", "skill evals", "benchmark skill performance"],
+      assistants: ["claude"],
+      trustLevel: "official",
+      popularity: 5000
+    });
+
+    const result = recommendSkills(repoFacts, [skillCreator], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const recommendation = result.recommendations[0];
+    const testingNeeds = new Set(["vitest_testing", "test_generation", "test_debugging"]);
+    expect(recommendation.matchedNeeds.some((needId) => testingNeeds.has(needId))).toBe(false);
+    expect(recommendation.capsApplied?.some((cap) => cap.kind === "specialized_gate_cap")).toBe(true);
+    expect(recommendation.score).toBeLessThanOrEqual(45);
+  });
+
+  it("requires MCP repo evidence for MCP builder to avoid gate penalties", async () => {
+    const mcpSkill = makeSkill("mcp-builder", {
+      summary: "Build Model Context Protocol servers and transports",
+      tags: ["mcp", "modelcontextprotocol", "server", "protocol"],
+      assistants: ["claude"],
+      languages: ["TypeScript"],
+      trustLevel: "official",
+      popularity: 4000
+    });
+
+    const noMcpFacts = makeRepoFacts();
+    const noEvidence = recommendSkills(noMcpFacts, [mcpSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    }).recommendations[0];
+    expect(noEvidence.penalties).toContain("MCP-specific skill, but repo has no MCP evidence");
+    expect(noEvidence.score).toBeLessThanOrEqual(35);
+
+    const mcpRepoRoot = await makeTempRepo({
+      dependencies: { "@modelcontextprotocol/sdk": "^1.0.0" }
+    });
+    const mcpFacts = makeRepoFacts({ repoRoot: mcpRepoRoot });
+    const withEvidence = recommendSkills(mcpFacts, [mcpSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    }).recommendations[0];
+    expect(withEvidence.penalties).not.toContain("MCP-specific skill, but repo has no MCP evidence");
+  });
+
+  it("keeps claude-api skill moderate without Anthropic SDK/import evidence", () => {
+    const repoFacts = makeRepoFacts();
+    const claudeApi = makeSkill("claude-api", {
+      summary: "Claude API client patterns with prompt caching for Sonnet and Opus",
+      tags: ["claude api", "anthropic sdk", "prompt caching", "api client"],
+      assistants: ["claude"],
+      languages: ["TypeScript"],
+      trustLevel: "official",
+      popularity: 5000
+    });
+
+    const result = recommendSkills(repoFacts, [claudeApi], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const recommendation = result.recommendations[0];
+    expect(recommendation.score).toBeLessThanOrEqual(60);
+    expect(recommendation.matchedNeeds).not.toContain("interactive_cli_ux");
+    expect(recommendation.matchedNeeds).not.toContain("test_debugging");
+    expect(recommendation.matchedNeeds).not.toContain("tsup_build_pipeline");
+  });
+
+  it("keeps crypto/defi skills heavily capped without repo-domain evidence", () => {
+    const repoFacts = makeRepoFacts();
+    const defiSkill = makeSkill("defi-trader", {
+      summary: "Onchain DeFi trading, futures, swaps and hyperliquid workflows",
+      tags: ["crypto", "defi", "trading", "futures", "hyperliquid", "farmdash"],
+      assistants: ["claude"],
+      trustLevel: "official",
+      popularity: 10000
+    });
+
+    const result = recommendSkills(repoFacts, [defiSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    expect(result.recommendations[0].score).toBeLessThanOrEqual(15);
+  });
+
+  it("prevents trust/popularity bonuses from escaping weak-relevance caps", async () => {
+    const repoRoot = await makeTempRepo({
+      dependencies: { "@inquirer/prompts": "^7.0.0" }
+    });
+    const repoFacts = makeRepoFacts({ repoRoot });
+    const promptSkill = makeSkill("prompt-pro", {
+      summary: "Prompt optimization playbook with AI prompt quality framework",
+      tags: ["prompt optimization", "ai prompt", "llm prompt"],
+      assistants: ["claude"],
+      trustLevel: "official",
+      popularity: 100000
+    });
+
+    const result = recommendSkills(repoFacts, [promptSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    expect(result.recommendations).toHaveLength(1);
+    expect(result.recommendations[0].score).toBeLessThanOrEqual(35);
+    expect(result.recommendations[0].capsApplied?.length ?? 0).toBeGreaterThan(0);
+  });
+
   it("exposes explainability fields and repoNeeds in output", () => {
     const repoFacts = makeRepoFacts();
     const candidate = makeSkill("explainable", {
@@ -416,9 +597,13 @@ describe("recommendSkills", () => {
 
     const recommendation = result.recommendations[0];
     expect(recommendation.matchedNeeds.length).toBeGreaterThan(0);
+    expect((recommendation.matchedNeedDetails?.length ?? 0)).toBeGreaterThan(0);
     expect(recommendation.matchedFacts.length).toBeGreaterThan(0);
     expect(Array.isArray(recommendation.penalties)).toBe(true);
     expect(Array.isArray(recommendation.eligibilityReasons)).toBe(true);
+    expect(Array.isArray(recommendation.capsApplied ?? [])).toBe(true);
+    expect(Array.isArray(recommendation.skillCategories ?? [])).toBe(true);
+    expect(Array.isArray(recommendation.domainSignals ?? [])).toBe(true);
     expect(recommendation.scoreBreakdown.length).toBeGreaterThan(0);
   });
 });

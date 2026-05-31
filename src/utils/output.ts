@@ -235,6 +235,26 @@ export function renderRecommendationCard(
   }
 
   if (verbose) {
+    const categories = (recommendation.skillCategories ?? []).slice(0, 8);
+    if (categories.length > 0) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "skillCategories",
+        value: categories.join(", ")
+      });
+    }
+
+    const domainSignals = (recommendation.domainSignals ?? []).slice(0, 8);
+    if (domainSignals.length > 0) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "domainSignals",
+        value: domainSignals.join(", ")
+      });
+    }
+
     const matchedNeeds = (recommendation.matchedNeeds ?? []).slice(0, 8);
     if (matchedNeeds.length > 0) {
       appendWrappedField(lines, {
@@ -242,6 +262,22 @@ export function renderRecommendationCard(
         indent,
         label: "matchedNeeds",
         value: matchedNeeds.join(", ")
+      });
+    }
+
+    const matchedNeedDetails = (recommendation.matchedNeedDetails ?? []).slice(0, 8).map((item) => {
+      const terms = item.matchedTerms.length > 0 ? ` terms=${item.matchedTerms.join("|")}` : "";
+      const anti = item.antiTerms.length > 0 ? ` anti=${item.antiTerms.join("|")}` : "";
+      const reason = item.reason ? ` reason=${item.reason}` : "";
+      const sign = item.points >= 0 ? "+" : "";
+      return `${item.id} [${item.strength}] ${sign}${item.points}${terms}${anti}${reason}`;
+    });
+    if (matchedNeedDetails.length > 0) {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "matchedNeedDetails",
+        reasons: matchedNeedDetails
       });
     }
 
@@ -260,7 +296,11 @@ export function renderRecommendationCard(
 
     const breakdown = (recommendation.scoreBreakdown ?? []).map((entry) => {
       const sign = entry.points >= 0 ? "+" : "";
-      return `${sign}${entry.points} ${entry.kind}: ${entry.detail}`;
+      const strength = entry.strength ? ` [${entry.strength}]` : "";
+      const terms = entry.matchedTerms && entry.matchedTerms.length > 0 ? ` terms=${entry.matchedTerms.join("|")}` : "";
+      const anti = entry.antiTerms && entry.antiTerms.length > 0 ? ` anti=${entry.antiTerms.join("|")}` : "";
+      const reason = entry.reason ? ` reason=${entry.reason}` : "";
+      return `${sign}${entry.points} ${entry.kind}${strength}: ${entry.detail}${terms}${anti}${reason}`;
     });
     if (breakdown.length > 0) {
       appendWrappedReasonsField(lines, {
@@ -268,6 +308,18 @@ export function renderRecommendationCard(
         indent,
         label: "scoreBreakdown",
         reasons: breakdown
+      });
+    }
+
+    const capsApplied = (recommendation.capsApplied ?? []).slice(0, 8).map((cap) =>
+      `${cap.kind}: cap=${cap.cap} reason=${cap.reason}`
+    );
+    if (capsApplied.length > 0) {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "capsApplied",
+        reasons: capsApplied
       });
     }
   }

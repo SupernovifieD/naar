@@ -292,10 +292,31 @@ export interface MatchedFact {
   detail?: string;
 }
 
+export type NeedMatchStrength = "exact" | "strong" | "weak" | "negative" | "none";
+
+export interface MatchedNeedDetail {
+  id: string;
+  strength: NeedMatchStrength;
+  points: number;
+  matchedTerms: string[];
+  antiTerms: string[];
+  reason?: string;
+}
+
+export interface RecommendationCapApplied {
+  kind: string;
+  cap: number;
+  reason: string;
+}
+
 export interface RecommendationScoreComponent {
   kind: string;
   points: number;
   detail: string;
+  strength?: NeedMatchStrength;
+  matchedTerms?: string[];
+  antiTerms?: string[];
+  reason?: string;
 }
 
 export interface RepoNeed {
@@ -305,14 +326,42 @@ export interface RepoNeed {
   reason: string;
 }
 
+export type SkillCategory =
+  | "code"
+  | "testing"
+  | "debugging"
+  | "refactoring"
+  | "config"
+  | "ci"
+  | "release"
+  | "cli"
+  | "api"
+  | "security"
+  | "agent-setup"
+  | "mcp"
+  | "prompting"
+  | "skill-development"
+  | "general-productivity"
+  | "writing"
+  | "design"
+  | "finance"
+  | "crypto"
+  | "art"
+  | "spreadsheet"
+  | "unknown";
+
 export interface SkillRecommendation {
   candidate: SkillCandidate;
   score: number;
   reasons: string[];
   matchedNeeds: string[];
+  matchedNeedDetails?: MatchedNeedDetail[];
   matchedFacts: MatchedFact[];
   eligibilityReasons: string[];
   penalties: string[];
+  capsApplied?: RecommendationCapApplied[];
+  skillCategories?: SkillCategory[];
+  domainSignals?: string[];
   scoreBreakdown: RecommendationScoreComponent[];
   blocked: boolean;
   blockReasons?: string[];

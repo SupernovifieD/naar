@@ -328,7 +328,19 @@ describe("recommend/go output descriptions", () => {
     recommendation.eligibilityReasons = ["Eligible for target: claude"];
     recommendation.penalties = ["Language-only match; no deeper project need match"];
     recommendation.matchedNeeds = ["node_cli_development"];
+    recommendation.matchedNeedDetails = [
+      {
+        id: "node_cli_development",
+        strength: "strong",
+        points: 28,
+        matchedTerms: ["cli"],
+        antiTerms: []
+      }
+    ];
     recommendation.matchedFacts = [{ factType: "tool", id: "vitest", source: "primaryFacts" }];
+    recommendation.capsApplied = [{ kind: "weak_only_cap", cap: 45, reason: "Only weak repo-need matches were found" }];
+    recommendation.skillCategories = ["cli", "testing"];
+    recommendation.domainSignals = ["internal_comms"];
     recommendation.scoreBreakdown = [{ kind: "repo_need_match", points: 30, detail: "node_cli_development" }];
 
     const result = makePipelineResult([recommendation]);
@@ -341,7 +353,9 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("eligibility:");
     expect(output).toContain("penalties:");
     expect(output).toContain("matchedNeeds:");
+    expect(output).toContain("matchedNeedDetails:");
     expect(output).toContain("matchedFacts:");
     expect(output).toContain("scoreBreakdown:");
+    expect(output).toContain("capsApplied:");
   });
 });

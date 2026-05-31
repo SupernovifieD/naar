@@ -183,19 +183,43 @@ describe("recommendation card helpers", () => {
   it("renders verbose recommendation explainability sections", () => {
     const output = stripAnsi(renderRecommendationCard(makeRecommendation({
       matchedNeeds: ["node_cli_development", "vitest_testing"],
+      matchedNeedDetails: [
+        {
+          id: "node_cli_development",
+          strength: "strong",
+          points: 28,
+          matchedTerms: ["cli", "terminal"],
+          antiTerms: []
+        }
+      ],
       matchedFacts: [{ factType: "tool", id: "vitest", source: "primaryFacts" }],
+      skillCategories: ["cli", "testing"],
+      domainSignals: ["internal_comms"],
+      capsApplied: [{ kind: "weak_only_cap", cap: 45, reason: "Only weak repo-need matches were found" }],
       scoreBreakdown: [
-        { kind: "repo_need_match", points: 30, detail: "node_cli_development" },
+        {
+          kind: "repo_need_match",
+          points: 30,
+          detail: "node_cli_development",
+          strength: "strong",
+          matchedTerms: ["cli", "terminal"]
+        },
         { kind: "tool_match", points: 12, detail: "vitest" }
       ]
     }), 1, { columns: 80, verbose: true }));
 
+    expect(output).toContain("skillCategories:");
+    expect(output).toContain("domainSignals:");
     expect(output).toContain("matchedNeeds:");
     expect(output).toContain("node_cli_development, vitest_testing");
+    expect(output).toContain("matchedNeedDetails:");
+    expect(output).toContain("node_cli_development [strong] +28");
     expect(output).toContain("matchedFacts:");
     expect(output).toContain("primaryFacts: tool:vitest");
     expect(output).toContain("scoreBreakdown:");
-    expect(output).toContain("+30 repo_need_match: node_cli_development");
+    expect(output).toContain("+30 repo_need_match [strong]: node_cli_development");
+    expect(output).toContain("capsApplied:");
+    expect(output).toContain("weak_only_cap: cap=45");
   });
 
   it("builds focused install choice description", () => {

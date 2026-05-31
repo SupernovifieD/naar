@@ -58,9 +58,13 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
     parsed.recommendations = parsed.recommendations.map((recommendation) => ({
       ...recommendation,
       matchedNeeds: recommendation.matchedNeeds ?? [],
+      matchedNeedDetails: recommendation.matchedNeedDetails ?? [],
       matchedFacts: recommendation.matchedFacts ?? [],
       eligibilityReasons: recommendation.eligibilityReasons ?? [],
       penalties: recommendation.penalties ?? [],
+      capsApplied: recommendation.capsApplied ?? [],
+      skillCategories: recommendation.skillCategories ?? [],
+      domainSignals: recommendation.domainSignals ?? [],
       scoreBreakdown: recommendation.scoreBreakdown ?? []
     }));
     parsed.repoNeeds = parsed.repoNeeds ?? [];
