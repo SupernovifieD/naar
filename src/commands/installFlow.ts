@@ -167,7 +167,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     if (flags.json) {
       printJson({
         repoRoot,
-        error: "Security: fetched bundles failed policy checks.",
+        error: "Security: fetched bundles failed policy checks. \n",
         blockedSkills: blockedAfterFetch.map((entry) => ({
           skillName: entry.skillName,
           providerId: entry.providerId,
@@ -192,13 +192,13 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
     for (const [index, entry] of blockedAfterFetch.entries()) {
       const finalStatus = entry.decision.hardBlocked ? "hard-blocked" : entry.decision.status;
       process.stderr.write(
-        `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)} `
-        + `${pc.blue("status")}=${colorFinalSecurityStatus(finalStatus)} `
-        + `${pc.blue("security_score")}=${colorSecurityScore(entry.risk.score)} `
-        + `${pc.blue("risk")}=${colorRisk(entry.risk.score, { percent: true })} `
-        + `${pc.blue("level")}=${colorSecurityLevel(entry.risk.level)}\n`
+        `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)}\n`
+        + `  ${pc.blue("Status")}: ${colorFinalSecurityStatus(finalStatus)}`
+        + `   ${pc.blue("Security Score")}: ${colorSecurityScore(entry.risk.score)}`
+        + `   ${pc.blue("Risk")}: ${colorRisk(entry.risk.score, { percent: true })}`
+        + `   ${pc.blue("Level")}: ${colorSecurityLevel(entry.risk.level)}\n`
       );
-      process.stderr.write(`  ${pc.blue("Reasons")}:\n\n`);
+      process.stderr.write(`  ${pc.blue("Reasons")}:\n`);
       for (const reason of entry.decision.reasons.slice(0, 5)) {
         process.stderr.write(`  - ${colorSecurityReason(reason)}\n`);
       }
@@ -209,7 +209,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
         process.stderr.write(
           `  ${pc.blue("Signal")}: ${pc.cyan(toDisplayLabel(signal.id))} `
           + `[${colorSignalSeverity(signal.severity)}] `
-          + `${pc.white(capitalizeSentence(signal.detail))}\n\n`
+          + `${pc.white(capitalizeSentence(signal.detail))}\n`
         );
         const evidences = signal.evidence ?? [];
         for (const evidence of evidences) {
@@ -219,7 +219,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
         }
       }
       if (index < blockedAfterFetch.length - 1) {
-        process.stderr.write("\n\n");
+        process.stderr.write("   \n");
       }
     }
     return;

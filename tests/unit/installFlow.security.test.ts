@@ -275,10 +275,12 @@ describe("runInstallFlow security enforcement", () => {
       await runInstallFlow({ ...baseFlags, json: false, nonInteractive: true });
     });
 
-    expect(stderr).toContain("status=hard-blocked");
-    expect(stderr).toContain("security_score=");
-    expect(stderr).toContain("risk=");
-    expect(stderr).toContain("level=");
+    expect(stderr).toContain(`- ${candidate.name} [test]`);
+    expect(stderr).toContain("Status:");
+    expect(stderr).toContain("Security Score:");
+    expect(stderr).toContain("Risk:");
+    expect(stderr).toContain("Level:");
+    expect(stderr).toContain("hard-blocked");
     expect(stderr).not.toContain("status=blocked (hard)");
   });
 
