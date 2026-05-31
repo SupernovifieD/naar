@@ -1,0 +1,11 @@
+{
+  "name": "acme/php-slim",
+  "require": {
+    "slim/slim": "^4.0",
+    "doctrine/orm": "^3.0"
+  },
+  "scripts": {
+    "test": "pest",
+    "lint": "phpcs"
+  }
+}

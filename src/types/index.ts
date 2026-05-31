@@ -22,7 +22,7 @@ export interface FactEvidence {
   reason: string;
   confidence?: number;
   exists?: boolean;
-  kind?: "found_path" | "missing_expected_path";
+  kind?: "found_path" | "missing_expected_path" | "manifest_field" | "dependency" | "script" | "config";
 }
 
 export interface LanguageDetection {
@@ -36,9 +36,14 @@ export type ProjectTypeId =
   | "library"
   | "web-app"
   | "api"
+  | "fullstack"
   | "monorepo"
   | "docs"
-  | "package";
+  | "package"
+  | "static-site"
+  | "data-science"
+  | "cms"
+  | "worker/service";
 
 export interface ProjectTypeDetection {
   id: ProjectTypeId;
@@ -53,6 +58,7 @@ export interface ToolDetection {
 }
 
 export type CommandRole =
+  | "install"
   | "build"
   | "dev"
   | "test"
@@ -70,6 +76,7 @@ export type CommandRole =
   | "clean"
   | "generate"
   | "migrate"
+  | "seed"
   | "docker-up"
   | "docker-down"
   | "unknown";
@@ -147,7 +154,7 @@ export interface FrameworkDetection {
 }
 
 export interface PackageManagerDetection {
-  id: "npm" | "pnpm" | "yarn" | "bun" | "pip" | "poetry" | "uv" | "pipenv";
+  id: "npm" | "pnpm" | "yarn" | "bun" | "deno" | "pip" | "pip-tools" | "poetry" | "uv" | "pipenv" | "conda" | "setuptools" | "hatch" | "pdm" | "composer";
   confidence: number;
   lockfiles: string[];
   evidence?: FactEvidence[];

@@ -1,0 +1,15 @@
+{
+  "name": "acme/php-laravel",
+  "require": {
+    "php": "^8.2",
+    "laravel/framework": "^11.0",
+    "phpunit/phpunit": "^11.0"
+  },
+  "scripts": {
+    "test": "phpunit",
+    "analyse": "phpstan analyse",
+    "format": "php-cs-fixer fix",
+    "serve": "php artisan serve",
+    "migrate": "php artisan migrate"
+  }
+}

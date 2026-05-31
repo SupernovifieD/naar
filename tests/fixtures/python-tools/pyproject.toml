@@ -1,0 +1,16 @@
+[project]
+name = "python-tools"
+version = "0.1.0"
+dependencies = ["fastapi", "sqlalchemy", "alembic", "celery", "pandas", "numpy", "scikit-learn"]
+
+[tool.uv]
+managed = true
+
+[tool.pdm]
+distribution = true
+
+[tool.hatch.version]
+path = "src/version.py"
+
+[tool.pytest.ini_options]
+addopts = "-q"

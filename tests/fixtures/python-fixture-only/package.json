@@ -1,0 +1,7 @@
+{
+  "name": "python-fixture-only",
+  "version": "1.0.0",
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

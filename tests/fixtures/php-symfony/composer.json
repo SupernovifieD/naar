@@ -1,0 +1,9 @@
+{
+  "name": "acme/php-symfony",
+  "require": {
+    "symfony/framework-bundle": "^7.0"
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}

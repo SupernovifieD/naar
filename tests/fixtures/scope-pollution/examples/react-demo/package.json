@@ -1,0 +1,1 @@
+{ "name": "react-demo", "version": "1.0.0", "dependencies": { "react": "^18.3.0", "next": "^15.0.0" } }

@@ -1,0 +1,14 @@
+[project]
+name = "python-package"
+version = "0.1.0"
+dependencies = ["click>=8", "typer>=0.12"]
+
+[project.optional-dependencies]
+dev = ["ruff", "black", "isort", "pytest"]
+
+[tool.poetry]
+name = "python-package"
+version = "0.1.0"
+
+[tool.mypy]
+strict = true

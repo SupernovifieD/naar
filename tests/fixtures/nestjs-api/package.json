@@ -1,0 +1,16 @@
+{
+  "name": "nestjs-api",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "nest start",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/common": "^10.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "typescript": "^5.8.0"
+  }
+}

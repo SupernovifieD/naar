@@ -1,0 +1,12 @@
+{
+  "name": "acme/php-library",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "Acme\\Lib\\": "src/"
+    }
+  },
+  "require": {
+    "propel/propel": "^2.0"
+  }
+}

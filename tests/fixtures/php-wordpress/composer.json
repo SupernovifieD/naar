@@ -1,0 +1,6 @@
+{
+  "name": "acme/wp-site",
+  "require": {
+    "roots/wordpress": "^6.6"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "ts-cli-package",
+  "version": "1.0.0",
+  "bin": {
+    "ts-cli-package": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "tsup": "^8.5.0",
+    "vitest": "^3.2.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0"
+  }
+}

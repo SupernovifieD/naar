@@ -1,0 +1,13 @@
+{
+  "name": "js-fixture-only",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "tsup": "^8.5.0",
+    "vitest": "^3.2.0"
+  }
+}
