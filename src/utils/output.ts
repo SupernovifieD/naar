@@ -10,6 +10,7 @@ interface RecommendationCardRenderOptions {
   reasonLimit?: number;
   columns?: number;
   compact?: boolean;
+  verbose?: boolean;
 }
 
 const CARD_MIN_WIDTH = 68;
@@ -144,9 +145,11 @@ export function renderRecommendationCard(
 ): string {
   const indent = options.indent ?? "";
   const compact = options.compact === true;
+  const verbose = options.verbose === true;
   const reasonLimit = compact
     ? 1
     : (options.reasonLimit ?? DEFAULT_REASON_LIMIT);
+  const penaltyLimit = compact ? 1 : 3;
   const cardWidth = resolveRecommendationCardWidth(options.columns);
   const divider = `${indent}${pc.dim("-".repeat(cardWidth))}`;
 
@@ -173,13 +176,44 @@ export function renderRecommendationCard(
     }
   }
 
-  const reasons = recommendation.reasons.slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
+  const reasons = (recommendation.reasons ?? []).slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
   appendWrappedReasonsField(lines, {
     cardWidth,
     indent,
     label: "why",
     reasons
   });
+
+  const eligibilityReasons = (recommendation.eligibilityReasons ?? []).map((reason) => reason.trim()).filter(Boolean);
+  if (eligibilityReasons.length > 0 && (!compact || verbose)) {
+    appendWrappedReasonsField(lines, {
+      cardWidth,
+      indent,
+      label: "eligibility",
+      reasons: compact ? eligibilityReasons.slice(0, 1) : eligibilityReasons
+    });
+  }
+
+  const penalties = (recommendation.penalties ?? []).map((reason) => reason.trim()).filter(Boolean);
+  if (penalties.length > 0) {
+    if (compact && !verbose) {
+      const first = penalties[0];
+      const more = penalties.length > 1 ? ` (+${penalties.length - 1} more)` : "";
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "penalties",
+        value: `${first}${more}`
+      });
+    } else {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "penalties",
+        reasons: penalties.slice(0, penaltyLimit)
+      });
+    }
+  }
 
   if (!compact) {
     appendWrappedField(lines, {
@@ -196,6 +230,44 @@ export function renderRecommendationCard(
         indent,
         label: "meta",
         fields: metadataFields
+      });
+    }
+  }
+
+  if (verbose) {
+    const matchedNeeds = (recommendation.matchedNeeds ?? []).slice(0, 8);
+    if (matchedNeeds.length > 0) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "matchedNeeds",
+        value: matchedNeeds.join(", ")
+      });
+    }
+
+    const matchedFacts = (recommendation.matchedFacts ?? []).slice(0, 8).map((fact) => {
+      const detail = fact.detail ? ` (${fact.detail})` : "";
+      return `${fact.source}:${fact.factType}:${fact.id}${detail}`;
+    });
+    if (matchedFacts.length > 0) {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "matchedFacts",
+        reasons: matchedFacts
+      });
+    }
+
+    const breakdown = (recommendation.scoreBreakdown ?? []).map((entry) => {
+      const sign = entry.points >= 0 ? "+" : "";
+      return `${sign}${entry.points} ${entry.kind}: ${entry.detail}`;
+    });
+    if (breakdown.length > 0) {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "scoreBreakdown",
+        reasons: breakdown
       });
     }
   }

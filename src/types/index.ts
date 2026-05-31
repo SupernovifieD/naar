@@ -284,10 +284,36 @@ export interface SkillProviderResult {
   warnings?: string[];
 }
 
+export interface MatchedFact {
+  factType: string;
+  id: string;
+  source: "primaryFacts" | "secondaryFacts" | "repoNeeds" | "candidateMetadata" | "repoSignals";
+  evidence?: FactEvidence[];
+  detail?: string;
+}
+
+export interface RecommendationScoreComponent {
+  kind: string;
+  points: number;
+  detail: string;
+}
+
+export interface RepoNeed {
+  id: string;
+  weight: number;
+  sourceFacts: MatchedFact[];
+  reason: string;
+}
+
 export interface SkillRecommendation {
   candidate: SkillCandidate;
   score: number;
   reasons: string[];
+  matchedNeeds: string[];
+  matchedFacts: MatchedFact[];
+  eligibilityReasons: string[];
+  penalties: string[];
+  scoreBreakdown: RecommendationScoreComponent[];
   blocked: boolean;
   blockReasons?: string[];
 }

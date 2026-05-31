@@ -12,6 +12,7 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
   if (flags.json) {
     printJson({
       repoFacts: pipeline.repoFacts,
+      repoNeeds: pipeline.repoNeeds,
       providers: pipeline.providerSummaries,
       warnings: pipeline.providerWarnings,
       recommendations: pipeline.recommendations
@@ -40,6 +41,7 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
   process.stdout.write(renderRecommendationCards(pipeline.recommendations, {
     indent: "  ",
     reasonLimit: 3,
-    compact: flags.compact
+    compact: flags.compact,
+    verbose: flags.verbose
   }));
 }

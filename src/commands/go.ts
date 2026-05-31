@@ -21,6 +21,7 @@ export async function runGo(flags: CliFlags): Promise<void> {
     printJson({
       repoRoot,
       repoFacts: pipeline.repoFacts,
+      repoNeeds: pipeline.repoNeeds,
       providers: pipeline.providerSummaries,
       warnings: pipeline.providerWarnings,
       recommendations: pipeline.recommendations
@@ -148,7 +149,8 @@ function renderRankingSummary(
   process.stdout.write(renderRecommendationCards(recommendations, {
     indent: "  ",
     reasonLimit: 3,
-    compact: flags.compact
+    compact: flags.compact,
+    verbose: flags.verbose
   }));
 
   const blocked = recommendations.filter((recommendation) => recommendation.blocked);

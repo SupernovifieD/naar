@@ -13,7 +13,7 @@ function stripAnsi(value: string): string {
 }
 
 function makeRecommendation(overrides: Partial<SkillRecommendation> = {}): SkillRecommendation {
-  return {
+  const base: SkillRecommendation = {
     candidate: {
       providerSkillId: "frontend-design",
       canonicalSkillId: "frontend-design",
@@ -49,8 +49,23 @@ function makeRecommendation(overrides: Partial<SkillRecommendation> = {}): Skill
     },
     score: 88,
     reasons: ["Matched stack: Next.js", "Assistant compatibility: claude"],
+    matchedNeeds: [],
+    matchedFacts: [],
+    eligibilityReasons: [],
+    penalties: [],
+    scoreBreakdown: [],
     blocked: false,
-    ...overrides
+    blockReasons: []
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    matchedNeeds: overrides.matchedNeeds ?? base.matchedNeeds,
+    matchedFacts: overrides.matchedFacts ?? base.matchedFacts,
+    eligibilityReasons: overrides.eligibilityReasons ?? base.eligibilityReasons,
+    penalties: overrides.penalties ?? base.penalties,
+    scoreBreakdown: overrides.scoreBreakdown ?? base.scoreBreakdown
   };
 }
 
@@ -151,6 +166,36 @@ describe("recommendation card helpers", () => {
     expect(output).not.toContain("description:");
     expect(output).not.toContain("targets:");
     expect(output).not.toContain("meta:");
+  });
+
+  it("renders eligibility and penalties sections as multi-line reason lists", () => {
+    const output = stripAnsi(renderRecommendationCard(makeRecommendation({
+      eligibilityReasons: ["Eligible for target: claude"],
+      penalties: ["Language-only match; no deeper project need match"]
+    }), 1, { columns: 80 }));
+
+    expect(output).toContain("eligibility:");
+    expect(output).toContain("  Eligible for target: claude");
+    expect(output).toContain("penalties:");
+    expect(output).toContain("  Language-only match; no deeper project need match");
+  });
+
+  it("renders verbose recommendation explainability sections", () => {
+    const output = stripAnsi(renderRecommendationCard(makeRecommendation({
+      matchedNeeds: ["node_cli_development", "vitest_testing"],
+      matchedFacts: [{ factType: "tool", id: "vitest", source: "primaryFacts" }],
+      scoreBreakdown: [
+        { kind: "repo_need_match", points: 30, detail: "node_cli_development" },
+        { kind: "tool_match", points: 12, detail: "vitest" }
+      ]
+    }), 1, { columns: 80, verbose: true }));
+
+    expect(output).toContain("matchedNeeds:");
+    expect(output).toContain("node_cli_development, vitest_testing");
+    expect(output).toContain("matchedFacts:");
+    expect(output).toContain("primaryFacts: tool:vitest");
+    expect(output).toContain("scoreBreakdown:");
+    expect(output).toContain("+30 repo_need_match: node_cli_development");
   });
 
   it("builds focused install choice description", () => {

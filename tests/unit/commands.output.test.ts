@@ -98,6 +98,11 @@ function makeRecommendation(description?: string, summary = "Summary fallback"):
     },
     score: 91,
     reasons: ["Matched stack: React"],
+    matchedNeeds: [],
+    matchedFacts: [],
+    eligibilityReasons: [],
+    penalties: [],
+    scoreBreakdown: [],
     blocked: false
   };
 }
@@ -105,6 +110,7 @@ function makeRecommendation(description?: string, summary = "Summary fallback"):
 function makePipelineResult(recommendations: SkillRecommendation[]) {
   return {
     repoFacts,
+    repoNeeds: [],
     recommendations,
     providerWarnings: [],
     providerSummaries: [
@@ -315,5 +321,27 @@ describe("recommend/go output descriptions", () => {
     expect(output).not.toContain("description:");
     expect(output).not.toContain("targets:");
     expect(output).not.toContain("meta:");
+  });
+
+  it("renders verbose explainability fields in recommend output when enabled", async () => {
+    const recommendation = makeRecommendation("Verbose description");
+    recommendation.eligibilityReasons = ["Eligible for target: claude"];
+    recommendation.penalties = ["Language-only match; no deeper project need match"];
+    recommendation.matchedNeeds = ["node_cli_development"];
+    recommendation.matchedFacts = [{ factType: "tool", id: "vitest", source: "primaryFacts" }];
+    recommendation.scoreBreakdown = [{ kind: "repo_need_match", points: 30, detail: "node_cli_development" }];
+
+    const result = makePipelineResult([recommendation]);
+    buildRecommendationsMock.mockResolvedValue(result);
+
+    const output = await captureStdout(async () => {
+      await runRecommend({ ...baseFlags, verbose: true });
+    });
+
+    expect(output).toContain("eligibility:");
+    expect(output).toContain("penalties:");
+    expect(output).toContain("matchedNeeds:");
+    expect(output).toContain("matchedFacts:");
+    expect(output).toContain("scoreBreakdown:");
   });
 });

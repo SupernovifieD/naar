@@ -1,6 +1,6 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import type { RepoFacts, SkillRecommendation } from "../types/index.js";
+import type { RepoFacts, RepoNeed, SkillRecommendation } from "../types/index.js";
 import { ensureNaarRuntimeGitignore } from "../utils/gitignore.js";
 import { SCAN_SCHEMA_VERSION } from "../scanner/scanRepo.js";
 
@@ -10,6 +10,7 @@ const RECOMMEND_FILE = "recommendations.json";
 
 export interface RecommendationCache {
   repoFacts: RepoFacts;
+  repoNeeds?: RepoNeed[];
   recommendations: SkillRecommendation[];
   providerSummaries?: Array<{
     providerId: string;
@@ -54,6 +55,15 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
     if ((parsed.repoFacts.scanSchemaVersion ?? 0) !== SCAN_SCHEMA_VERSION) {
       return null;
     }
+    parsed.recommendations = parsed.recommendations.map((recommendation) => ({
+      ...recommendation,
+      matchedNeeds: recommendation.matchedNeeds ?? [],
+      matchedFacts: recommendation.matchedFacts ?? [],
+      eligibilityReasons: recommendation.eligibilityReasons ?? [],
+      penalties: recommendation.penalties ?? [],
+      scoreBreakdown: recommendation.scoreBreakdown ?? []
+    }));
+    parsed.repoNeeds = parsed.repoNeeds ?? [];
     return parsed;
   } catch {
     return null;

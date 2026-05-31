@@ -41,6 +41,11 @@ describe("pipeline installed filtering", () => {
         },
         score: 90,
         reasons: ["Matched stack"],
+        matchedNeeds: [],
+        matchedFacts: [],
+        eligibilityReasons: [],
+        penalties: [],
+        scoreBreakdown: [],
         blocked: false
       },
       {
@@ -63,6 +68,11 @@ describe("pipeline installed filtering", () => {
         },
         score: 88,
         reasons: ["Matched stack"],
+        matchedNeeds: [],
+        matchedFacts: [],
+        eligibilityReasons: [],
+        penalties: [],
+        scoreBreakdown: [],
         blocked: false
       }
     ];
@@ -80,6 +90,7 @@ describe("pipeline installed filtering", () => {
         topology: { sourceDirs: [], routeDirs: [], componentDirs: [], apiDirs: [], testDirs: [], docDirs: [] },
         readiness: { score: 70, grade: "Good", missingCapabilities: [] }
       },
+      repoNeeds: [],
       recommendations,
       generatedAtIso: "2026-05-29T00:00:00.000Z"
     };
