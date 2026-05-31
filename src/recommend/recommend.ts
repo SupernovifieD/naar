@@ -4,7 +4,6 @@ import type {
   AssistantId,
   MatchedNeedDetail,
   MatchedFact,
-  NeedMatchStrength,
   RecommendationCapApplied,
   RecommendationScoreComponent,
   RepoFacts,
@@ -90,6 +89,10 @@ interface RecommendationContext {
 }
 
 interface NormalizedCandidate {
+  nameText: string;
+  nameTokens: Set<string>;
+  tagText: string;
+  tagTokens: Set<string>;
   primaryText: string;
   primaryTokens: Set<string>;
   supportingText: string;
@@ -184,8 +187,8 @@ export function recommendSkills(
     const matchedNeedDetails: MatchedNeedDetail[] = [];
     const capsApplied: RecommendationCapApplied[] = [];
     const scoreBreakdown: RecommendationScoreComponent[] = [];
-    const skillCategories = classifySkillCategories(normalized.primaryText, normalized.primaryTokens);
-    const domainSignals = detectDomainSignals(normalized.primaryText, normalized.primaryTokens);
+    const skillCategories = normalized.categories;
+    const domainSignals = normalized.domainSignals;
     let score = 0;
     let sawStrongNeedMatch = false;
     let sawWeakNeedMatch = false;
@@ -220,12 +223,10 @@ export function recommendSkills(
       supportingText: normalized.supportingText,
       supportingTokens: normalized.supportingTokens
     };
-    const needMatchStrengths = new Map<string, NeedMatchStrength>();
     for (const repoNeed of repoNeeds) {
       const profile = getNeedMatchProfile(repoNeed.id);
       if (!profile) continue;
       const match = matchNeedProfile(profile, needLexicon);
-      needMatchStrengths.set(repoNeed.id, match.strength);
 
       let points = 0;
       if (match.strength === "exact") points = 35;
@@ -444,6 +445,10 @@ export function recommendSkills(
     const specializedGateResults = evaluateSpecializedGates({
       candidateText: normalized.primaryText,
       candidateTokens: normalized.primaryTokens,
+      candidateNameText: normalized.nameText,
+      candidateNameTokens: normalized.nameTokens,
+      candidateTagText: normalized.tagText,
+      candidateTagTokens: normalized.tagTokens,
       skillCategories,
       domainSignals,
       repoNeedIds,
@@ -463,11 +468,13 @@ export function recommendSkills(
         reason: gate.message
       });
       penalties.push(gate.message);
-      capsApplied.push({
-        kind: "specialized_gate_cap",
-        cap: gate.scoreCap,
-        reason: gate.message
-      });
+      if (gate.scoreCap < 100) {
+        capsApplied.push({
+          kind: "specialized_gate_cap",
+          cap: gate.scoreCap,
+          reason: gate.message
+        });
+      }
     }
 
     if (sawWeakNeedMatch && !sawStrongNeedMatch) {
@@ -499,15 +506,37 @@ export function recommendSkills(
       });
     }
 
+    const { rawScore, relevanceRaw, qualityRaw } = computeScorePartitions(scoreBreakdown);
+    const normalizedRelevance = 100 * (1 - Math.exp(-(Math.max(0, relevanceRaw) / 90)));
+    const baseQualityBonus = Math.min(8, qualityRaw * 0.4);
+    let qualityBonus = baseQualityBonus;
+    if (normalizedRelevance < 25 && qualityBonus > 0) {
+      qualityBonus = 0;
+    } else if (normalizedRelevance < 45 && qualityBonus > 3) {
+      qualityBonus = 3;
+    }
+
+    scoreBreakdown.push({
+      kind: "normalized_relevance",
+      points: roundScore(normalizedRelevance),
+      detail: `From relevanceRaw=${roundScore(relevanceRaw)}`
+    });
+    scoreBreakdown.push({
+      kind: "normalized_quality_bonus",
+      points: roundScore(qualityBonus),
+      detail: `From qualityRaw=${roundScore(qualityRaw)}`
+    });
+
     const effectiveCap = capsApplied.length > 0
       ? Math.min(...capsApplied.map((cap) => cap.cap))
       : null;
-    if (effectiveCap !== null && score > effectiveCap) {
-      const beforeCap = score;
-      score = effectiveCap;
+    let finalScore = normalizedRelevance + qualityBonus;
+    if (effectiveCap !== null && finalScore > effectiveCap) {
+      const beforeCap = finalScore;
+      finalScore = effectiveCap;
       scoreBreakdown.push({
         kind: "score_cap_applied",
-        points: effectiveCap - beforeCap,
+        points: roundScore(finalScore - beforeCap),
         detail: `Score capped at ${effectiveCap}`,
         reason: capsApplied.find((cap) => cap.cap === effectiveCap)?.reason
       });
@@ -521,7 +550,10 @@ export function recommendSkills(
 
     const recommendation: SkillRecommendation = {
       candidate,
-      score: clampScore(score),
+      score: clampScore(finalScore),
+      rawScore: roundScore(rawScore),
+      relevanceRaw: roundScore(relevanceRaw),
+      qualityRaw: roundScore(qualityRaw),
       reasons: normalizedReasons,
       matchedNeeds: dedupeStrings(matchedNeeds),
       matchedNeedDetails,
@@ -793,13 +825,17 @@ function inferRepoNeeds(repoFacts: RepoFacts, context: RecommendationContext): R
 }
 
 function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
-  const primaryParts = [
+  const nameText = normalizeTextForSearch([
     candidate.name,
     candidate.canonicalSkillId,
-    candidate.providerSkillId,
+    candidate.providerSkillId
+  ].join(" "));
+  const tagText = normalizeTextForSearch(candidate.tags.join(" "));
+  const primaryParts = [
+    nameText,
+    tagText,
     candidate.summary,
-    candidate.metadata.description ?? "",
-    ...candidate.tags
+    candidate.metadata.description ?? ""
   ];
   const supportingParts = [
     ...(candidate.compatibility.frameworks ?? []),
@@ -810,6 +846,8 @@ function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
   const primaryText = normalizeTextForSearch(primaryParts.join(" "));
   const supportingText = normalizeTextForSearch(supportingParts.join(" "));
   const primaryTokens = toTokenSet(primaryText);
+  const nameTokens = toTokenSet(nameText);
+  const tagTokens = toTokenSet(tagText);
   const supportingTokens = toTokenSet(supportingText);
   const tokens = new Set<string>([...primaryTokens, ...supportingTokens]);
   const assistants = new Set<AssistantId>(candidate.compatibility.assistants);
@@ -817,7 +855,9 @@ function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
   const languages = new Set<string>((candidate.compatibility.languages ?? []).map((item) => item.toLowerCase()));
 
   for (const framework of FRAMEWORK_IDS) {
-    if (tokens.has(framework)) frameworks.add(framework);
+    if (nameTokens.has(framework) || tagTokens.has(framework)) {
+      frameworks.add(framework);
+    }
   }
   for (const language of ["typescript", "javascript", "python", "go", "rust", "java", "php", "ruby"]) {
     if (tokens.has(language)) languages.add(language);
@@ -831,6 +871,10 @@ function normalizeCandidate(candidate: SkillCandidate): NormalizedCandidate {
   const isGeneralProductivity = [...PRODUCTIVITY_KEYWORDS].some((token) => tokens.has(token));
 
   return {
+    nameText,
+    nameTokens,
+    tagText,
+    tagTokens,
     primaryText,
     primaryTokens,
     supportingText,
@@ -946,6 +990,40 @@ function applyScoreComponent(
 ): number {
   scoreBreakdown.push(component);
   return score + component.points;
+}
+
+function computeScorePartitions(scoreBreakdown: RecommendationScoreComponent[]): {
+  rawScore: number;
+  relevanceRaw: number;
+  qualityRaw: number;
+} {
+  let rawScore = 0;
+  let relevanceRaw = 0;
+  let qualityRaw = 0;
+
+  for (const component of scoreBreakdown) {
+    rawScore += component.points;
+    if (isQualityComponent(component.kind)) {
+      qualityRaw += component.points;
+    } else {
+      relevanceRaw += component.points;
+    }
+  }
+
+  return { rawScore, relevanceRaw, qualityRaw };
+}
+
+function isQualityComponent(kind: string): boolean {
+  return kind === "assistant_tiebreak"
+    || kind === "publisher_trust"
+    || kind === "publisher_trust_penalty"
+    || kind === "low_risk_bonus"
+    || kind === "popularity_bonus";
+}
+
+function roundScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round(value * 100) / 100;
 }
 
 function clampScore(value: number): number {

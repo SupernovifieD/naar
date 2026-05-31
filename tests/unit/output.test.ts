@@ -210,6 +210,8 @@ describe("recommendation card helpers", () => {
 
     expect(output).toContain("skillCategories:");
     expect(output).toContain("domainSignals:");
+    expect(output).toContain("scoreModel:");
+    expect(output).toContain("relevanceRaw=");
     expect(output).toContain("matchedNeeds:");
     expect(output).toContain("node_cli_development, vitest_testing");
     expect(output).toContain("matchedNeedDetails:");
@@ -220,6 +222,7 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("+30 repo_need_match [strong]: node_cli_development");
     expect(output).toContain("capsApplied:");
     expect(output).toContain("weak_only_cap: cap=45");
+    expect(output).toContain("capSummary:");
   });
 
   it("builds focused install choice description", () => {

@@ -357,5 +357,7 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("matchedFacts:");
     expect(output).toContain("scoreBreakdown:");
     expect(output).toContain("capsApplied:");
+    expect(output).toContain("scoreModel:");
+    expect(output).toContain("capSummary:");
   });
 });

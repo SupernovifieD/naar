@@ -353,6 +353,9 @@ export type SkillCategory =
 export interface SkillRecommendation {
   candidate: SkillCandidate;
   score: number;
+  rawScore?: number;
+  relevanceRaw?: number;
+  qualityRaw?: number;
   reasons: string[];
   matchedNeeds: string[];
   matchedNeedDetails?: MatchedNeedDetail[];

@@ -1,6 +1,6 @@
 import path from "node:path";
 import os from "node:os";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import { recommendSkills } from "../../src/recommend/recommend.js";
 import type {
@@ -576,6 +576,177 @@ describe("recommendSkills", () => {
     expect(result.recommendations[0].capsApplied?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it("matches safe_file_writes only for contextual filesystem/install phrases", async () => {
+    const repoRoot = await makeTempRepo();
+    await mkdir(path.join(repoRoot, "src/installer"), { recursive: true });
+    const repoFacts = makeRepoFacts({ repoRoot });
+
+    const typeSafetySkill = makeSkill("type-safety-write", {
+      summary: "Type-safe TypeScript refactoring and strict write patterns",
+      tags: ["type safety", "safe refactor", "typescript"],
+      assistants: ["claude"]
+    });
+    const installWriteSkill = makeSkill("atomic-installer", {
+      summary: "Atomic filesystem write plan with dry run and rollback support for installer flows",
+      tags: ["atomic write", "filesystem write", "dry run", "install plan"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [typeSafetySkill, installWriteSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const typeSafety = result.recommendations.find((item) => item.candidate.canonicalSkillId === "type-safety-write");
+    const installWrite = result.recommendations.find((item) => item.candidate.canonicalSkillId === "atomic-installer");
+    const typeSafetyNeed = typeSafety?.matchedNeedDetails?.find((detail) => detail.id === "safe_file_writes");
+    const installNeed = installWrite?.matchedNeedDetails?.find((detail) => detail.id === "safe_file_writes");
+
+    expect(typeSafetyNeed?.strength === "none" || typeSafetyNeed?.strength === "negative" || typeSafetyNeed?.strength === "weak").toBe(true);
+    expect(installNeed?.strength === "exact" || installNeed?.strength === "strong").toBe(true);
+    expect(typeSafety?.penalties.some((penalty) => penalty.includes("Need anti-trigger: safe_file_writes"))).toBe(true);
+  });
+
+  it("does not treat compiler flags as CLI command design evidence", () => {
+    const repoFacts = makeRepoFacts();
+    const compilerFlagsSkill = makeSkill("compiler-flags", {
+      summary: "TypeScript compiler flags and tsconfig strict flags",
+      tags: ["compiler flags", "tsconfig flags", "strict flags"],
+      assistants: ["claude"]
+    });
+    const cliFlagsSkill = makeSkill("cli-flags", {
+      summary: "CLI flags and subcommands with argument parsing in commander",
+      tags: ["cli flags", "subcommands", "argument parsing", "commander"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [compilerFlagsSkill, cliFlagsSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const compilerFlags = result.recommendations.find((item) => item.candidate.canonicalSkillId === "compiler-flags");
+    const cliFlags = result.recommendations.find((item) => item.candidate.canonicalSkillId === "cli-flags");
+    const compilerNeed = compilerFlags?.matchedNeedDetails?.find((detail) => detail.id === "cli_command_design");
+    const cliNeed = cliFlags?.matchedNeedDetails?.find((detail) => detail.id === "cli_command_design");
+
+    expect(compilerNeed?.strength === "none" || compilerNeed?.strength === "negative" || compilerNeed?.strength === "weak").toBe(true);
+    expect(cliNeed?.strength === "exact" || cliNeed?.strength === "strong").toBe(true);
+    expect((cliFlags?.score ?? 0)).toBeGreaterThan(compilerFlags?.score ?? 0);
+  });
+
+  it("requires CI-specific wording for github_actions_ci need matching", () => {
+    const repoFacts = makeRepoFacts();
+    const genericWorkflowSkill = makeSkill("generic-workflow", {
+      summary: "Code strictness workflow and engineering workflow checklists",
+      tags: ["workflow", "strictness workflow"],
+      assistants: ["claude"]
+    });
+    const githubActionsSkill = makeSkill("gha-workflow", {
+      summary: "GitHub Actions workflow yaml for continuous integration and publish workflow",
+      tags: ["github actions", "workflow yaml", "continuous integration"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [genericWorkflowSkill, githubActionsSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const genericWorkflow = result.recommendations.find((item) => item.candidate.canonicalSkillId === "generic-workflow");
+    const ghaWorkflow = result.recommendations.find((item) => item.candidate.canonicalSkillId === "gha-workflow");
+    const genericNeed = genericWorkflow?.matchedNeedDetails?.find((detail) => detail.id === "github_actions_ci");
+    const ghaNeed = ghaWorkflow?.matchedNeedDetails?.find((detail) => detail.id === "github_actions_ci");
+
+    expect(genericNeed?.strength === "none" || genericNeed?.strength === "negative" || genericNeed?.strength === "weak").toBe(true);
+    expect(ghaNeed?.strength === "exact" || ghaNeed?.strength === "strong").toBe(true);
+    expect((ghaWorkflow?.score ?? 0)).toBeGreaterThan(genericWorkflow?.score ?? 0);
+  });
+
+  it("applies React secondary-only cap only for primary-topic React skills", () => {
+    const repoFacts = makeRepoFacts({
+      primaryFrameworks: [],
+      secondaryFrameworks: ["react"]
+    });
+    const reactPrimary = makeSkill("react-primary", {
+      summary: "React component architecture for large React applications",
+      tags: ["react", "react component", "jsx"],
+      frameworks: ["react"],
+      assistants: ["claude"]
+    });
+    const reactIncidental = makeSkill("incidental-config", {
+      name: "TypeScript Config Guide",
+      summary: "TypeScript config review with React compatibility notes",
+      tags: ["typescript", "tsconfig"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [reactPrimary, reactIncidental], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const primary = result.recommendations.find((item) => item.candidate.canonicalSkillId === "react-primary");
+    const incidental = result.recommendations.find((item) => item.candidate.canonicalSkillId === "incidental-config");
+
+    expect(primary?.capsApplied?.some((cap) => cap.reason.includes("secondary/fixture"))).toBe(true);
+    expect(primary?.score).toBeLessThanOrEqual(45);
+    expect(incidental?.capsApplied?.some((cap) => cap.reason.includes("secondary/fixture")) ?? false).toBe(false);
+  });
+
+  it("adds raw and normalized debug score fields", () => {
+    const repoFacts = makeRepoFacts();
+    const candidate = makeSkill("score-shape", {
+      summary: "CLI vitest TypeScript workflow",
+      tags: ["cli", "vitest", "typecheck", "release"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [candidate], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const recommendation = result.recommendations[0];
+    expect(typeof recommendation.rawScore).toBe("number");
+    expect(typeof recommendation.relevanceRaw).toBe("number");
+    expect(typeof recommendation.qualityRaw).toBe("number");
+    expect(recommendation.rawScore).not.toBe(recommendation.score);
+  });
+
+  it("uses contextual skill categories for security/ci/cli/prompting", () => {
+    const repoFacts = makeRepoFacts();
+    const tsStrictSkill = makeSkill("ts-strict", {
+      summary: "TypeScript strict mode, compiler options and refactoring safety",
+      tags: ["typescript", "tsconfig", "strict mode"],
+      assistants: ["claude"]
+    });
+    const promptSkill = makeSkill("prompting", {
+      summary: "Prompt optimization and prompt engineering playbook (CRISP)",
+      tags: ["prompt optimization", "prompt engineering", "crisp framework"],
+      assistants: ["claude"]
+    });
+
+    const result = recommendSkills(repoFacts, [tsStrictSkill, promptSkill], {
+      minSecurityScore: 80,
+      noScripts: true,
+      eligibleAssistants: ["claude"]
+    });
+
+    const tsStrict = result.recommendations.find((item) => item.candidate.canonicalSkillId === "ts-strict");
+    const prompting = result.recommendations.find((item) => item.candidate.canonicalSkillId === "prompting");
+
+    expect(tsStrict?.skillCategories?.includes("security")).toBe(false);
+    expect(tsStrict?.skillCategories?.includes("ci")).toBe(false);
+    expect(prompting?.skillCategories?.includes("prompting")).toBe(true);
+    expect(prompting?.skillCategories?.includes("cli")).toBe(false);
+  });
+
   it("exposes explainability fields and repoNeeds in output", () => {
     const repoFacts = makeRepoFacts();
     const candidate = makeSkill("explainable", {
@@ -605,5 +776,8 @@ describe("recommendSkills", () => {
     expect(Array.isArray(recommendation.skillCategories ?? [])).toBe(true);
     expect(Array.isArray(recommendation.domainSignals ?? [])).toBe(true);
     expect(recommendation.scoreBreakdown.length).toBeGreaterThan(0);
+    expect(typeof recommendation.rawScore).toBe("number");
+    expect(typeof recommendation.relevanceRaw).toBe("number");
+    expect(typeof recommendation.qualityRaw).toBe("number");
   });
 });

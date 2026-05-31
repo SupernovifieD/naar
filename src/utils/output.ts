@@ -235,6 +235,28 @@ export function renderRecommendationCard(
   }
 
   if (verbose) {
+    appendWrappedField(lines, {
+      cardWidth,
+      indent,
+      label: "scoreModel",
+      value: `final=${recommendation.score} raw=${recommendation.rawScore ?? recommendation.score}`
+        + ` relevanceRaw=${recommendation.relevanceRaw ?? recommendation.score}`
+        + ` qualityRaw=${recommendation.qualityRaw ?? 0}`
+    });
+
+    const allCaps = recommendation.capsApplied ?? [];
+    const capReasons = allCaps.slice(0, 3);
+    if (capReasons.length > 0) {
+      const strictestCap = Math.min(...allCaps.map((item) => item.cap));
+      const reasonSummary = capReasons.map((item) => item.reason).join("; ");
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "capSummary",
+        value: `strictest=${strictestCap}; ${reasonSummary}`
+      });
+    }
+
     const categories = (recommendation.skillCategories ?? []).slice(0, 8);
     if (categories.length > 0) {
       appendWrappedField(lines, {

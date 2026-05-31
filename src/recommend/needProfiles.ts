@@ -1,11 +1,14 @@
 import type { NeedMatchStrength } from "../types/index.js";
+import { matchesTerm, type TextMatchTerm } from "./textMatch.js";
+
+type NeedProfileTerm = TextMatchTerm | string;
 
 export type NeedMatchProfile = {
   id: string;
-  exact?: string[];
-  strong?: string[];
-  weak?: string[];
-  anti?: string[];
+  exact?: NeedProfileTerm[];
+  strong?: NeedProfileTerm[];
+  weak?: NeedProfileTerm[];
+  anti?: NeedProfileTerm[];
   allowWeakOnly?: boolean;
   notes?: string;
 };
@@ -24,11 +27,18 @@ export type NeedProfileMatch = {
   reason?: string;
 };
 
+const TOKEN_CI: TextMatchTerm = { value: "ci", mode: "token" };
+const TOKEN_TSC: TextMatchTerm = { value: "tsc", mode: "token" };
+const TOKEN_VITEST: TextMatchTerm = { value: "vitest", mode: "token" };
+const TOKEN_NPM: TextMatchTerm = { value: "npm", mode: "token" };
+const TOKEN_ZOD: TextMatchTerm = { value: "zod", mode: "token" };
+const TOKEN_UNDICI: TextMatchTerm = { value: "undici", mode: "token" };
+
 export const NEED_MATCH_PROFILES: NeedMatchProfile[] = [
   {
     id: "typescript_config_review",
     exact: ["tsconfig", "compiler options", "typescript strict", "strict mode", "type safety", "type guards", "utility types", "generics"],
-    strong: ["typescript config", "safe refactor", "typecheck", "tsc"],
+    strong: ["typescript config", "safe refactor", "typecheck", TOKEN_TSC],
     weak: ["typescript"],
     anti: ["react app only", "frontend only", "full-stack only"],
     allowWeakOnly: true
@@ -41,7 +51,7 @@ export const NEED_MATCH_PROFILES: NeedMatchProfile[] = [
   },
   {
     id: "typescript_typecheck",
-    strong: ["tsc", "typecheck", "compiler", "compiler errors", "typescript errors", "strict mode"],
+    strong: [TOKEN_TSC, "typecheck", "compiler", "compiler errors", "typescript errors", "strict mode"],
     weak: ["typescript"],
     allowWeakOnly: true
   },
@@ -54,49 +64,63 @@ export const NEED_MATCH_PROFILES: NeedMatchProfile[] = [
   },
   {
     id: "cli_command_design",
-    strong: ["cli command", "command design", "command-line interface", "terminal command", "commander", "yargs", "argument parsing", "flags", "subcommands"],
-    weak: ["cli", "terminal"],
-    anti: ["prompt engineering", "prompt optimization", "ai prompt", "llm prompt"],
+    strong: [
+      "cli command",
+      "command-line interface",
+      "command line interface",
+      "terminal command",
+      "command syntax",
+      "subcommands",
+      "argument parsing",
+      "option parsing",
+      "cli flags",
+      "command-line flags",
+      "command line flags",
+      "commander",
+      "yargs",
+      "oclif"
+    ],
+    weak: ["cli command", "terminal command"],
+    anti: ["prompt engineering", "prompt optimization", "ai prompt", "llm prompt", "compiler flags", "tsconfig flags", "typescript flags", "strict flags"],
     allowWeakOnly: false
   },
   {
     id: "interactive_cli_ux",
     strong: ["terminal ui", "tui", "interactive cli", "inquirer", "@inquirer/prompts", "command-line prompts", "terminal prompts", "interactive terminal", "cli prompts"],
-    weak: ["interactive", "prompt"],
+    weak: ["interactive cli", "terminal prompt"],
     anti: ["prompt engineering", "prompt optimization", "ai prompt", "llm prompt", "prompt framework", "crisp framework"],
     allowWeakOnly: false
   },
   {
     id: "vitest_testing",
-    strong: ["vitest", "unit test", "unit testing", "test runner", "test coverage", "mocking", "test suite", "assertions"],
+    strong: [TOKEN_VITEST, "unit test", "unit testing", "test runner", "test coverage", "mocking", "test suite", "assertions"],
     weak: ["testing", "tests"],
     anti: ["skill eval", "skill evaluation", "prompt eval", "model eval", "benchmark skill", "skill performance", "llm evaluation"],
     allowWeakOnly: false
   },
   {
     id: "test_generation",
-    strong: ["test generation", "generate tests", "unit tests", "vitest", "jest", "playwright", "test cases", "test coverage"],
+    strong: ["test generation", "generate tests", "unit tests", TOKEN_VITEST, "jest", "playwright", "test cases", "test coverage"],
     weak: ["testing", "tests"],
     anti: ["skill eval", "prompt eval", "model benchmark", "skill performance"],
     allowWeakOnly: false
   },
   {
     id: "test_debugging",
-    strong: ["debug tests", "test failures", "vitest", "jest", "flaky tests", "unit test debugging", "test runner"],
+    strong: ["debug tests", "test failures", TOKEN_VITEST, "jest", "flaky tests", "unit test debugging", "test runner"],
     weak: ["debugging", "tests"],
     anti: ["skill eval", "benchmark skill", "model eval"],
     allowWeakOnly: false
   },
   {
     id: "github_actions_ci",
-    strong: ["github actions", ".github/workflows", "ci", "continuous integration", "workflow yaml", "workflow yml", "release workflow", "npm publish workflow"],
-    weak: ["workflow"],
-    anti: ["agent workflow", "business workflow", "multi-skill workflow", "workflow recipes"],
+    strong: ["github actions", ".github/workflows", "continuous integration", "workflow yaml", "workflow yml", "release workflow", "npm publish workflow", "publish workflow", TOKEN_CI],
+    anti: ["agent workflow", "business workflow", "multi-skill workflow", "workflow recipes", "strictness workflow", "team workflow"],
     allowWeakOnly: false
   },
   {
     id: "npm_package_development",
-    strong: ["npm package", "package development", "package manager", "npm", "package.json", "publish", "prepack", "prepublish", "library package"],
+    strong: ["npm package", "package development", "package manager", TOKEN_NPM, "package.json", "publish", "prepack", "prepublish", "library package"],
     weak: ["package"],
     allowWeakOnly: true
   },
@@ -127,14 +151,29 @@ export const NEED_MATCH_PROFILES: NeedMatchProfile[] = [
   },
   {
     id: "http_api_client",
-    strong: ["http client", "api client", "fetch", "undici", "sdk client", "rest api", "external api"],
+    strong: ["http client", "api client", "fetch", TOKEN_UNDICI, "sdk client", "rest api", "external api"],
     weak: ["api"],
     allowWeakOnly: false
   },
   {
     id: "safe_file_writes",
-    strong: ["file write", "filesystem", "fs", "safe write", "atomic write", "installer", "apply changes", "dry run", "write plan", "patch"],
-    weak: ["files"],
+    strong: [
+      "safe file write",
+      "safe file writes",
+      "filesystem write",
+      "atomic write",
+      "atomic file write",
+      "dry run",
+      "write plan",
+      "write preview",
+      "apply patch",
+      "patch application",
+      "installer",
+      "install plan",
+      "rollback"
+    ],
+    weak: ["filesystem", "file writes", "installer"],
+    anti: ["type safe", "type safety", "typescript strict", "safe refactor", "refactoring"],
     allowWeakOnly: false
   },
   {
@@ -145,13 +184,13 @@ export const NEED_MATCH_PROFILES: NeedMatchProfile[] = [
   },
   {
     id: "json_schema_validation",
-    strong: ["json schema", "schema validation", "zod", "validation", "parse", "safeparse", "typed schema"],
+    strong: ["json schema", "schema validation", TOKEN_ZOD, "validation", "parse", "safeparse", "typed schema"],
     weak: ["json"],
     allowWeakOnly: false
   },
   {
     id: "zod_validation",
-    strong: ["zod", "safeparse", "zod schema", "schema validation"],
+    strong: [TOKEN_ZOD, "safeparse", "zod schema", "schema validation"],
     weak: ["validation"],
     allowWeakOnly: false
   },
@@ -255,39 +294,20 @@ export function matchNeedProfile(profile: NeedMatchProfile, lexicon: NeedMatchLe
   };
 }
 
-function matchTerms(terms: string[], lexicon: NeedMatchLexicon, scope: "primary" | "all"): string[] {
+function matchTerms(terms: NeedProfileTerm[], lexicon: NeedMatchLexicon, scope: "primary" | "all"): string[] {
   const hits: string[] = [];
   for (const rawTerm of terms) {
-    const term = normalizeText(rawTerm);
-    if (!term) continue;
-    if (termMatch(term, lexicon.primaryText, lexicon.primaryTokens)) {
-      hits.push(rawTerm);
+    const label = typeof rawTerm === "string" ? rawTerm : rawTerm.value;
+    if (!label.trim()) continue;
+    if (matchesTerm(lexicon.primaryText, lexicon.primaryTokens, rawTerm)) {
+      hits.push(label);
       continue;
     }
-    if (scope === "all" && termMatch(term, lexicon.supportingText, lexicon.supportingTokens)) {
-      hits.push(rawTerm);
+    if (scope === "all" && matchesTerm(lexicon.supportingText, lexicon.supportingTokens, rawTerm)) {
+      hits.push(label);
     }
   }
   return dedupe(hits);
-}
-
-function termMatch(term: string, text: string, tokens: Set<string>): boolean {
-  if (term.includes(" ")) {
-    if (text.includes(term)) return true;
-    const parts = term.split(" ").filter(Boolean);
-    if (parts.length === 0) return false;
-    return parts.every((part) => tokens.has(part));
-  }
-  return tokens.has(term);
-}
-
-function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[./:@]/g, " ")
-    .replace(/[^a-z0-9+_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function dedupe(values: string[]): string[] {
