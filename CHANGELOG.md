@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [0.2.0] - 2026-05-31
+## [0.2.1] - 2026-05-31
 
 ### Added
 - Added install-time full bundle content security scanning for fetched skill files, including markdown comments, code blocks, and inline instructions.
