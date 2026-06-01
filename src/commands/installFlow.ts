@@ -93,7 +93,7 @@ const CHECKBOX_THEME_WITH_QUIT_HINT = {
 };
 
 const RISK_CONFIRMATION_TIMEOUT_MS = 20_000;
-const DANGEROUS_RISK_CONFIRMATION_TIMEOUT_MS = 30_000;
+const DANGEROUS_RISK_CONFIRMATION_TIMEOUT_MS = 60_000;
 
 type FinalSecurityStatus = "eligible" | "risky" | "blocked" | "hard-blocked";
 
@@ -878,8 +878,8 @@ async function runRiskyInstallChallenge(
 }
 
 function generateRiskConfirmationCode(): string {
-  const value = Math.floor(Math.random() * 9000) + 1000;
-  return `NAAR-${value}`;
+  const value = Math.floor(Math.random() * 900) + 100;
+  return `NR-${value}`;
 }
 
 async function runPromptWithQuitShortcut<T>(

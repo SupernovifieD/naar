@@ -564,7 +564,7 @@ describe("runInstallFlow security enforcement", () => {
 
     confirmMock.mockResolvedValue(true);
     inputMock.mockImplementation(async (prompt: { message: string }) => {
-      const matched = prompt.message.match(/Type (NAAR-\d{4}) to continue/);
+      const matched = prompt.message.match(/Type (NR-\d{3}) to continue/);
       return matched ? matched[1] : "";
     });
 
@@ -640,7 +640,7 @@ describe("runInstallFlow security enforcement", () => {
 
     confirmMock.mockResolvedValue(true);
     inputMock.mockImplementation(async (prompt: { message: string }) => {
-      const matched = prompt.message.match(/Type (NAAR-\d{4}) to continue/);
+      const matched = prompt.message.match(/Type (NR-\d{3}) to continue/);
       return matched ? matched[1] : "";
     });
 
