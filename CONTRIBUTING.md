@@ -54,7 +54,10 @@ npm run build
 
 ## Release Process for Maintainers
 
-Naar uses GitHub Actions + npm Trusted Publishing for automated npm release on tag push.
+Naar uses GitHub Actions + npm Trusted Publishing with a two-step release flow:
+
+1. Push a `v*` tag to run tag checks only (no npm publish).
+2. Publish a GitHub Release for that `v*` tag to run checks again and publish to npm.
 
 Release sequence:
 
@@ -66,12 +69,15 @@ npm version <patch|minor|major>
 git push origin main --follow-tags
 ```
 
+Then publish a GitHub Release for the new tag (for example `v0.2.2`).
+
 Release notes:
 
-- Pushing a `v*` tag triggers the npm publish workflow.
+- Pushing a `v*` tag triggers tag checks only. It does not publish to npm.
+- Publishing a GitHub Release for a `v*` tag triggers npm publishing.
 - Stable versions publish to npm `latest`.
 - Prerelease versions (for example `1.2.3-rc.1`) publish to npm `next`.
-- The workflow fails if the pushed tag version does not match `package.json`.
+- Both workflows fail if the tag version does not match `package.json`.
 
 ## Post-Publish Smoke Test
 

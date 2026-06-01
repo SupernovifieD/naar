@@ -1,20 +1,20 @@
 name: Publish to npm
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref }}
+  group: npm-publish-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 jobs:
   publish:
+    if: startsWith(github.event.release.tag_name, 'v')
     runs-on: ubuntu-latest
 
     steps:
@@ -40,12 +40,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Validate tag and package version match
+      - name: Validate release tag and package version match
         id: version_gate
         shell: bash
         run: |
           set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          TAG_VERSION="${TAG_NAME#v}"
           PKG_VERSION="$(node -p "require('./package.json').version")"
           echo "tag_version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
           echo "package_version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
