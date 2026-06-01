@@ -120,7 +120,7 @@ Flag behavior:
 - `--min-security-score <n>` sets the required threshold for that run.
 - `--no-scripts` enforces script blocking.
 - `--allow-scripts` disables `--no-scripts` for that run.
-- `--allow-risky` allows only overrideable risky skills (never hard-blocked skills).
+- `--allow-risky` is required for non-interactive installs that proceed with post-fetch security concerns.
 
 ### 4.4 Fetched Content Analysis
 
@@ -148,7 +148,7 @@ Signals can include evidence:
 - Line number
 - Excerpt (short, capped)
 
-When fetched bundles fail policy, Naar reports concise signal/evidence output and stops before writing.
+When fetched bundles contain concerns, Naar reports concise signal/evidence output, enters a security review step, and requires explicit user intent before any write.
 
 ### 4.5 Two-Stage Blocking
 
@@ -161,8 +161,9 @@ Naar has two checkpoints:
 2. Install-time fetched-bundle vetting
 - Selected bundles are fetched.
 - Fetched content is scanned.
-- Policy failures block installation before install-plan application.
-- If selected skills are overrideably risky and `--allow-risky` is used in interactive mode, Naar requires a short timed typed confirmation code before any file writes.
+- If concerns are found (`risky`, `blocked`, `hard-blocked`), Naar enters a security review decision flow before install-plan application.
+- Interactive mode requires explicit continue intent and a timed typed confirmation code before any file writes.
+- Hard-blocked results are displayed with dangerous-override wording and require stronger confirmation.
 - Wrong code, timeout, or cancel aborts install and writes nothing.
 
 This protects against incomplete metadata and content drift between listing and fetched bundle.
@@ -195,7 +196,7 @@ Naar avoids silent writes:
 - `--json` outputs plan data and does not write unless `--apply` is also set.
 - `--non-interactive` requires explicit apply behavior to write.
 - `--yes` alone does not bypass risky security policy.
-- In non-interactive mode, risky installs still require explicit `--allow-risky`.
+- In non-interactive mode, post-fetch security concerns require explicit `--allow-risky --yes` to proceed.
 - Interactive mode prompts for confirmation.
 - Conflict detection blocks overwrite cases unless `--force` is used.
 

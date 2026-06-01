@@ -136,12 +136,14 @@ Provider runtime tuning:
 - No write before preview + confirmation
 - `--json` mode is non-writing unless `--apply`
 - No repository source files are uploaded to providers
+- Post-fetch security concerns trigger a review step before any write
+- In non-interactive mode, concern overrides require both `--allow-risky` and `--yes`
 
 Recommendation/install status semantics:
 
 - `ELIGIBLE`: compatible and installable under current policy.
-- `RISKY`: overrideable security concerns; install requires `--allow-risky` and interactive typed confirmation.
-- `BLOCKED`: hard-blocked or policy-blocked; not installable by default.
+- `RISKY`: overrideable security concerns; install requires explicit confirmation before writes.
+- `BLOCKED`: policy concerns requiring explicit override confirmation before writes.
 - `INCOMPATIBLE`: does not match the selected target compatibility set.
 
 Recommendation output is a preliminary, pre-fetch view:
@@ -150,7 +152,7 @@ Recommendation output is a preliminary, pre-fetch view:
 - `Pre-fetch risk estimate` is based on provider metadata before bundle download.
 - Recommendation statuses are rendered as preliminary labels.
 
-During installation, Naar fetches bundle files and performs a second, final security analysis. That stage reports `Security score` and final status, which can differ from the pre-fetch estimate.
+During installation, Naar fetches bundle files and performs a second, final security analysis. That stage reports `Security score` and final status, which can differ from the pre-fetch estimate. If concerns are found (`risky`, `blocked`, or `hard-blocked`), Naar enters a security review step instead of writing files immediately.
 
 ## Security Model
 

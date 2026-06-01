@@ -131,7 +131,7 @@ function applySharedOptions(command: Command): Command {
     .option("--from-plan <file>", "Load install selections from plan JSON")
     .option("--no-scripts", "Disallow script-bearing skills")
     .option("--allow-scripts", "Allow script-bearing skills (unsafe)")
-    .option("--allow-risky", "Allow overrideable risky skills (unsafe)");
+    .option("--allow-risky", "Acknowledge risky security concerns; required for non-interactive concern overrides (unsafe)");
 }
 
 function colorizeCommanderOutput(content: string): string {
