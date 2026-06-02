@@ -45,13 +45,16 @@ Important boundaries:
 
 ## 3. Files Naar May Write
 
-During installation, Naar can write managed skill/rule files for selected targets:
+During installation, Naar can write managed files for selected write-capable targets. The current conservative defaults are:
 
-- Claude: `.claude/skills/<skill>/SKILL.md`
-- Cursor: `.cursor/rules/naar-<skill>.mdc`
-- Copilot: `.github/copilot-instructions.md` (managed appended blocks)
-- Codex: `.agents/skills/<skill>/SKILL.md`
-- Generic: `.agents/skills/<skill>/SKILL.md`
+- Claude Code project skills: `.claude/skills/<skill>/SKILL.md`
+- Cursor project rules: `.cursor/rules/naar-<skill>.mdc`
+- GitHub Copilot repository instructions: `.github/copilot-instructions.md` (managed appended blocks)
+- OpenAI Codex repo skills: `.agents/skills/<skill>/SKILL.md`
+
+Additional stable and experimental targets are opt-in through `--target`, target aliases, or target groups. Deprecated targets are explicit opt-in only. Research targets are discoverable through `naar targets list`, but they are not write-capable and never produce install actions.
+
+Run `naar targets list` or `naar targets inspect <target>` to inspect write capability, status, path hints, and documentation links before installing to a target.
 
 Naar also writes internal management files:
 

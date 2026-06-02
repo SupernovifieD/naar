@@ -1,15 +1,18 @@
 import path from "node:path";
 import type { CliFlags, InstallTarget } from "../types/index.js";
-import { resolveTargetAlias } from "../targets/index.js";
+import { isBroadTargetGroupAlias, resolveTargetSelection } from "../targets/index.js";
 
 export function parseTargets(input: string[] | undefined): InstallTarget[] {
   if (!input || input.length === 0) return [];
   const targets: InstallTarget[] = [];
   for (const raw of input) {
-    const mapped = resolveTargetAlias(raw);
-    if (mapped) targets.push(mapped);
+    targets.push(...resolveTargetSelection(raw));
   }
   return [...new Set(targets)];
+}
+
+export function hasBroadTargetSelection(input: string[] | undefined): boolean {
+  return (input ?? []).some((value) => isBroadTargetGroupAlias(value));
 }
 
 export function normalizeProviders(input: string[] | undefined): string[] {
@@ -29,6 +32,7 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     repo: String(raw.repo ?? process.cwd()),
     provider: normalizeProviders(raw.provider as string[] | undefined),
     target: parseTargets(raw.target as string[] | undefined),
+    broadTargetSelection: hasBroadTargetSelection(raw.target as string[] | undefined),
     json: Boolean(raw.json),
     compact: Boolean(raw.compact),
     apply: Boolean(raw.apply),

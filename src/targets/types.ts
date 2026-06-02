@@ -6,7 +6,8 @@ export type AgentArtifactKind =
   | "instruction"
   | "context"
   | "agents-md"
-  | "generic-skill";
+  | "generic-skill"
+  | "unknown";
 
 export type TargetStatus =
   | "stable"
@@ -14,9 +15,17 @@ export type TargetStatus =
   | "research"
   | "deprecated";
 
+export type TargetVerificationStatus =
+  | "verified-docs"
+  | "project-convention"
+  | "research-unverified";
+
+export type TargetScopeSupport = "repo" | "workspace" | "path" | "mode";
+
 export type InstallStrategy =
   | "write-skill-folder"
   | "write-rule-file"
+  | "write-concise-file"
   | "append-managed-block"
   | "research-only";
 
@@ -33,9 +42,20 @@ export interface AgentTargetDefinition {
   aliases: string[];
   status: TargetStatus;
   enabledByDefault: boolean;
+  canWrite: boolean;
   artifactKind: AgentArtifactKind;
   installStrategy: InstallStrategy;
   pathHint: string;
+  installPathTemplate?: string;
+  documentationUrl?: string;
+  verificationStatus: TargetVerificationStatus;
+  scopeSupport: TargetScopeSupport[];
+  supportsBundledFiles: boolean;
+  supportsManagedBlocks: boolean;
+  supportsPathScopedRules: boolean;
+  supportsModeSpecificRules: boolean;
+  acceptsGenericSkills: boolean;
+  acceptsAgentsMd: boolean;
   detection: TargetDetectionDefinition;
   compatibility: {
     assistantIds: AssistantId[];
@@ -50,6 +70,7 @@ export interface TargetRenderContext {
   skillName: string;
   skillSummary: string;
   skillMarkdown: string;
+  sourceProviderId?: string;
 }
 
 export type TargetRenderer = (context: TargetRenderContext) => InstallAction[];

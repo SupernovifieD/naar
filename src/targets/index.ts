@@ -2,11 +2,24 @@ export {
   AGENT_TARGET_ORDER,
   AGENT_TARGETS,
   getDefaultInstallTargets,
+  getDefaultTargets,
   getEnabledTargets,
+  getResearchTargets,
   getTargetById,
+  getTargetsByArtifactKind,
+  getTargetsByProduct,
+  getTargetsByStatus,
+  getWriteCapableTargets,
   listInstallTargets
 } from "./registry.js";
-export { TARGET_ALIASES, resolveTargetAlias } from "./aliases.js";
+export {
+  TARGET_ALIASES,
+  TARGET_GROUP_ALIASES,
+  isBroadTargetGroupAlias,
+  isTargetGroupAlias,
+  resolveTargetAlias,
+  resolveTargetSelection
+} from "./aliases.js";
 export {
   dedupeAssistants,
   getAllTargetAssistantIds,
@@ -22,5 +35,7 @@ export type {
   TargetDetectionDefinition,
   TargetRenderContext,
   TargetRenderer,
-  TargetStatus
+  TargetScopeSupport,
+  TargetStatus,
+  TargetVerificationStatus
 } from "./types.js";

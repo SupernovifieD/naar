@@ -1,13 +1,13 @@
 import type { InstallAction } from "../../types/index.js";
 import type { TargetRenderContext } from "../types.js";
-import { resolveInstallPath } from "./shared.js";
+import { buildConciseTargetContent, resolveInstallPath } from "./shared.js";
 
-export function renderSkillFolderTarget(context: TargetRenderContext): InstallAction[] {
+export function renderConciseFileTarget(context: TargetRenderContext): InstallAction[] {
   return [
     {
       type: "write",
       path: resolveInstallPath(context),
-      content: context.skillMarkdown,
+      content: buildConciseTargetContent(context),
       overwrite: false
     }
   ];

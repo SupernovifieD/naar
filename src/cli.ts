@@ -9,6 +9,7 @@ import { runGo } from "./commands/go.js";
 import { runList } from "./commands/list.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runConfig } from "./commands/config.js";
+import { runTargetsInspect, runTargetsList } from "./commands/targets.js";
 import { CLI_VERSION } from "./utils/version.js";
 
 const program = new Command();
@@ -94,6 +95,26 @@ applySharedOptions(program
       allowScripts: opts.allowScripts === true ? true : undefined
     });
   }));
+
+const targetsCommand = program
+  .command("targets")
+  .description("List and inspect supported assistant targets");
+
+targetsCommand
+  .command("list")
+  .description("List supported assistant targets")
+  .option("--json", "Emit JSON output")
+  .action((options: { json?: boolean }) => {
+    runTargetsList({ json: Boolean(options.json) });
+  });
+
+targetsCommand
+  .command("inspect <target>")
+  .description("Inspect a supported assistant target or target group")
+  .option("--json", "Emit JSON output")
+  .action((target: string, options: { json?: boolean }) => {
+    runTargetsInspect(target, { json: Boolean(options.json) });
+  });
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

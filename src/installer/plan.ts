@@ -45,7 +45,8 @@ export async function createInstallPlan(options: CreatePlanOptions): Promise<Ins
         slug,
         skillName: skill.name,
         skillSummary: skill.summary,
-        skillMarkdown
+        skillMarkdown,
+        sourceProviderId: skill.source.providerId
       });
       for (const action of targetActions) {
         action.sourceSkillId = skill.canonicalSkillId;

@@ -54,6 +54,7 @@ npx -y naar-cli@latest go
 | `naar list` | Lists skills Naar has installed in the repository. | You want to audit installed skills and locations. | `naar list` |
 | `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
 | `naar config` | Views or updates Naar config for the repo. | You want default providers, targets, or score settings. | `naar config --json` |
+| `naar targets` | Lists and inspects supported assistant targets. | You want to see stable, experimental, deprecated, and research targets. | `naar targets list` |
 
 ## Common Examples
 
@@ -157,15 +158,64 @@ These options are available on `naar config`:
 
 ## Targets
 
-Naar supports target aliases and full target ids.
+Naar supports target aliases, full target ids, and target groups. Defaults stay conservative: Claude skills, Cursor rules, Copilot repository instructions, and Codex repo skills.
 
-| Alias | Target id | Install location |
-| --- | --- | --- |
-| `claude` | `claude_project_skills` | `.claude/skills/<skill>/SKILL.md` |
-| `cursor` | `cursor_project_rules` | `.cursor/rules/naar-<skill>.mdc` |
-| `copilot` | `copilot_repo_instructions` | `.github/copilot-instructions.md` as managed appended blocks |
-| `codex` | `codex_repo_skills` | `.agents/skills/<skill>/SKILL.md` |
-| `generic` | `generic_agent_skills` | `.agents/skills/<skill>/SKILL.md` |
+Target status:
+
+- `stable`: documented path and tested renderer.
+- `experimental`: documented path, newer integration, opt-in only.
+- `deprecated`: legacy path retained for compatibility, explicit opt-in only.
+- `research`: visible for discovery, not write-capable.
+
+Target commands:
+
+```bash
+naar targets list
+naar targets inspect codex_repo_skills
+naar targets inspect agents-md
+```
+
+Useful target groups:
+
+| Group | Meaning |
+| --- | --- |
+| `all` | Stable and experimental write-capable targets, excluding deprecated and research targets. |
+| `all-skills` | Stable and experimental skill-folder targets only. |
+| `all-rules` | Stable and experimental rule targets only. |
+| `all-instructions` | Stable and experimental instruction/context targets only. |
+| `agents-md` | Standard `AGENTS.md` managed block target. |
+| `experimental` | Experimental write-capable targets only. |
+| `deprecated` | Deprecated write-capable targets only. |
+| `research` | Research-only targets; these never write files. |
+
+Broad groups such as `all`, `experimental`, and `deprecated` require explicit confirmation. In non-interactive runs they require `--yes`.
+
+| Product | Target id | Artifact kind | Path | Status | Default? | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Claude Code | `claude_project_skills` | skill | `.claude/skills/<skill>/SKILL.md` | stable | yes | Full skill folder target. |
+| Claude Code | `claude_project_memory` | context | `CLAUDE.md` | stable | no | Concise managed memory block. |
+| Cursor | `cursor_project_rules` | rule | `.cursor/rules/naar-<skill>.mdc` | stable | yes | Project rule file. |
+| Cursor | `cursor_legacy_rules` | rule | `.cursorrules` | deprecated | no | Legacy managed block. |
+| GitHub Copilot | `copilot_repo_instructions` | instruction | `.github/copilot-instructions.md` | stable | yes | Managed appended blocks. |
+| GitHub Copilot | `copilot_path_instructions` | instruction | `.github/instructions/naar-<skill>.instructions.md` | stable | no | Concise path instruction file. |
+| OpenAI Codex | `codex_repo_skills` | skill | `.agents/skills/<skill>/SKILL.md` | stable | yes | Full skill folder target. |
+| Gemini CLI | `gemini_context` | context | `GEMINI.md` | stable | no | Concise managed context block. |
+| AGENTS.md | `agents_md_standard` | agents-md | `AGENTS.md` | stable | no | Standard managed instructions block. |
+| Generic Agent | `generic_agent_skills` | generic-skill | `.agents/skills/<skill>/SKILL.md` | stable | no | Generic skill folder convention. |
+| Windsurf | `windsurf_workspace_skills` | skill | `.windsurf/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
+| Windsurf | `windsurf_agents_skills` | skill | `.agents/skills/<skill>/SKILL.md` | experimental | no | `.agents/skills` skill alias. |
+| Windsurf | `windsurf_rules` | rule | `.windsurf/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
+| Cline | `cline_workspace_skills` | skill | `.cline/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
+| Cline | `cline_clinerules_skills` | skill | `.clinerules/skills/<skill>/SKILL.md` | experimental | no | Rule-folder skill target. |
+| Cline | `cline_rules` | rule | `.clinerules/naar-<skill>.md` | experimental | no | Concise rule file. |
+| Roo Code | `roo_rules` | rule | `.roo/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
+| Roo Code | `roo_legacy_rules` | rule | `.roorules` | deprecated | no | Legacy managed block. |
+| Continue | `continue_rules` | rule | `.continue/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
+| Kiro | `kiro_workspace_skills` | skill | `.kiro/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
+| Kiro | `kiro_steering` | context | `.kiro/steering/naar-<skill>.md` | experimental | no | Concise steering file. |
+| Research targets | `*_research` | unknown | research only | research | no | Discoverable but never write-capable. |
+
+Skills are reusable `SKILL.md` folders. Rules, instructions, context files, steering files, and `AGENTS.md` entries are concise activation hints; Naar does not blindly dump full skill content into always-on instruction files.
 
 ## Providers and Authentication
 

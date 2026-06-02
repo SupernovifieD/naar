@@ -27,25 +27,40 @@ describe("scanRepo ecosystem coverage", () => {
     await writeFile(path.join(repoRoot, "AGENTS.md"), "# Codex\n", "utf8");
     await mkdir(path.join(repoRoot, ".agents", "skills", "installed-skill"), { recursive: true });
     await writeFile(path.join(repoRoot, ".agents", "skills", "installed-skill", "SKILL.md"), "# Generic\n", "utf8");
+    await writeFile(path.join(repoRoot, "GEMINI.md"), "# Gemini\n", "utf8");
+    await mkdir(path.join(repoRoot, ".windsurf", "rules"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".windsurf", "rules", "repo.md"), "# Windsurf\n", "utf8");
+    await mkdir(path.join(repoRoot, ".cline", "skills", "repo-skill"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".cline", "skills", "repo-skill", "SKILL.md"), "# Cline\n", "utf8");
+    await mkdir(path.join(repoRoot, ".roo", "rules"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".roo", "rules", "repo.md"), "# Roo\n", "utf8");
+    await mkdir(path.join(repoRoot, ".continue", "rules"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".continue", "rules", "repo.md"), "# Continue\n", "utf8");
+    await mkdir(path.join(repoRoot, ".kiro", "steering"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".kiro", "steering", "repo.md"), "# Kiro\n", "utf8");
+    await writeFile(path.join(repoRoot, ".cursorrules"), "# Cursor legacy\n", "utf8");
+    await writeFile(path.join(repoRoot, ".roorules"), "# Roo legacy\n", "utf8");
 
     const facts = await scanRepo(repoRoot);
     const assistants = new Map(facts.aiAssistants.map((assistant) => [assistant.id, assistant]));
 
     expect(assistants.get("claude")).toMatchObject({
       status: "found",
-      recommendedInstallTargets: ["claude_project_skills"]
+      recommendedInstallTargets: expect.arrayContaining(["claude_project_skills", "claude_project_memory"])
     });
     expect(assistants.get("claude")?.configPathsFound).toContain("CLAUDE.md");
 
     expect(assistants.get("cursor")).toMatchObject({
       status: "found",
-      recommendedInstallTargets: ["cursor_project_rules"]
+      recommendedInstallTargets: expect.arrayContaining(["cursor_project_rules", "cursor_legacy_rules"])
     });
-    expect(assistants.get("cursor")?.configPathsFound).toContain(".cursor/rules/repo.mdc");
+    expect(assistants.get("cursor")?.configPathsFound).toEqual(
+      expect.arrayContaining([".cursor/rules/repo.mdc", ".cursorrules"])
+    );
 
     expect(assistants.get("copilot")).toMatchObject({
       status: "found",
-      recommendedInstallTargets: ["copilot_repo_instructions"]
+      recommendedInstallTargets: expect.arrayContaining(["copilot_repo_instructions", "copilot_path_instructions"])
     });
     expect(assistants.get("copilot")?.configPathsFound).toContain(".github/instructions/repo.instructions.md");
 
@@ -62,6 +77,44 @@ describe("scanRepo ecosystem coverage", () => {
       recommendedInstallTargets: ["generic_agent_skills"]
     });
     expect(assistants.get("generic")?.configPathsFound).toContain(".agents/skills/installed-skill/SKILL.md");
+
+    expect(assistants.get("gemini")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: expect.arrayContaining(["gemini_context", "gemini_workspace_skills_research"])
+    });
+    expect(assistants.get("gemini")?.configPathsFound).toContain("GEMINI.md");
+
+    expect(assistants.get("windsurf")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: expect.arrayContaining(["windsurf_workspace_skills", "windsurf_rules"])
+    });
+    expect(assistants.get("windsurf")?.configPathsFound).toContain(".windsurf/rules/repo.md");
+
+    expect(assistants.get("cline")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: expect.arrayContaining(["cline_workspace_skills", "cline_rules"])
+    });
+    expect(assistants.get("cline")?.configPathsFound).toContain(".cline/skills/repo-skill/SKILL.md");
+
+    expect(assistants.get("roo")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: expect.arrayContaining(["roo_rules", "roo_legacy_rules"])
+    });
+    expect(assistants.get("roo")?.configPathsFound).toEqual(
+      expect.arrayContaining([".roo/rules/repo.md", ".roorules"])
+    );
+
+    expect(assistants.get("continue")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["continue_rules"]
+    });
+    expect(assistants.get("continue")?.configPathsFound).toContain(".continue/rules/repo.md");
+
+    expect(assistants.get("kiro")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: expect.arrayContaining(["kiro_workspace_skills", "kiro_steering"])
+    });
+    expect(assistants.get("kiro")?.configPathsFound).toContain(".kiro/steering/repo.md");
   });
 
   it("detects Next.js + Tailwind stack in primary scope", async () => {

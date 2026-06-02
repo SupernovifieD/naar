@@ -161,7 +161,36 @@ export interface PackageManagerDetection {
   workspaceMode?: boolean;
 }
 
-export type AssistantId = "claude" | "cursor" | "copilot" | "codex" | "generic";
+export type AssistantId =
+  | "claude"
+  | "cursor"
+  | "copilot"
+  | "codex"
+  | "gemini"
+  | "windsurf"
+  | "cline"
+  | "roo"
+  | "continue"
+  | "kiro"
+  | "agents-md"
+  | "generic"
+  | "aider"
+  | "openhands"
+  | "junie"
+  | "kilo"
+  | "zed"
+  | "warp"
+  | "devin"
+  | "factory"
+  | "jules"
+  | "amp"
+  | "augment"
+  | "goose"
+  | "opencode"
+  | "phoenix"
+  | "semgrep"
+  | "ona"
+  | "trae";
 
 export interface AIAssistantDetection {
   id: AssistantId;
@@ -405,9 +434,46 @@ export interface SkillSecurityReport {
 
 export type InstallTarget =
   | "claude_project_skills"
+  | "claude_project_memory"
   | "cursor_project_rules"
+  | "cursor_legacy_rules"
   | "copilot_repo_instructions"
+  | "copilot_path_instructions"
   | "codex_repo_skills"
+  | "gemini_context"
+  | "gemini_workspace_skills_research"
+  | "windsurf_workspace_skills"
+  | "windsurf_agents_skills"
+  | "windsurf_rules"
+  | "cline_workspace_skills"
+  | "cline_clinerules_skills"
+  | "cline_rules"
+  | "roo_rules"
+  | "roo_legacy_rules"
+  | "roo_workspace_skills_research"
+  | "roo_mode_rules_research"
+  | "roo_mode_skills_research"
+  | "continue_rules"
+  | "kiro_workspace_skills"
+  | "kiro_steering"
+  | "agents_md_standard"
+  | "aider_research"
+  | "openhands_research"
+  | "junie_research"
+  | "kilo_research"
+  | "zed_research"
+  | "warp_research"
+  | "devin_research"
+  | "factory_research"
+  | "jules_research"
+  | "amp_research"
+  | "augment_research"
+  | "goose_research"
+  | "opencode_research"
+  | "phoenix_research"
+  | "semgrep_research"
+  | "ona_research"
+  | "trae_research"
   | "generic_agent_skills";
 
 export interface InstallAction {
@@ -416,6 +482,7 @@ export interface InstallAction {
   content?: string;
   sourceSkillId?: string;
   overwrite?: boolean;
+  managedMarker?: string;
 }
 
 export interface InstallConflict {
@@ -474,6 +541,7 @@ export interface CliFlags {
   repo: string;
   provider: string[];
   target: InstallTarget[];
+  broadTargetSelection?: boolean;
   json: boolean;
   compact: boolean;
   apply: boolean;

@@ -20,6 +20,11 @@ export async function applyInstallPlan(repoRoot: string, plan: InstallPlan): Pro
     if (action.type === "append") {
       const existing = (await exists(fullPath)) ? await readFile(fullPath, "utf8") : "";
       const append = action.content ?? "";
+      if (action.managedMarker) {
+        const next = upsertManagedBlock(existing, append, action.managedMarker);
+        await writeFile(fullPath, next, "utf8");
+        continue;
+      }
       if (!existing.includes(append)) {
         await writeFile(fullPath, existing + append, "utf8");
       }
@@ -38,19 +43,17 @@ export async function uninstallManagedFiles(repoRoot: string, state: InstalledSt
 
   for (const skill of selected) {
     for (const managed of skill.managedFiles) {
-      if (managed.includes("#naar:skill:")) {
-        const [filePath, markerSuffix] = managed.split("#naar:skill:");
-        const slug = markerSuffix;
+      const markerIndex = managed.indexOf("#naar:");
+      if (markerIndex >= 0) {
+        const filePath = managed.slice(0, markerIndex);
+        const marker = managed.slice(markerIndex + 1);
         const fullPath = path.join(repoRoot, filePath);
         if (!(await exists(fullPath))) {
           continue;
         }
 
         const content = await readFile(fullPath, "utf8");
-        const blockRegex = new RegExp(
-          `\\n?<!-- naar:skill:${escapeRegExp(slug)}:start -->[\\s\\S]*?<!-- naar:skill:${escapeRegExp(slug)}:end -->\\n?`,
-          "g"
-        );
+        const blockRegex = managedBlockRegex(marker);
         const next = content.replace(blockRegex, "\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
         await writeFile(fullPath, next, "utf8");
         removed.push(managed);
@@ -66,6 +69,21 @@ export async function uninstallManagedFiles(repoRoot: string, state: InstalledSt
   }
 
   return removed;
+}
+
+function upsertManagedBlock(existing: string, block: string, marker: string): string {
+  const blockRegex = managedBlockRegex(marker);
+  if (blockRegex.test(existing)) {
+    return existing.replace(blockRegex, block);
+  }
+  return existing + block;
+}
+
+function managedBlockRegex(marker: string): RegExp {
+  return new RegExp(
+    `\\n?<!-- ${escapeRegExp(marker)}:start -->[\\s\\S]*?<!-- ${escapeRegExp(marker)}:end -->\\n?`,
+    "g"
+  );
 }
 
 function escapeRegExp(input: string): string {

@@ -247,6 +247,55 @@ beforeEach(() => {
 });
 
 describe("runInstallFlow security enforcement", () => {
+  it("cancels before fetching when only research targets are selected", async () => {
+    const candidate = makeCandidate();
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    await runInstallFlow({
+      ...baseFlags,
+      target: ["trae_research"]
+    });
+
+    expect(printJsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      installSkipped: true,
+      error: "Selected targets are research-only or not write-capable."
+    }));
+    expect(buildProvidersMock).not.toHaveBeenCalled();
+    expect(createInstallPlanMock).not.toHaveBeenCalled();
+  });
+
+  it("requires --yes for broad target groups in json/non-interactive mode", async () => {
+    const candidate = makeCandidate();
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    await runInstallFlow({
+      ...baseFlags,
+      target: ["codex_repo_skills", "agents_md_standard"],
+      broadTargetSelection: true,
+      apply: true,
+      yes: false
+    });
+
+    expect(printJsonMock).toHaveBeenCalledWith(expect.objectContaining({
+      installSkipped: true,
+      error: "Broad target groups require --yes in non-interactive/json mode."
+    }));
+    expect(buildProvidersMock).not.toHaveBeenCalled();
+    expect(createInstallPlanMock).not.toHaveBeenCalled();
+  });
+
   it("returns structured JSON security review when fetched bundles have concerns", async () => {
     const candidate = makeCandidate();
     loadOrBuildRecommendationsMock.mockResolvedValue({

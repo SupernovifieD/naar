@@ -50,8 +50,7 @@ class PromptExitRequestedError extends Error {
   }
 }
 
-const INSTALL_TARGETS = listInstallTargets();
-const COPILOT_INSTRUCTIONS_PATH = getTargetById("copilot_repo_instructions").pathHint;
+const INSTALL_TARGETS = listInstallTargets().filter((target) => target.canWrite && target.status === "stable");
 
 const CHECKBOX_THEME_WITH_QUIT_HINT = {
   style: {
@@ -118,6 +117,25 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
   if (targets.length === 0) {
     process.stdout.write(`${warningLine("No coding assistant targets selected. Installation canceled.")}\n`);
+    return;
+  }
+
+  targets = filterWriteCapableTargetsForInstall(targets, flags);
+  if (targets.length === 0) {
+    if (flags.json) {
+      printJson({
+        repoRoot,
+        installSkipped: true,
+        error: "Selected targets are research-only or not write-capable."
+      });
+    } else {
+      process.stdout.write(`${warningLine("Selected targets are research-only or not write-capable. Installation canceled.")}\n`);
+    }
+    return;
+  }
+
+  const broadTargetConfirmed = await confirmBroadTargetSelection(flags, targets);
+  if (!broadTargetConfirmed) {
     return;
   }
 
@@ -442,6 +460,61 @@ function selectFromReference(
   });
 }
 
+function filterWriteCapableTargetsForInstall(targets: InstallTarget[], flags: CliFlags): InstallTarget[] {
+  const writeableTargets = targets.filter((target) => getTargetById(target).canWrite);
+  const skippedTargets = targets.filter((target) => !getTargetById(target).canWrite);
+
+  if (skippedTargets.length > 0 && !flags.json) {
+    process.stdout.write(
+      `${warningLine(`Skipping non-writeable research targets: ${skippedTargets.join(", ")}.`)}\n`
+    );
+  }
+
+  return dedupeInstallTargets(writeableTargets);
+}
+
+async function confirmBroadTargetSelection(flags: CliFlags, targets: InstallTarget[]): Promise<boolean> {
+  if (!flags.broadTargetSelection) return true;
+
+  if (flags.nonInteractive || flags.json) {
+    if (flags.yes) return true;
+    if (flags.json) {
+      printJson({
+        installSkipped: true,
+        error: "Broad target groups require --yes in non-interactive/json mode.",
+        targets
+      });
+    } else {
+      process.stdout.write(`${warningLine("Broad target groups require --yes in non-interactive mode. Installation canceled.")}\n`);
+    }
+    return false;
+  }
+
+  let confirmed = false;
+  try {
+    confirmed = await runPromptWithQuitShortcut((context) =>
+      confirm(
+        {
+          message: `Install to ${targets.length} targets from a broad target group? (press q to quit)`,
+          default: false
+        },
+        context
+      )
+    );
+  } catch (error) {
+    if (error instanceof PromptExitRequestedError) {
+      process.stdout.write(`${warningLine("Installation canceled.")}\n`);
+      return false;
+    }
+    throw error;
+  }
+
+  if (!confirmed) {
+    process.stdout.write(`${warningLine("Installation canceled.")}\n`);
+  }
+  return confirmed;
+}
+
 async function readPlanSelections(filePath: string): Promise<string[]> {
   const raw = await readFile(path.resolve(filePath), "utf8");
   const parsed = JSON.parse(raw) as { skills?: Array<string | { id?: string; skillId?: string; canonicalSkillId?: string }> };
@@ -526,8 +599,8 @@ async function persistInstallationState(
       actions
         .filter((action) => action.sourceSkillId === skill.canonicalSkillId)
         .map((action) => {
-          if (action.type === "append" && action.path === COPILOT_INSTRUCTIONS_PATH) {
-            return `${action.path}#naar:skill:${slug}`;
+          if (action.type === "append") {
+            return `${action.path}#${action.managedMarker ?? `naar:skill:${slug}`}`;
           }
           return action.path;
         })

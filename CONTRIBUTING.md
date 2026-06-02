@@ -86,9 +86,11 @@ Useful scripts:
 
 ## Agent Target Registry
 
-Naar's supported install targets are centralized in `src/targets/registry.ts`. Phase 1 keeps the existing targets only: Claude Code project skills, Cursor rules, GitHub Copilot repository instructions, OpenAI Codex repo skills, and Generic `.agents/skills`.
+Naar's supported install targets are centralized in `src/targets/registry.ts`. The registry covers stable, experimental, deprecated, AGENTS.md, and research-only targets while keeping the default target set conservative.
 
 When adding a future target, add a registry entry first, then wire only the required renderer or detection adapter. Do not duplicate aliases, labels, install paths, target order, or assistant compatibility maps in command, scanner, config, or installer code.
+
+For schema details, renderer rules, naming conventions, and safety requirements, see [docs/agent-target-registry.md](./docs/agent-target-registry.md).
 
 ## Release Process for Maintainers
 
