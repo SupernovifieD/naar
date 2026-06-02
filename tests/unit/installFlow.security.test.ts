@@ -456,7 +456,7 @@ describe("runInstallFlow security enforcement", () => {
     expect(payload.securityReview).toBeDefined();
   });
 
-  it("cancels risky interactive install when confirmation code is wrong", async () => {
+  it("cancels risky interactive install after three incorrect confirmation attempts", async () => {
     const candidate = makeCandidate({ license: "" });
     buildRecommendationsMock.mockResolvedValue({
       repoFacts,
@@ -479,14 +479,18 @@ describe("runInstallFlow security enforcement", () => {
     confirmMock.mockResolvedValue(true);
     inputMock.mockResolvedValue("WRONG");
 
-    await runInstallFlow({
-      ...baseFlags,
-      json: false,
-      nonInteractive: false,
-      yes: true,
-      allowRisky: true
+    const stdout = await captureStdout(async () => {
+      await runInstallFlow({
+        ...baseFlags,
+        json: false,
+        nonInteractive: false,
+        yes: true,
+        allowRisky: true
+      });
     });
 
+    expect(inputMock).toHaveBeenCalledTimes(3);
+    expect(stdout).toContain("You failed all 3 attempts. Rerun the command to try again. No files were written.");
     expect(createInstallPlanMock).not.toHaveBeenCalled();
     expect(applyInstallPlanMock).not.toHaveBeenCalled();
   });
@@ -514,8 +518,10 @@ describe("runInstallFlow security enforcement", () => {
       }]);
 
       confirmMock.mockResolvedValue(true);
+      let promptCount = 0;
       inputMock.mockImplementation((_prompt: { message: string }, context: { signal: AbortSignal }) =>
         new Promise((_resolve, reject) => {
+          promptCount += 1;
           context.signal.addEventListener("abort", () => {
             const error = new Error("aborted");
             error.name = "AbortPromptError";
@@ -532,9 +538,12 @@ describe("runInstallFlow security enforcement", () => {
         allowRisky: true
       });
 
-      await vi.advanceTimersByTimeAsync(20_001);
+      await vi.advanceTimersByTimeAsync(60_001);
+      await vi.advanceTimersByTimeAsync(60_001);
+      await vi.advanceTimersByTimeAsync(60_001);
       await runPromise;
 
+      expect(promptCount).toBe(3);
       expect(createInstallPlanMock).not.toHaveBeenCalled();
       expect(applyInstallPlanMock).not.toHaveBeenCalled();
     } finally {
@@ -576,6 +585,57 @@ describe("runInstallFlow security enforcement", () => {
       allowRisky: true
     });
 
+    expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("generates a new code for each failed attempt and allows success on a later attempt", async () => {
+    const candidate = makeCandidate({ license: "" });
+    buildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({
+        skill: candidate,
+        files: {
+          "SKILL.md": "# Skill\n\nUse this safely."
+        }
+      }))
+    }]);
+
+    const prompts: string[] = [];
+    const randomSpy = vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.5)
+      .mockReturnValueOnce(0.999);
+    confirmMock.mockResolvedValue(true);
+    inputMock.mockImplementation(async (prompt: { message: string }) => {
+      prompts.push(prompt.message);
+      const matched = prompt.message.match(/Type (NR-\d{3}) to continue/);
+      return prompts.length === 3 && matched ? matched[1] : "WRONG";
+    });
+
+    try {
+      await runInstallFlow({
+        ...baseFlags,
+        json: false,
+        nonInteractive: false,
+        yes: true,
+        allowRisky: true
+      });
+    } finally {
+      randomSpy.mockRestore();
+    }
+
+    expect(inputMock).toHaveBeenCalledTimes(3);
+    const codes = prompts.map((prompt) => prompt.match(/Type (NR-\d{3}) to continue/)?.[1]);
+    expect(new Set(codes).size).toBe(3);
     expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
     expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
   });

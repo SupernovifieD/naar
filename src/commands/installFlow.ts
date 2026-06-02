@@ -92,8 +92,9 @@ const CHECKBOX_THEME_WITH_QUIT_HINT = {
   }
 };
 
-const RISK_CONFIRMATION_TIMEOUT_MS = 20_000;
+const RISK_CONFIRMATION_TIMEOUT_MS = 60_000;
 const DANGEROUS_RISK_CONFIRMATION_TIMEOUT_MS = 60_000;
+const RISK_CONFIRMATION_MAX_ATTEMPTS = 3;
 
 type FinalSecurityStatus = "eligible" | "risky" | "blocked" | "hard-blocked";
 
@@ -812,7 +813,6 @@ async function runRiskyInstallChallenge(
   const timeoutMs = options.dangerousOverrideRequired
     ? DANGEROUS_RISK_CONFIRMATION_TIMEOUT_MS
     : RISK_CONFIRMATION_TIMEOUT_MS;
-  const confirmationCode = generateRiskConfirmationCode();
   process.stdout.write(`\n${warningHeader(options.dangerousOverrideRequired ? "Dangerous security override required" : "Security confirmation required")}\n`);
   if (options.dangerousOverrideRequired) {
     process.stdout.write("You are about to override blocked or hard-blocked security decisions.\n");
@@ -820,7 +820,10 @@ async function runRiskyInstallChallenge(
   } else {
     process.stdout.write("You are about to install skills with explicit security risk overrides.\n");
   }
-  process.stdout.write(`Type the confirmation code within ${Math.round(timeoutMs / 1000)} seconds to continue.\n\n`);
+  process.stdout.write(
+    `Type the confirmation code within ${Math.round(timeoutMs / 1000)} seconds to continue. `
+    + `You have ${RISK_CONFIRMATION_MAX_ATTEMPTS} attempts.\n\n`
+  );
   for (const entry of concerningAfterFetch) {
     process.stdout.write(
       `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)}\n`
@@ -833,48 +836,64 @@ async function runRiskyInstallChallenge(
       process.stdout.write(`  - ${colorSecurityReason(reason)}\n`);
     }
   }
-  process.stdout.write(`\nConfirmation code: ${pc.bold(pc.yellow(confirmationCode))}\n`);
 
-  let timedOut = false;
-  const timeoutController = new AbortController();
-  const timer = setTimeout(() => {
-    timedOut = true;
-    timeoutController.abort();
-  }, timeoutMs);
+  for (let attempt = 1; attempt <= RISK_CONFIRMATION_MAX_ATTEMPTS; attempt += 1) {
+    const confirmationCode = generateRiskConfirmationCode();
+    process.stdout.write(`\nConfirmation code (${attempt}/${RISK_CONFIRMATION_MAX_ATTEMPTS}): ${pc.bold(pc.yellow(confirmationCode))}\n`);
 
-  try {
-    const value = await runPromptWithQuitShortcut(
-      (context) => input(
-        { message: `Type ${confirmationCode} to continue (press q to quit)` },
-        { signal: AbortSignal.any([context.signal, timeoutController.signal]) }
-      ),
-      { abortAsExit: false }
-    );
+    let timedOut = false;
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => {
+      timedOut = true;
+      timeoutController.abort();
+    }, timeoutMs);
 
-    if (value.trim() !== confirmationCode) {
-      process.stdout.write(`${warningLine("Incorrect confirmation code. Installation canceled. No files were written.")}\n`);
-      return false;
-    }
+    try {
+      const value = await runPromptWithQuitShortcut(
+        (context) => input(
+          { message: `Type ${confirmationCode} to continue (press q to quit)` },
+          { signal: AbortSignal.any([context.signal, timeoutController.signal]) }
+        ),
+        { abortAsExit: false }
+      );
 
-    process.stdout.write(`${pc.green("Security override confirmation accepted.")}\n`);
-    return true;
-  } catch (error) {
-    if (error instanceof PromptExitRequestedError) {
-      process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
+      if (value.trim() === confirmationCode) {
+        process.stdout.write(`${pc.green("Security override confirmation accepted.")}\n`);
+        return true;
+      }
+
+      if (attempt < RISK_CONFIRMATION_MAX_ATTEMPTS) {
+        process.stdout.write(`${warningLine("Incorrect confirmation code. A new code has been generated.")}\n`);
+        continue;
+      }
+
+      process.stdout.write(`${warningLine("Incorrect confirmation code. You failed all 3 attempts. Rerun the command to try again. No files were written.")}\n`);
       return false;
+    } catch (error) {
+      if (error instanceof PromptExitRequestedError) {
+        process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
+        return false;
+      }
+      if (timedOut && isPromptAbortError(error)) {
+        if (attempt < RISK_CONFIRMATION_MAX_ATTEMPTS) {
+          process.stdout.write(`${warningLine("Security confirmation expired. A new code has been generated.")}\n`);
+          continue;
+        }
+        process.stdout.write(`${warningLine("Security confirmation expired. You failed all 3 attempts. Rerun the command to try again. No files were written.")}\n`);
+        return false;
+      }
+      if (isPromptAbortError(error)) {
+        process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
+        return false;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    if (timedOut && isPromptAbortError(error)) {
-      process.stdout.write(`${warningLine("Security confirmation expired. Installation canceled. No files were written.")}\n`);
-      return false;
-    }
-    if (isPromptAbortError(error)) {
-      process.stdout.write(`${warningLine("Installation canceled. No files were written.")}\n`);
-      return false;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
   }
+
+  process.stdout.write(`${warningLine("You failed all 3 attempts. Rerun the command to try again. No files were written.")}\n`);
+  return false;
 }
 
 function generateRiskConfirmationCode(): string {
