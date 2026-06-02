@@ -15,3 +15,5 @@ coverage
 /.naar/tmp/
 /.naar/logs/
 /.naar/installed.json
+
+/.naar/skills/

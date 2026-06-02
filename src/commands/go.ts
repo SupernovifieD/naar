@@ -1,11 +1,11 @@
 import type { CliFlags } from "../types/index.js";
-import { readFileSync } from "node:fs";
 import ora from "ora";
 import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations, type PipelinePhaseEvent } from "./pipeline.js";
 import { runInstallFlow } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
+import { CLI_VERSION } from "../utils/version.js";
 import {
   colorAssistantStatus,
   colorScore,
@@ -14,8 +14,6 @@ import {
   warningHeader,
   warningLine
 } from "../utils/output.js";
-
-const CLI_VERSION = readCliVersion();
 
 export async function runGo(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -192,19 +190,6 @@ function groupFrameworks(
   }
 
   return grouped;
-}
-
-function readCliVersion(): string {
-  try {
-    const raw = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
-    const parsed = JSON.parse(raw) as { version?: unknown };
-    if (typeof parsed.version === "string" && parsed.version.trim().length > 0) {
-      return parsed.version.trim();
-    }
-  } catch {
-    // Fallback keeps go output usable even if package metadata is unavailable.
-  }
-  return "unknown";
 }
 
 function resolveRecommendationStatus(recommendation: { status?: string; blocked: boolean }): string {

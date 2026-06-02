@@ -261,6 +261,8 @@ describe("recommend/go output descriptions", () => {
       await runGo(baseFlags);
     });
 
+    expect(output).toMatch(/Naar v\d+\.\d+\.\d+/);
+    expect(output).not.toContain("Naar vunknown");
     expect(output).toContain("[3/5] Ranking recommendations...");
     expect(output).toContain("1) Frontend Design [anthropic]");
     expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");

@@ -9,6 +9,7 @@ import { runGo } from "./commands/go.js";
 import { runList } from "./commands/list.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runConfig } from "./commands/config.js";
+import { CLI_VERSION } from "./utils/version.js";
 
 const program = new Command();
 
@@ -27,7 +28,7 @@ program.configureOutput({
 program
   .name("naar")
   .description("Naar: a repo-aware package manager for AI-agent skills, rules, and instructions")
-  .version("0.2.1");
+  .version(CLI_VERSION);
 
 applySharedOptions(program
   .command("go")
