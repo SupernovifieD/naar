@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-06-03
+
+### Added
+- Added a centralized agent target ecosystem with stable, experimental, deprecated, AGENTS.md, and research-only target classifications.
+- Added new target discovery commands: `naar targets list` and `naar targets inspect <target>` with JSON support.
+- Added target group aliases including `all`, `all-skills`, `all-rules`, `all-instructions`, `agents-md`, `experimental`, `deprecated`, and `research`.
+- Added verified write-capable targets for Claude memory, Copilot path instructions, Gemini context, AGENTS.md, Windsurf, Cline, Roo, Continue, and Kiro integrations.
+- Added research-only target entries for tools without verified project-level write targets, including Trae and other agent ecosystems.
+- Added local-only install history with `naar history`, `list`, `skills`, `show`, `prune`, `forget`, and `clear`.
+- Added global history storage with OS-specific paths, `NAAR_HOME` override, versioned schema validation, corrupt-file backup, restrictive permissions, and atomic writes.
+- Added `--history <true|false>` and `NAAR_HISTORY=0|false` controls for disabling history recording.
+
+### Changed
+- Refactored target compatibility, aliases, detection, defaults, and install rendering to use the central target registry.
+- Preserved existing default install targets while making all new experimental/deprecated/research targets opt-in.
+- Rendered non-skill-folder targets as concise managed rules/instructions/context hints instead of copying full `SKILL.md` into always-on files.
+- Made managed block writes idempotent with target-specific markers while preserving legacy Copilot block handling.
+- Updated scanner assistant detection to use registry-driven target patterns and group product-level detections.
+- Updated history terminal timestamps to show local machine time and date while keeping JSON timestamps as ISO strings.
+
+### Security and Privacy
+- Prevented research-only targets from producing install actions.
+- Required explicit confirmation for broad target groups such as `all`, `experimental`, and `deprecated`, with `--yes` required in non-interactive/JSON flows.
+- Recorded history only after successful applied installs, never during dry runs, failed installs, or recommendation-only runs.
+- Kept install success best-effort when history recording fails.
+- Limited history data to local project paths, path hashes, timestamps, broad detected stack facts, installed skill metadata, targets, and security scores.
+- Documented that history must not store source code, file contents, secrets, environment variables, tokens, remote URLs, shell history, or terminal commands.
+
+### Docs
+- Added an agent target registry guide for target schema, safety rules, aliases, detection, and renderer conventions.
+- Updated README with the expanded target matrix, target groups, history commands, and local history controls.
+- Updated SECURITY.md with local history privacy guidance and target write-safety behavior.
+
 ## [0.2.2] - 2026-06-02
 
 ### Added
