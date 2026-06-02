@@ -37,6 +37,7 @@ import {
 import { analyzeSkill, evaluateInstallDecision, mergeSecuritySignals } from "../security/analyzeSkill.js";
 import { analyzeSkillContent } from "../security/analyzeSkillContent.js";
 import { getTargetById, isCandidateCompatibleWithTarget, listInstallTargets } from "../targets/index.js";
+import { recordInstallHistory } from "../history/historyService.js";
 
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
@@ -317,8 +318,21 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
 
   await applyInstallPlan(repoRoot, plan);
   await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
+  const historyWarning = await updateInstallHistoryBestEffort(
+    flags,
+    repoRoot,
+    pipeline.repoFacts,
+    resolvedSkills
+  );
 
   process.stdout.write(`\n${pc.green("✔ Installation complete.")}\n`);
+  if (historyWarning) {
+    if (flags.json) {
+      printJson({ historyWarning });
+    } else {
+      process.stdout.write(`${warningLine(historyWarning)}\n`);
+    }
+  }
   renderInstallLocations(repoRoot, plan.actions);
   if (concerningAfterFetch.length > 0) {
     renderInstalledRiskSummary(concerningAfterFetch, plan.actions);
@@ -628,6 +642,36 @@ async function persistInstallationState(
 
   await saveInstalledState(repoRoot, state);
   await saveLockfile(repoRoot, lock);
+}
+
+async function updateInstallHistoryBestEffort(
+  flags: CliFlags,
+  repoRoot: string,
+  repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
+  resolvedSkills: ResolvedSkill[]
+): Promise<string | undefined> {
+  try {
+    const state = await loadInstalledState(repoRoot);
+    const selectedScopedIds = new Set(
+      resolvedSkills.map((resolved) => {
+        const skill = resolved.bundle.skill;
+        return skill.providerScopedId ?? toProviderScopedId(skill.source.providerId, skill.providerSkillId);
+      })
+    );
+    const installedSkills = state.skills.filter((skill) => {
+      const scopedId = skill.providerScopedId ?? toProviderScopedId(skill.providerId, skill.providerSkillId);
+      return selectedScopedIds.has(scopedId);
+    });
+    await recordInstallHistory({
+      repoPath: repoRoot,
+      repoFacts,
+      installedSkills,
+      history: flags.history
+    });
+  } catch {
+    return "Installed successfully, but Naar could not update local history.";
+  }
+  return undefined;
 }
 
 function dedupe(values: string[]): string[] {

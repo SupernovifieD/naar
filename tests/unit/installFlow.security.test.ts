@@ -8,10 +8,13 @@ const loadOrBuildRecommendationsMock = vi.hoisted(() => vi.fn());
 const buildProvidersMock = vi.hoisted(() => vi.fn());
 const createInstallPlanMock = vi.hoisted(() => vi.fn());
 const applyInstallPlanMock = vi.hoisted(() => vi.fn());
+const buildInstalledRecordMock = vi.hoisted(() => vi.fn());
+const loadInstalledStateMock = vi.hoisted(() => vi.fn());
 const printJsonMock = vi.hoisted(() => vi.fn());
 const checkboxMock = vi.hoisted(() => vi.fn());
 const confirmMock = vi.hoisted(() => vi.fn());
 const inputMock = vi.hoisted(() => vi.fn());
+const recordInstallHistoryMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/config/store.js", () => ({
   loadConfig: loadConfigMock,
@@ -36,12 +39,16 @@ vi.mock("../../src/installer/apply.js", () => ({
 }));
 
 vi.mock("../../src/installer/state.js", () => ({
-  buildInstalledRecord: vi.fn(),
-  loadInstalledState: vi.fn(async () => ({ version: 1, skills: [] })),
+  buildInstalledRecord: buildInstalledRecordMock,
+  loadInstalledState: loadInstalledStateMock,
   loadLockfile: vi.fn(async () => ({ version: 1, skills: [] })),
   saveInstalledState: vi.fn(async () => undefined),
   saveLockfile: vi.fn(async () => undefined),
   toProviderScopedId: vi.fn((providerId: string, providerSkillId: string) => `${providerId}:${providerSkillId}`)
+}));
+
+vi.mock("../../src/history/historyService.js", () => ({
+  recordInstallHistory: recordInstallHistoryMock
 }));
 
 vi.mock("../../src/utils/json.js", () => ({
@@ -223,6 +230,9 @@ beforeEach(() => {
   buildProvidersMock.mockReset();
   createInstallPlanMock.mockReset();
   applyInstallPlanMock.mockReset();
+  buildInstalledRecordMock.mockReset();
+  loadInstalledStateMock.mockReset();
+  recordInstallHistoryMock.mockReset();
   printJsonMock.mockReset();
   checkboxMock.mockReset();
   confirmMock.mockReset();
@@ -244,6 +254,20 @@ beforeEach(() => {
     summary: { filesToWrite: 0, filesToUpdate: 0, filesBlocked: 0 },
     requiresConfirmation: true
   });
+  loadInstalledStateMock.mockImplementation(async () => ({ version: 1, skills: [] }));
+  buildInstalledRecordMock.mockImplementation((skill, managedFiles, targets) => ({
+    providerScopedId: skill.providerScopedId ?? `${skill.source.providerId}:${skill.providerSkillId}`,
+    canonicalSkillId: skill.canonicalSkillId,
+    providerId: skill.source.providerId,
+    providerSkillId: skill.providerSkillId,
+    installedAtIso: "2026-06-03T00:00:00.000Z",
+    installedVersion: skill.source.version ?? "unknown",
+    pinnedRef: skill.metadata.pinnedRef ?? skill.source.ref ?? "unversioned",
+    targets,
+    managedFiles,
+    securityScoreAtInstall: skill.risk.score
+  }));
+  recordInstallHistoryMock.mockResolvedValue({ recorded: true, disabled: false });
 });
 
 describe("runInstallFlow security enforcement", () => {
@@ -294,6 +318,105 @@ describe("runInstallFlow security enforcement", () => {
     }));
     expect(buildProvidersMock).not.toHaveBeenCalled();
     expect(createInstallPlanMock).not.toHaveBeenCalled();
+  });
+
+  it("records local history after a successful applied install", async () => {
+    const candidate = makeCandidate();
+    const installedRecord = {
+      providerScopedId: "test:secure-skill",
+      canonicalSkillId: "secure-skill",
+      providerId: "test",
+      providerSkillId: "secure-skill",
+      installedAtIso: "2026-06-03T00:00:00.000Z",
+      installedVersion: "1.0.0",
+      pinnedRef: "1.0.0",
+      targets: ["codex_repo_skills"],
+      managedFiles: [".agents/skills/secure-skill/SKILL.md"],
+      securityScoreAtInstall: 100
+    };
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({ skill: candidate, files: { "SKILL.md": "# Skill\n" } }))
+    }]);
+    loadInstalledStateMock
+      .mockImplementationOnce(async () => ({ version: 1, skills: [] }))
+      .mockImplementationOnce(async () => ({ version: 1, skills: [installedRecord] }));
+
+    await runInstallFlow({ ...baseFlags, apply: true, yes: true });
+
+    expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(recordInstallHistoryMock).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: "/tmp/repo",
+      repoFacts,
+      installedSkills: [installedRecord],
+      history: undefined
+    }));
+  });
+
+  it("does not record local history for dry runs", async () => {
+    const candidate = makeCandidate();
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({ skill: candidate, files: { "SKILL.md": "# Skill\n" } }))
+    }]);
+
+    await runInstallFlow({ ...baseFlags, apply: true, yes: true, dryRun: true });
+
+    expect(applyInstallPlanMock).not.toHaveBeenCalled();
+    expect(recordInstallHistoryMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps installation successful when local history recording fails", async () => {
+    const candidate = makeCandidate();
+    const installedRecord = {
+      providerScopedId: "test:secure-skill",
+      canonicalSkillId: "secure-skill",
+      providerId: "test",
+      providerSkillId: "secure-skill",
+      installedAtIso: "2026-06-03T00:00:00.000Z",
+      installedVersion: "1.0.0",
+      pinnedRef: "1.0.0",
+      targets: ["codex_repo_skills"],
+      managedFiles: [".agents/skills/secure-skill/SKILL.md"],
+      securityScoreAtInstall: 100
+    };
+    loadOrBuildRecommendationsMock.mockResolvedValue({
+      repoFacts,
+      repoNeeds: [],
+      recommendations: [makeRecommendation(candidate)],
+      providerWarnings: [],
+      providerSummaries: [{ providerId: "test", candidateCount: 1 }]
+    });
+    buildProvidersMock.mockReturnValue([{
+      id: "test",
+      fetchFiles: vi.fn(async () => ({ skill: candidate, files: { "SKILL.md": "# Skill\n" } }))
+    }]);
+    loadInstalledStateMock
+      .mockImplementationOnce(async () => ({ version: 1, skills: [] }))
+      .mockImplementationOnce(async () => ({ version: 1, skills: [installedRecord] }));
+    recordInstallHistoryMock.mockRejectedValueOnce(new Error("history failed"));
+
+    const output = await captureOutput(async () => {
+      await runInstallFlow({ ...baseFlags, json: false, nonInteractive: true, apply: true, yes: true });
+    });
+
+    expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(output.stdout).toContain("Installed successfully, but Naar could not update local history.");
+    expect(output.stdout).toContain("Installation complete.");
   });
 
   it("returns structured JSON security review when fetched bundles have concerns", async () => {

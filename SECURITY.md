@@ -67,9 +67,24 @@ And it writes a managed local copy of fetched skill markdown:
 
 These files support provenance and lifecycle operations (`list`, `uninstall`, reinstall decisions). `.naar/installed.json` records fields including provider id, skill id, canonical id, version/ref, selected targets, managed files, and security score at install time.
 
-## 4. How Skill Vetting Works
+## 4. Local History Privacy
 
-### 4.1 Candidate Metadata Analysis
+Naar may write a local history file outside the project directory to remember which projects installed which skills. This file is stored in the operating system's user data directory:
+
+- macOS: `~/Library/Application Support/naar/history.json`
+- Linux: `$XDG_DATA_HOME/naar/history.json`, or `~/.local/share/naar/history.json`
+- Windows: `%APPDATA%/naar/history.json`
+- Override: `$NAAR_HOME/history.json`
+
+The history file may contain local project paths, project names, path hashes, timestamps, broad detected stack facts, installed Naar skill metadata, target names, and security scores.
+
+The history file must not contain source code, file contents, environment variables, secrets, API keys, tokens, remote repository URLs, terminal history, shell commands, or private package registry URLs.
+
+Users can inspect project paths, prune missing projects, forget individual projects, clear all history, or disable install recording with `--history false`, `NAAR_HISTORY=0`, or `NAAR_HISTORY=false`.
+
+## 5. How Skill Vetting Works
+
+### 5.1 Candidate Metadata Analysis
 
 Before installation, Naar analyzes each candidate skill metadata profile (`analyzeSkill`), including:
 
@@ -94,7 +109,7 @@ Each signal includes:
 
 Security score starts at `100`, and penalties reduce it.
 
-### 4.2 Security Levels
+### 5.2 Security Levels
 
 Current level mapping is:
 
@@ -105,7 +120,7 @@ Current level mapping is:
 
 The score is a risk heuristic, not proof of safety.
 
-### 4.3 Default Security Policy
+### 5.3 Default Security Policy
 
 Current defaults and policy checks:
 
@@ -125,7 +140,7 @@ Flag behavior:
 - `--allow-scripts` disables `--no-scripts` for that run.
 - `--allow-risky` is required for non-interactive installs that proceed with post-fetch security concerns.
 
-### 4.4 Fetched Content Analysis
+### 5.4 Fetched Content Analysis
 
 Naar does not rely only on provider metadata. During install, after bundles are fetched, Naar scans fetched text content (`analyzeSkillContent`) across markdown/config/text files, including code fences, comments, inline code, and frontmatter.
 
@@ -153,7 +168,7 @@ Signals can include evidence:
 
 When fetched bundles contain concerns, Naar reports concise signal/evidence output, enters a security review step, and requires explicit user intent before any write.
 
-### 4.5 Two-Stage Blocking
+### 5.5 Two-Stage Blocking
 
 Naar has two checkpoints:
 
@@ -171,7 +186,7 @@ Naar has two checkpoints:
 
 This protects against incomplete metadata and content drift between listing and fetched bundle.
 
-### 4.6 Recommendation Score vs Security Score
+### 5.6 Recommendation Score vs Security Score
 
 Naar computes both:
 
@@ -189,7 +204,7 @@ Output wording intentionally reflects two stages:
 - Recommendation stage (before bundle fetch): `Match score`, `Pre-fetch risk estimate`, and preliminary status labels.
 - Install stage (after bundle fetch and content scan): final `Security score` and final status (`eligible`, `risky`, `blocked`, `hard-blocked`).
 
-## 5. Installation Safety Flow
+## 6. Installation Safety Flow
 
 Naar avoids silent writes:
 
@@ -216,7 +231,7 @@ naar scan
 naar recommend
 ```
 
-## 6. User Responsibility and Low-Security Skills
+## 7. User Responsibility and Low-Security Skills
 
 Naar blocks risky skills by default, but no automated vetting system can prove that a third-party skill is safe. If you lower the security threshold, force overwrite conflict handling (`--force`), allow scripts, or install low-trust skills, you are accepting that risk.
 
@@ -232,7 +247,7 @@ Use extra caution with skills that:
 - Are unpinned to immutable refs
 - Ask the assistant to access secrets, credentials, production systems, deployment systems, or local shell commands
 
-## 7. Token Usage and Cost
+## 8. Token Usage and Cost
 
 Installing more skills can increase assistant context size and token usage.
 
@@ -243,7 +258,7 @@ Installing more skills can increase assistant context size and token usage.
 
 Naar helps you choose relevant skills, but it cannot guarantee how each assistant will count/load those files. Treat each installed skill as additional context with potential token cost.
 
-## 8. Recommended Safe Usage
+## 9. Recommended Safe Usage
 
 - Start with `naar scan`.
 - Review with `naar recommend`.
@@ -256,7 +271,7 @@ Naar helps you choose relevant skills, but it cannot guarantee how each assistan
 - Use `naar list` to review installed skills.
 - Remove unused skills with `naar uninstall`.
 
-## 9. Limitations
+## 10. Limitations
 
 - Naar does not perform a full manual audit of every skill.
 - Naar cannot guarantee that instructions are harmless.
@@ -266,7 +281,7 @@ Naar helps you choose relevant skills, but it cannot guarantee how each assistan
 - Even safe-looking instructions can cause bad outcomes if applied carelessly.
 - Sensitive repositories still require manual review of installed instructions.
 
-## 10. Reporting Security Issues
+## 11. Reporting Security Issues
 
 If you find a security issue in Naar vetting logic or install behavior, open a GitHub issue with a minimal reproduction. Do not include secrets, private repository code, API keys, or sensitive customer data in public issues.
 

@@ -554,6 +554,7 @@ export interface CliFlags {
   force: boolean;
   verbose: boolean;
   allCompatible: boolean;
+  history?: boolean;
   from?: string;
   fromPlan?: string;
 }

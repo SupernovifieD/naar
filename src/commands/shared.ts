@@ -45,7 +45,17 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     force: Boolean(raw.force),
     verbose: Boolean(raw.verbose),
     allCompatible: Boolean(raw.allCompatible),
+    history: coerceOptionalBoolean(raw.history),
     from: typeof raw.from === "string" ? raw.from : undefined,
     fromPlan: typeof raw.fromPlan === "string" ? raw.fromPlan : undefined
   };
+}
+
+function coerceOptionalBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return undefined;
 }

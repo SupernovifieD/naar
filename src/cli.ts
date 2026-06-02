@@ -10,6 +10,7 @@ import { runList } from "./commands/list.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runConfig } from "./commands/config.js";
 import { runTargetsInspect, runTargetsList } from "./commands/targets.js";
+import { parseHistoryBooleanOption, registerHistoryCommand } from "./history/historyCommands.js";
 import { CLI_VERSION } from "./utils/version.js";
 
 const program = new Command();
@@ -116,6 +117,8 @@ targetsCommand
     runTargetsInspect(target, { json: Boolean(options.json) });
   });
 
+registerHistoryCommand(program);
+
 program.parseAsync(process.argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`${pc.red(`Error: ${message}`)}\n`);
@@ -151,6 +154,7 @@ function applySharedOptions(command: Command): Command {
     .option("--force", "Allow overwrite on install conflicts")
     .option("--from <provider:skill@version>", "Install a specific provider skill reference")
     .option("--from-plan <file>", "Load install selections from plan JSON")
+    .option("--history <true|false>", "Enable or disable local install history for this invocation", parseHistoryBooleanOption)
     .option("--no-scripts", "Disallow script-bearing skills")
     .option("--allow-scripts", "Allow script-bearing skills (unsafe)")
     .option("--allow-risky", "Acknowledge risky security concerns; required for non-interactive concern overrides (unsafe)");
