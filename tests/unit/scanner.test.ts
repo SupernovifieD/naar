@@ -1,12 +1,69 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import os from "node:os";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { afterEach, describe, expect, it } from "vitest";
 import { scanRepo } from "../../src/scanner/scanRepo.js";
+
+const tempRoots: string[] = [];
 
 function ids<T extends { id: string }>(values: T[]): string[] {
   return values.map((value) => value.id);
 }
 
+afterEach(async () => {
+  await Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true })));
+  tempRoots.length = 0;
+});
+
 describe("scanRepo ecosystem coverage", () => {
+  it("detects existing AI assistant targets through registry patterns", async () => {
+    const repoRoot = await mkdtemp(path.join(os.tmpdir(), "naar-assistants-"));
+    tempRoots.push(repoRoot);
+    await writeFile(path.join(repoRoot, "CLAUDE.md"), "# Claude\n", "utf8");
+    await mkdir(path.join(repoRoot, ".cursor", "rules"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".cursor", "rules", "repo.mdc"), "# Cursor\n", "utf8");
+    await mkdir(path.join(repoRoot, ".github", "instructions"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".github", "instructions", "repo.instructions.md"), "# Copilot\n", "utf8");
+    await writeFile(path.join(repoRoot, "AGENTS.md"), "# Codex\n", "utf8");
+    await mkdir(path.join(repoRoot, ".agents", "skills", "installed-skill"), { recursive: true });
+    await writeFile(path.join(repoRoot, ".agents", "skills", "installed-skill", "SKILL.md"), "# Generic\n", "utf8");
+
+    const facts = await scanRepo(repoRoot);
+    const assistants = new Map(facts.aiAssistants.map((assistant) => [assistant.id, assistant]));
+
+    expect(assistants.get("claude")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["claude_project_skills"]
+    });
+    expect(assistants.get("claude")?.configPathsFound).toContain("CLAUDE.md");
+
+    expect(assistants.get("cursor")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["cursor_project_rules"]
+    });
+    expect(assistants.get("cursor")?.configPathsFound).toContain(".cursor/rules/repo.mdc");
+
+    expect(assistants.get("copilot")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["copilot_repo_instructions"]
+    });
+    expect(assistants.get("copilot")?.configPathsFound).toContain(".github/instructions/repo.instructions.md");
+
+    expect(assistants.get("codex")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["codex_repo_skills"]
+    });
+    expect(assistants.get("codex")?.configPathsFound).toEqual(
+      expect.arrayContaining(["AGENTS.md", ".agents/skills/installed-skill/SKILL.md"])
+    );
+
+    expect(assistants.get("generic")).toMatchObject({
+      status: "found",
+      recommendedInstallTargets: ["generic_agent_skills"]
+    });
+    expect(assistants.get("generic")?.configPathsFound).toContain(".agents/skills/installed-skill/SKILL.md");
+  });
+
   it("detects Next.js + Tailwind stack in primary scope", async () => {
     const facts = await scanRepo(path.resolve("tests/fixtures/next-tailwind"));
 

@@ -84,6 +84,12 @@ Useful scripts:
 | `npm run build` | Build the CLI with `tsup`. |
 | `npm run verify` | Run typecheck and tests. |
 
+## Agent Target Registry
+
+Naar's supported install targets are centralized in `src/targets/registry.ts`. Phase 1 keeps the existing targets only: Claude Code project skills, Cursor rules, GitHub Copilot repository instructions, OpenAI Codex repo skills, and Generic `.agents/skills`.
+
+When adding a future target, add a registry entry first, then wire only the required renderer or detection adapter. Do not duplicate aliases, labels, install paths, target order, or assistant compatibility maps in command, scanner, config, or installer code.
+
 ## Release Process for Maintainers
 
 Naar uses GitHub Actions and npm Trusted Publishing with a two-step release flow:

@@ -8,6 +8,7 @@ import type {
   InstallTarget,
   SkillFetchedBundle
 } from "../types/index.js";
+import { renderTargetInstallActions } from "../targets/index.js";
 
 export interface ResolvedSkill {
   bundle: SkillFetchedBundle;
@@ -39,7 +40,13 @@ export async function createInstallPlan(options: CreatePlanOptions): Promise<Ins
     });
 
     for (const target of resolved.targets) {
-      const targetActions = buildTargetActions(target, slug, skill.name, skill.summary, skillMarkdown);
+      const targetActions = renderTargetInstallActions({
+        targetId: target,
+        slug,
+        skillName: skill.name,
+        skillSummary: skill.summary,
+        skillMarkdown
+      });
       for (const action of targetActions) {
         action.sourceSkillId = skill.canonicalSkillId;
         actions.push(action);
@@ -79,63 +86,6 @@ export async function createInstallPlan(options: CreatePlanOptions): Promise<Ins
   };
 }
 
-function buildTargetActions(
-  target: InstallTarget,
-  slug: string,
-  skillName: string,
-  skillSummary: string,
-  skillMarkdown: string
-): InstallAction[] {
-  switch (target) {
-    case "claude_project_skills":
-      return [
-        {
-          type: "write",
-          path: `.claude/skills/${slug}/SKILL.md`,
-          content: skillMarkdown,
-          overwrite: false
-        }
-      ];
-    case "cursor_project_rules":
-      return [
-        {
-          type: "write",
-          path: `.cursor/rules/naar-${slug}.mdc`,
-          content: buildCursorRule(skillName, skillSummary, skillMarkdown),
-          overwrite: false
-        }
-      ];
-    case "copilot_repo_instructions":
-      return [
-        {
-          type: "append",
-          path: `.github/copilot-instructions.md`,
-          content: buildCopilotBlock(slug, skillName, skillSummary, skillMarkdown)
-        }
-      ];
-    case "codex_repo_skills":
-    case "generic_agent_skills":
-      return [
-        {
-          type: "write",
-          path: `.agents/skills/${slug}/SKILL.md`,
-          content: skillMarkdown,
-          overwrite: false
-        }
-      ];
-    default:
-      return [];
-  }
-}
-
-function buildCursorRule(skillName: string, summary: string, markdown: string): string {
-  return `---\ndescription: ${escapeYaml(skillName)}\nalwaysApply: true\n---\n\n# ${skillName}\n\n${summary}\n\n${markdown}`;
-}
-
-function buildCopilotBlock(slug: string, skillName: string, summary: string, markdown: string): string {
-  return `\n<!-- naar:skill:${slug}:start -->\n## Naar Skill: ${skillName}\n${summary}\n\n${markdown}\n<!-- naar:skill:${slug}:end -->\n`;
-}
-
 function dedupeActions(actions: InstallAction[]): InstallAction[] {
   const map = new Map<string, InstallAction>();
 
@@ -155,8 +105,4 @@ function dedupeActions(actions: InstallAction[]): InstallAction[] {
   }
 
   return [...map.values()];
-}
-
-function escapeYaml(input: string): string {
-  return input.replace(/"/g, "'");
 }

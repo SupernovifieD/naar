@@ -14,6 +14,7 @@ import type {
   SkillProviderResult
 } from "../types/index.js";
 import { loadRecommendationCache, loadScanCache, saveRecommendationCache, saveScanCache } from "./cache.js";
+import { dedupeAssistants, getAllTargetAssistantIds, getTargetAssistantIds } from "../targets/index.js";
 
 export interface PipelineResult {
   repoFacts: RepoFacts;
@@ -170,14 +171,14 @@ function resolveEligibleAssistants(
 ): { assistants: AssistantId[]; source: "explicit-targets" | "config-default-targets" | "detected-assistants" | "fallback-all" } {
   if (flags.target.length > 0) {
     return {
-      assistants: dedupeAssistants(flags.target.map(targetToAssistant)),
+      assistants: dedupeAssistants(flags.target.flatMap(getTargetAssistantIds)),
       source: "explicit-targets"
     };
   }
 
   if (defaultTargets.length > 0) {
     return {
-      assistants: dedupeAssistants(defaultTargets.map(targetToAssistant)),
+      assistants: dedupeAssistants(defaultTargets.flatMap(getTargetAssistantIds)),
       source: "config-default-targets"
     };
   }
@@ -195,19 +196,7 @@ function resolveEligibleAssistants(
   }
 
   return {
-    assistants: ["claude", "cursor", "copilot", "codex", "generic"],
+    assistants: getAllTargetAssistantIds(),
     source: "fallback-all"
   };
-}
-
-function targetToAssistant(target: InstallTarget): AssistantId {
-  if (target === "claude_project_skills") return "claude";
-  if (target === "cursor_project_rules") return "cursor";
-  if (target === "copilot_repo_instructions") return "copilot";
-  if (target === "codex_repo_skills") return "codex";
-  return "generic";
-}
-
-function dedupeAssistants(values: AssistantId[]): AssistantId[] {
-  return [...new Set(values)];
 }

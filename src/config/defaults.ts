@@ -1,12 +1,8 @@
 import type { InstallTarget, NaarConfig } from "../types/index.js";
+import { getDefaultInstallTargets } from "../targets/index.js";
 
 export const DEFAULT_PROVIDERS = ["anthropic", "clawhub"];
-export const DEFAULT_TARGETS: InstallTarget[] = [
-  "claude_project_skills",
-  "cursor_project_rules",
-  "copilot_repo_instructions",
-  "codex_repo_skills"
-];
+export const DEFAULT_TARGETS: InstallTarget[] = getDefaultInstallTargets();
 
 export const DEFAULT_CONFIG: NaarConfig = {
   defaultProviders: DEFAULT_PROVIDERS,

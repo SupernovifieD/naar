@@ -1,24 +1,12 @@
 import path from "node:path";
 import type { CliFlags, InstallTarget } from "../types/index.js";
-
-export const TARGET_ALIAS: Record<string, InstallTarget> = {
-  claude: "claude_project_skills",
-  cursor: "cursor_project_rules",
-  copilot: "copilot_repo_instructions",
-  codex: "codex_repo_skills",
-  generic: "generic_agent_skills",
-  claude_project_skills: "claude_project_skills",
-  cursor_project_rules: "cursor_project_rules",
-  copilot_repo_instructions: "copilot_repo_instructions",
-  codex_repo_skills: "codex_repo_skills",
-  generic_agent_skills: "generic_agent_skills"
-};
+import { resolveTargetAlias } from "../targets/index.js";
 
 export function parseTargets(input: string[] | undefined): InstallTarget[] {
   if (!input || input.length === 0) return [];
   const targets: InstallTarget[] = [];
   for (const raw of input) {
-    const mapped = TARGET_ALIAS[raw];
+    const mapped = resolveTargetAlias(raw);
     if (mapped) targets.push(mapped);
   }
   return [...new Set(targets)];

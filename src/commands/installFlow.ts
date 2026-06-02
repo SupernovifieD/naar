@@ -36,6 +36,7 @@ import {
 } from "../utils/output.js";
 import { analyzeSkill, evaluateInstallDecision, mergeSecuritySignals } from "../security/analyzeSkill.js";
 import { analyzeSkillContent } from "../security/analyzeSkillContent.js";
+import { getTargetById, isCandidateCompatibleWithTarget, listInstallTargets } from "../targets/index.js";
 
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
@@ -49,36 +50,8 @@ class PromptExitRequestedError extends Error {
   }
 }
 
-const INSTALL_TARGET_ORDER: InstallTarget[] = [
-  "claude_project_skills",
-  "cursor_project_rules",
-  "copilot_repo_instructions",
-  "codex_repo_skills",
-  "generic_agent_skills"
-];
-
-const INSTALL_TARGET_LABELS: Record<InstallTarget, { name: string; pathHint: string }> = {
-  claude_project_skills: {
-    name: "Claude Code project skills",
-    pathHint: ".claude/skills/"
-  },
-  cursor_project_rules: {
-    name: "Cursor rules",
-    pathHint: ".cursor/rules/"
-  },
-  copilot_repo_instructions: {
-    name: "GitHub Copilot instructions",
-    pathHint: ".github/copilot-instructions.md"
-  },
-  codex_repo_skills: {
-    name: "OpenAI Codex repo skills",
-    pathHint: ".agents/skills/"
-  },
-  generic_agent_skills: {
-    name: "Generic agent skills",
-    pathHint: ".agents/skills/"
-  }
-};
+const INSTALL_TARGETS = listInstallTargets();
+const COPILOT_INSTRUCTIONS_PATH = getTargetById("copilot_repo_instructions").pathHint;
 
 const CHECKBOX_THEME_WITH_QUIT_HINT = {
   style: {
@@ -417,11 +390,11 @@ async function chooseInstallTargets(
   }
 
   const compatibilityCountByTarget = new Map<InstallTarget, number>();
-  for (const target of INSTALL_TARGET_ORDER) {
+  for (const target of INSTALL_TARGETS) {
     const compatibleCount = selectedRecommendations.filter((recommendation) =>
-      targetCompatible(recommendation.candidate, target)
+      isCandidateCompatibleWithTarget(recommendation.candidate, target.id)
     ).length;
-    compatibilityCountByTarget.set(target, compatibleCount);
+    compatibilityCountByTarget.set(target.id, compatibleCount);
   }
 
   const hasAnyCompatibleTarget = [...compatibilityCountByTarget.values()].some((count) => count > 0);
@@ -434,13 +407,12 @@ async function chooseInstallTargets(
       {
         message: "Select coding assistant rules/skills to install (press q to quit)",
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
-        choices: INSTALL_TARGET_ORDER.map((target) => {
-          const compatibilityCount = compatibilityCountByTarget.get(target) ?? 0;
-          const targetLabel = INSTALL_TARGET_LABELS[target];
+        choices: INSTALL_TARGETS.map((target) => {
+          const compatibilityCount = compatibilityCountByTarget.get(target.id) ?? 0;
           return {
-            name: `${pc.bold(targetLabel.name)} (${pc.dim(targetLabel.pathHint)}) ${pc.cyan(`[${compatibilityCount} compatible skills]`)}`,
-            value: target,
-            checked: configuredTargets.includes(target),
+            name: `${pc.bold(target.displayName)} (${pc.dim(target.pathHint)}) ${pc.cyan(`[${compatibilityCount} compatible skills]`)}`,
+            value: target.id,
+            checked: configuredTargets.includes(target.id),
             disabled: compatibilityCount === 0 ? "No selected skills are compatible with this target" : false
           };
         })
@@ -511,24 +483,11 @@ async function resolveBundles(
     };
 
     const bundle = await provider.fetchFiles(ref);
-    const targets = selectedTargets.filter((target) => targetCompatible(candidate, target));
+    const targets = selectedTargets.filter((target) => isCandidateCompatibleWithTarget(candidate, target));
     resolved.push({ bundle, targets });
   }
 
   return resolved;
-}
-
-function targetCompatible(candidate: SkillCandidate, target: InstallTarget): boolean {
-  const mapping: Record<InstallTarget, string> = {
-    claude_project_skills: "claude",
-    cursor_project_rules: "cursor",
-    copilot_repo_instructions: "copilot",
-    codex_repo_skills: "codex",
-    generic_agent_skills: "generic"
-  };
-
-  const assistant = mapping[target];
-  return candidate.compatibility.assistants.includes(assistant as never) || candidate.compatibility.assistants.includes("generic");
 }
 
 function renderPlanPreview(
@@ -567,7 +526,7 @@ async function persistInstallationState(
       actions
         .filter((action) => action.sourceSkillId === skill.canonicalSkillId)
         .map((action) => {
-          if (action.type === "append" && action.path === ".github/copilot-instructions.md") {
+          if (action.type === "append" && action.path === COPILOT_INSTRUCTIONS_PATH) {
             return `${action.path}#naar:skill:${slug}`;
           }
           return action.path;

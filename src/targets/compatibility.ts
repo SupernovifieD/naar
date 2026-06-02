@@ -1,0 +1,21 @@
+import type { AssistantId, InstallTarget, SkillCandidate } from "../types/index.js";
+import { getTargetById, listInstallTargets } from "./registry.js";
+
+export function getTargetAssistantIds(target: InstallTarget): AssistantId[] {
+  return getTargetById(target).compatibility.assistantIds;
+}
+
+export function getAllTargetAssistantIds(): AssistantId[] {
+  return dedupeAssistants(listInstallTargets().flatMap((target) => target.compatibility.assistantIds));
+}
+
+export function isCandidateCompatibleWithTarget(candidate: SkillCandidate, target: InstallTarget): boolean {
+  const definition = getTargetById(target);
+  const candidateAssistants = candidate.compatibility.assistants;
+  return definition.compatibility.assistantIds.some((assistant) => candidateAssistants.includes(assistant))
+    || (definition.compatibility.acceptsGenericSkills && candidateAssistants.includes("generic"));
+}
+
+export function dedupeAssistants(values: AssistantId[]): AssistantId[] {
+  return [...new Set(values)];
+}

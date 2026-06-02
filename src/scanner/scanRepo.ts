@@ -37,6 +37,7 @@ import { detectGoEcosystem } from "./detectors/go.js";
 import { detectPhpEcosystem } from "./detectors/php.js";
 import { detectCommandFacts } from "./detectors/commands.js";
 import { detectProjectTypeSignals } from "./detectors/projectTypes.js";
+import { detectAssistantTargets } from "../targets/index.js";
 
 const IGNORE_GLOBS = [
   "**/.git/**",
@@ -347,46 +348,7 @@ function detectTopology(files: ScopedFile[]): RepoTopology {
 function detectAssistants(files: ScopedFile[]): AIAssistantDetection[] {
   const repoFiles = files.filter((file) => isPrimaryScope(file.scope));
   const paths = repoFiles.map((file) => file.path);
-  const fileSet = new Set(paths);
-
-  const hasClaude = fileSet.has("CLAUDE.md") || fileSet.has(".claude/CLAUDE.md") || paths.some((file) => file.startsWith(".claude/"));
-  const hasCursor = paths.some((file) => file.startsWith(".cursor/")) || fileSet.has(".cursorrules");
-  const hasCopilot = fileSet.has(".github/copilot-instructions.md") || paths.some((file) => file.startsWith(".github/instructions/") && file.endsWith(".instructions.md"));
-  const hasCodex = fileSet.has("AGENTS.md") || paths.some((file) => file.startsWith(".codex/")) || paths.some((file) => file.startsWith(".agents/skills/"));
-  const hasGeneric = paths.some((file) => file.startsWith(".agents/skills/"));
-
-  return [
-    {
-      id: "claude",
-      status: hasClaude ? "found" : "missing",
-      configPathsFound: paths.filter((file) => file === "CLAUDE.md" || file === ".claude/CLAUDE.md" || file.startsWith(".claude/")).slice(0, 20),
-      recommendedInstallTargets: ["claude_project_skills"]
-    },
-    {
-      id: "cursor",
-      status: hasCursor ? "found" : "missing",
-      configPathsFound: paths.filter((file) => file.startsWith(".cursor/") || file === ".cursorrules").slice(0, 20),
-      recommendedInstallTargets: ["cursor_project_rules"]
-    },
-    {
-      id: "copilot",
-      status: hasCopilot ? "found" : "missing",
-      configPathsFound: paths.filter((file) => file === ".github/copilot-instructions.md" || (file.startsWith(".github/instructions/") && file.endsWith(".instructions.md"))).slice(0, 20),
-      recommendedInstallTargets: ["copilot_repo_instructions"]
-    },
-    {
-      id: "codex",
-      status: hasCodex ? "found" : "missing",
-      configPathsFound: paths.filter((file) => file === "AGENTS.md" || file.startsWith(".codex/") || file.startsWith(".agents/skills/")).slice(0, 20),
-      recommendedInstallTargets: ["codex_repo_skills"]
-    },
-    {
-      id: "generic",
-      status: hasGeneric ? "found" : "missing",
-      configPathsFound: paths.filter((file) => file.startsWith(".agents/skills/")).slice(0, 20),
-      recommendedInstallTargets: ["generic_agent_skills"]
-    }
-  ];
+  return detectAssistantTargets(paths);
 }
 
 function detectFindings(
@@ -502,4 +464,3 @@ function parentDir(file: string): string {
   const idx = file.lastIndexOf("/");
   return idx === -1 ? "." : file.slice(0, idx);
 }
-
