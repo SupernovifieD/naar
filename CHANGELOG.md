@@ -2,6 +2,37 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.2] - 2026-06-02
+
+### Added
+- Added an explicit post-fetch security review decision step for install concerns so risky, blocked, and hard-blocked fetched bundles are reviewed before any files are written.
+- Added explicit risky override semantics with `--allow-risky`, structured status values, and stronger hard-block/dangerous-override wording.
+- Added timed security confirmation with 3 attempts, fresh confirmation codes per attempt, and a 60-second window per code.
+- Added final post-install warnings when concerning skills are installed after explicit confirmation.
+- Added clearer `naar list` output with per-skill version, targets, location, and install date when available.
+
+### Changed
+- Clarified two-stage scoring language in terminal output: recommendation cards now distinguish match score and pre-fetch risk estimate from final fetched-bundle security score.
+- Improved fetched-bundle security warning presentation with recommendation-card color styling, capitalized labels, clearer spacing, and no user-facing penalty point values.
+- Moved post-fetch install concerns from an abrupt failure path into an intentional review/continue/cancel flow for interactive installs.
+- Improved Step 4 security summaries by placing final status/security score/risk details below each skill name with readable labels.
+- Shortened security confirmation codes to 6 characters while preserving explicit typed confirmation.
+
+### Fixed
+- Fixed the bundled `go` banner showing `Naar vunknown` by resolving the CLI version from package metadata in both source and `dist` layouts.
+- Fixed version output drift by using the same package-derived version for Commander and the `go` progress banner.
+- Ignored local `.naar/skills/` skill copies in generated `.gitignore` entries so installed skill archives do not pollute repository status.
+
+### Security
+- Kept hard-blocked security findings non-overrideable by default policy while adding explicit interactive dangerous override handling where the install flow permits it.
+- Required explicit `--allow-risky --yes` intent for non-interactive installs with post-fetch security concerns.
+- Made cancellation, failed confirmation, and timeout paths abort before writes with a clear no-files-written guarantee.
+
+### Docs and Release
+- Polished README and contributor guidance for launch readiness.
+- Added detailed security documentation covering trust boundaries, status semantics, override behavior, and install-time review.
+- Split release automation so tag pushes run checks only and GitHub Release publication triggers npm Trusted Publishing.
+
 ## [0.2.1] - 2026-05-31
 
 ### Added
