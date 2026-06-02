@@ -7,6 +7,7 @@ const NAAR_RUNTIME_ENTRIES = [
   "/.naar/cache/",
   "/.naar/tmp/",
   "/.naar/logs/",
+  "/.naar/skills/",
   "/.naar/installed.json"
 ] as const;
 

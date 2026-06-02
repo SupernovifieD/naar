@@ -23,6 +23,7 @@ describe("ensureNaarRuntimeGitignore", () => {
     expect(content).toContain("/.naar/cache/");
     expect(content).toContain("/.naar/tmp/");
     expect(content).toContain("/.naar/logs/");
+    expect(content).toContain("/.naar/skills/");
     expect(content).toContain("/.naar/installed.json");
   });
 
@@ -49,6 +50,7 @@ describe("ensureNaarRuntimeGitignore", () => {
     expect(count("/.naar/cache/")).toBe(1);
     expect(count("/.naar/tmp/")).toBe(1);
     expect(count("/.naar/logs/")).toBe(1);
+    expect(count("/.naar/skills/")).toBe(1);
     expect(count("/.naar/installed.json")).toBe(1);
   });
 });
