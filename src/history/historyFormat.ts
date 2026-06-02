@@ -15,7 +15,7 @@ export function renderHistorySummary(history: NaarHistory, options: { disabled?:
   const skills = listSkillSummaries(history);
   process.stdout.write(`${pc.blue("Remembered projects")}: ${pc.cyan(String(projects.length))}\n`);
   process.stdout.write(`${pc.blue("Remembered skills")}: ${pc.cyan(String(skills.length))}\n`);
-  process.stdout.write(`${pc.blue("Last updated")}: ${history.updatedAt}\n`);
+  process.stdout.write(`${pc.blue("Last updated")}: ${formatDateTime(history.updatedAt)}\n`);
 
   const recentProjects = projects.slice(0, 5);
   if (recentProjects.length > 0) {
@@ -75,10 +75,10 @@ export function renderHistoryProject(project: HistoryProject, options: { warning
   }
   process.stdout.write(`${pc.bold(project.name)}\n`);
   process.stdout.write(`${pc.blue("Path")}: ${project.path}\n`);
-  process.stdout.write(`${pc.blue("First seen")}: ${project.firstSeenAt}\n`);
-  process.stdout.write(`${pc.blue("Last seen")}: ${project.lastSeenAt}\n`);
+  process.stdout.write(`${pc.blue("First seen")}: ${formatDateTime(project.firstSeenAt)}\n`);
+  process.stdout.write(`${pc.blue("Last seen")}: ${formatDateTime(project.lastSeenAt)}\n`);
   if (project.lastInstallAt) {
-    process.stdout.write(`${pc.blue("Last install")}: ${project.lastInstallAt}\n`);
+    process.stdout.write(`${pc.blue("Last install")}: ${formatDateTime(project.lastInstallAt)}\n`);
   }
 
   if (project.detected) {
@@ -102,7 +102,7 @@ export function renderHistoryProject(project: HistoryProject, options: { warning
       process.stdout.write(`  ${pc.blue("Version")}: ${skill.version ?? "unknown"}\n`);
       process.stdout.write(`  ${pc.blue("Ref")}: ${skill.ref ?? "unknown"}\n`);
       process.stdout.write(`  ${pc.blue("Install count")}: ${skill.installCount}\n`);
-      process.stdout.write(`  ${pc.blue("Last seen")}: ${skill.lastSeenAt}\n`);
+      process.stdout.write(`  ${pc.blue("Last seen")}: ${formatDateTime(skill.lastSeenAt)}\n`);
     }
   }
 }
@@ -128,4 +128,20 @@ function renderOptionalList(label: string, values: string[] | undefined): void {
 
 function formatDate(value: string): string {
   return value.slice(0, 10);
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(date);
+  const localDate = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  }).format(date);
+  return `${time} - ${localDate}`;
 }

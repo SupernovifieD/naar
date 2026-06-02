@@ -176,6 +176,8 @@ describe("history commands", () => {
     await runHistorySummary({ historyFilePath, history: false });
     expect(stripAnsi(captured)).toContain("History is disabled");
     expect(stripAnsi(captured)).toContain("Remembered projects: 1");
+    expect(stripAnsi(captured)).toMatch(/Last updated: .+ - .+/);
+    expect(stripAnsi(captured)).not.toContain(NOW.toISOString());
 
     captureStdout();
     await runHistoryList({ historyFilePath });
@@ -190,6 +192,11 @@ describe("history commands", () => {
     captureStdout();
     await runHistoryShow(repoPath, { historyFilePath, verbose: true });
     expect(stripAnsi(captured)).toContain("Security score: 100/100");
+
+    captureStdout();
+    await runHistorySummary({ historyFilePath, json: true });
+    const summary = JSON.parse(captured) as { updatedAt: string };
+    expect(summary.updatedAt).toBe(NOW.toISOString());
 
     captureStdout();
     await runHistoryList({ historyFilePath, json: true });
