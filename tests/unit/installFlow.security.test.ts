@@ -75,7 +75,7 @@ vi.mock("@inquirer/prompts", () => ({
   input: inputMock
 }));
 
-import { runInstallFlow } from "../../src/commands/installFlow.js";
+import { runInstallFlow, runInstallFlowFromRecommendations } from "../../src/commands/installFlow.js";
 
 const baseFlags: CliFlags = {
   repo: "/tmp/repo",
@@ -356,6 +356,36 @@ describe("runInstallFlow security enforcement", () => {
       repoPath: "/tmp/repo",
       repoFacts,
       installedSkills: [installedRecord],
+      history: undefined
+    }));
+  });
+
+  it("installs preselected search recommendations without building or loading recommendations", async () => {
+    const candidate = makeCandidate();
+    const fetchFiles = vi.fn(async () => ({
+      skill: candidate,
+      files: { "SKILL.md": "# Skill\n" }
+    }));
+    buildProvidersMock.mockReturnValue([{ id: "test", fetchFiles }]);
+
+    await runInstallFlowFromRecommendations(
+      { ...baseFlags, apply: true, yes: true },
+      [makeRecommendation(candidate)],
+      { source: "search" }
+    );
+
+    expect(buildRecommendationsMock).not.toHaveBeenCalled();
+    expect(loadOrBuildRecommendationsMock).not.toHaveBeenCalled();
+    expect(fetchFiles).toHaveBeenCalledWith({
+      providerId: "test",
+      skillId: "secure-skill",
+      version: "1.0.0"
+    });
+    expect(createInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(applyInstallPlanMock).toHaveBeenCalledTimes(1);
+    expect(recordInstallHistoryMock).toHaveBeenCalledWith(expect.objectContaining({
+      repoPath: "/tmp/repo",
+      repoFacts: undefined,
       history: undefined
     }));
   });

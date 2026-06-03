@@ -65,11 +65,13 @@ export function createCliProgram(): Command {
     .alias("s")
     .description("Search provider catalogs for skills")
     .option("--include-installed", "Include already-installed skills in search results")
+    .option("--install", "Install selected search result through the safe install flow")
     .action(async (queryParts: string[], _opts, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
-      const opts = cmd.optsWithGlobals() as { includeInstalled?: boolean };
+      const opts = cmd.optsWithGlobals() as { includeInstalled?: boolean; install?: boolean };
       await runSearch(flags, queryParts.join(" "), {
-        includeInstalled: opts.includeInstalled === true
+        includeInstalled: opts.includeInstalled === true,
+        install: opts.install === true
       });
     }));
 

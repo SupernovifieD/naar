@@ -10,6 +10,7 @@ describe("search CLI registration", () => {
     expect(command?.aliases()).toContain("s");
     expect(command?.description()).toBe("Search provider catalogs for skills");
     expect(command?.helpInformation()).toContain("--include-installed");
+    expect(command?.helpInformation()).toContain("--install");
   });
 
   it("exposes the s alias on the main program", () => {

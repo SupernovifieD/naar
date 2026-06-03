@@ -7,6 +7,7 @@ import type {
   CliFlags,
   InstallAction,
   InstallTarget,
+  RepoFacts,
   SkillCandidate,
   SkillRecommendation,
   SkillRef
@@ -42,6 +43,10 @@ import { recordInstallHistory } from "../history/historyService.js";
 export interface InstallFlowOptions {
   forceFreshRecommendations?: boolean;
   printHeader?: boolean;
+  initialRecommendations?: SkillRecommendation[];
+  skipRecommendationBuild?: boolean;
+  skipRecommendationSelection?: boolean;
+  source?: "recommend" | "search" | "direct";
 }
 
 class PromptExitRequestedError extends Error {
@@ -80,18 +85,41 @@ interface PostFetchSecurityEntry {
   risk: ReturnType<typeof analyzeSkill>;
 }
 
+export async function runInstallFlowFromRecommendations(
+  flags: CliFlags,
+  recommendations: SkillRecommendation[],
+  flowOptions: Omit<InstallFlowOptions, "initialRecommendations" | "skipRecommendationBuild" | "skipRecommendationSelection"> = {}
+): Promise<void> {
+  await runInstallFlow(flags, {
+    ...flowOptions,
+    initialRecommendations: recommendations,
+    skipRecommendationBuild: true,
+    skipRecommendationSelection: true,
+    source: flowOptions.source ?? "direct"
+  });
+}
+
 export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOptions = {}): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
   const config = await loadConfig(repoRoot);
 
-  const pipeline = flowOptions.forceFreshRecommendations || flags.allowRisky
-    ? await buildRecommendations(repoRoot, flags)
-    : await loadOrBuildRecommendations(repoRoot, flags);
+  let repoFacts: RepoFacts | undefined;
+  let recommendations: SkillRecommendation[] = [];
+  if (flowOptions.skipRecommendationBuild || flowOptions.initialRecommendations) {
+    recommendations = flowOptions.initialRecommendations ?? [];
+  } else {
+    const pipeline = flowOptions.forceFreshRecommendations || flags.allowRisky
+      ? await buildRecommendations(repoRoot, flags)
+      : await loadOrBuildRecommendations(repoRoot, flags);
+    repoFacts = pipeline.repoFacts;
+    recommendations = pipeline.recommendations;
+  }
 
-  const recommendations = pipeline.recommendations;
   let selectedRecommendations: SkillRecommendation[] = [];
   try {
-    selectedRecommendations = await chooseRecommendations(flags, recommendations);
+    selectedRecommendations = flowOptions.skipRecommendationSelection
+      ? recommendations.filter((recommendation) => isRecommendationSelectable(recommendation, flags.allowRisky))
+      : await chooseRecommendations(flags, recommendations);
   } catch (error) {
     if (error instanceof PromptExitRequestedError) {
       process.stdout.write(`${warningLine("Installation canceled.")}\n`);
@@ -321,7 +349,7 @@ export async function runInstallFlow(flags: CliFlags, flowOptions: InstallFlowOp
   const historyWarning = await updateInstallHistoryBestEffort(
     flags,
     repoRoot,
-    pipeline.repoFacts,
+    repoFacts,
     resolvedSkills
   );
 
@@ -355,17 +383,10 @@ async function chooseRecommendations(
   flags: CliFlags,
   recommendations: SkillRecommendation[]
 ): Promise<SkillRecommendation[]> {
-  const isSelectable = (recommendation: SkillRecommendation): boolean => {
-    const status = resolveRecommendationStatus(recommendation);
-    if (status === "eligible") return true;
-    if (status === "risky" && flags.allowRisky) return true;
-    return false;
-  };
-
   if (flags.from) {
     const match = selectFromReference(flags.from, recommendations);
     if (!match) return [];
-    return isSelectable(match) ? [match] : [];
+    return isRecommendationSelectable(match, flags.allowRisky) ? [match] : [];
   }
 
   if (flags.fromPlan) {
@@ -373,11 +394,11 @@ async function chooseRecommendations(
     return recommendations.filter((recommendation) =>
       (requested.includes(recommendation.candidate.canonicalSkillId)
       || requested.includes(recommendation.candidate.providerSkillId))
-      && isSelectable(recommendation)
+      && isRecommendationSelectable(recommendation, flags.allowRisky)
     );
   }
 
-  const selectable = recommendations.filter((recommendation) => isSelectable(recommendation));
+  const selectable = recommendations.filter((recommendation) => isRecommendationSelectable(recommendation, flags.allowRisky));
   if (selectable.length === 0) {
     return [];
   }
@@ -408,6 +429,13 @@ async function chooseRecommendations(
   );
 
   return selectable.filter((recommendation) => selectedIds.includes(recommendation.candidate.canonicalSkillId));
+}
+
+function isRecommendationSelectable(recommendation: SkillRecommendation, allowRisky: boolean): boolean {
+  const status = resolveRecommendationStatus(recommendation);
+  if (status === "eligible") return true;
+  if (status === "risky" && allowRisky) return true;
+  return false;
 }
 
 async function chooseInstallTargets(
@@ -647,7 +675,7 @@ async function persistInstallationState(
 async function updateInstallHistoryBestEffort(
   flags: CliFlags,
   repoRoot: string,
-  repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"],
+  repoFacts: RepoFacts | undefined,
   resolvedSkills: ResolvedSkill[]
 ): Promise<string | undefined> {
   try {

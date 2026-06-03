@@ -11,6 +11,8 @@ const loadRecommendationCacheMock = vi.hoisted(() => vi.fn());
 const saveRecommendationCacheMock = vi.hoisted(() => vi.fn());
 const loadScanCacheMock = vi.hoisted(() => vi.fn());
 const saveScanCacheMock = vi.hoisted(() => vi.fn());
+const runInstallFlowFromRecommendationsMock = vi.hoisted(() => vi.fn());
+const checkboxMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/config/store.js", () => ({
   loadConfig: loadConfigMock
@@ -44,6 +46,14 @@ vi.mock("../../src/commands/cache.js", () => ({
   saveScanCache: saveScanCacheMock
 }));
 
+vi.mock("../../src/commands/installFlow.js", () => ({
+  runInstallFlowFromRecommendations: runInstallFlowFromRecommendationsMock
+}));
+
+vi.mock("@inquirer/prompts", () => ({
+  checkbox: checkboxMock
+}));
+
 import { runSearch } from "../../src/commands/search.js";
 
 const defaultTargets: InstallTarget[] = ["claude_project_skills", "codex_repo_skills"];
@@ -74,6 +84,7 @@ const baseFlags: CliFlags = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  runInstallFlowFromRecommendationsMock.mockResolvedValue(undefined);
   loadConfigMock.mockResolvedValue(config);
   buildProvidersMock.mockReturnValue([{ id: "anthropic" }, { id: "clawhub" }]);
   loadInstalledStateMock.mockResolvedValue({ version: 1, skills: [] });
@@ -104,6 +115,7 @@ describe("runSearch", () => {
     expect(saveRecommendationCacheMock).not.toHaveBeenCalled();
     expect(loadScanCacheMock).not.toHaveBeenCalled();
     expect(saveScanCacheMock).not.toHaveBeenCalled();
+    expect(runInstallFlowFromRecommendationsMock).not.toHaveBeenCalled();
   });
 
   it("emits JSON output without prompts or installation behavior", async () => {
@@ -207,6 +219,103 @@ describe("runSearch", () => {
     expect(queryProvidersMock).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
       targets: ["claude_project_skills"]
     }));
+  });
+
+  it("skips JSON search installation without explicit apply and yes confirmation", async () => {
+    const output = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, json: true, apply: false, yes: false }, "brewpage", { install: true });
+    });
+    const parsed = JSON.parse(output) as {
+      installSkipped: boolean;
+      installSkippedDueToMissingConfirmation: boolean;
+      error: string;
+      results: unknown[];
+    };
+
+    expect(parsed.installSkipped).toBe(true);
+    expect(parsed.installSkippedDueToMissingConfirmation).toBe(true);
+    expect(parsed.error).toContain("--apply and --yes");
+    expect(parsed.results).toHaveLength(1);
+    expect(runInstallFlowFromRecommendationsMock).not.toHaveBeenCalled();
+  });
+
+  it("installs one exact search match through install flow without scanning or recommendation cache", async () => {
+    await captureStdout(async () => {
+      await runSearch({ ...baseFlags, apply: true, yes: true }, "brewpage", { install: true });
+    });
+
+    expect(runInstallFlowFromRecommendationsMock).toHaveBeenCalledTimes(1);
+    const [passedFlags, recommendations, options] = runInstallFlowFromRecommendationsMock.mock.calls[0];
+    expect(passedFlags.apply).toBe(true);
+    expect(recommendations).toHaveLength(1);
+    expect(recommendations[0].candidate.canonicalSkillId).toBe("brewpage");
+    expect(options).toMatchObject({ source: "search", printHeader: false });
+    expect(scanRepoMock).not.toHaveBeenCalled();
+    expect(recommendSkillsMock).not.toHaveBeenCalled();
+    expect(loadRecommendationCacheMock).not.toHaveBeenCalled();
+    expect(saveRecommendationCacheMock).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-install ambiguous fuzzy search results", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("anthropic", [
+        makeCandidate("github-actions-one", { name: "GitHub Actions One" }),
+        makeCandidate("github-actions-two", { name: "GitHub Actions Two" })
+      ])
+    ]);
+
+    const output = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, apply: true, yes: true }, "github actions", { install: true });
+    });
+
+    expect(output).toContain("Search returned multiple possible matches");
+    expect(runInstallFlowFromRecommendationsMock).not.toHaveBeenCalled();
+  });
+
+  it("uses --from to select one result from ambiguous search output", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("clawhub", [
+        makeCandidate("github-actions-one", {
+          name: "GitHub Actions One",
+          source: { providerId: "clawhub", publisher: "clawhub", version: "1.0.0" }
+        }),
+        makeCandidate("github-actions-two", {
+          name: "GitHub Actions Two",
+          source: { providerId: "clawhub", publisher: "clawhub", version: "2.0.0" }
+        })
+      ])
+    ]);
+
+    await captureStdout(async () => {
+      await runSearch({
+        ...baseFlags,
+        apply: true,
+        yes: true,
+        from: "clawhub:github-actions-two@2.0.0"
+      }, "github actions", { install: true });
+    });
+
+    expect(runInstallFlowFromRecommendationsMock).toHaveBeenCalledTimes(1);
+    const recommendations = runInstallFlowFromRecommendationsMock.mock.calls[0][1];
+    expect(recommendations[0].candidate.canonicalSkillId).toBe("github-actions-two");
+  });
+
+  it("prompts interactively before installing search results", async () => {
+    checkboxMock.mockResolvedValue(["anthropic:brewpage"]);
+
+    await captureStdout(async () => {
+      await runSearch({
+        ...baseFlags,
+        nonInteractive: false,
+        apply: false,
+        yes: false
+      }, "brewpage", { install: true });
+    });
+
+    expect(checkboxMock).toHaveBeenCalledTimes(1);
+    const choices = checkboxMock.mock.calls[0][0].choices as Array<{ checked?: boolean; value: string }>;
+    expect(choices[0]).toMatchObject({ value: "anthropic:brewpage", checked: true });
+    expect(runInstallFlowFromRecommendationsMock).toHaveBeenCalledTimes(1);
   });
 });
 

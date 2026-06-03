@@ -126,11 +126,18 @@ naar search "brewpage" --provider clawhub
 naar search "brewpage" --target claude_project_skills
 naar search "brewpage" --json
 naar search "brewpage" --include-installed
+naar search "brewpage" --install
 ```
 
 Naar shows one exact match or up to three close matches from your configured providers. Search mode does not run repo scanning, repo-need inference, recommendation scoring, or recommendation storage. It is useful when you already know roughly what skill you want.
 
-Installation from search results is intentionally not part of this release step; it will be added in a follow-up.
+Use `--install` to install selected search results through the same safe install flow as `naar install`: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all still apply. Automated search installs must be explicit, for example:
+
+```bash
+naar search "brewpage" --install --provider clawhub --target codex_repo_skills --apply --yes --non-interactive
+```
+
+Ambiguous fuzzy results are not auto-installed in automation. Re-run with a more specific query or use `--from <provider:skill@version>`.
 
 ## Flags and Options
 
