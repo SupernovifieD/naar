@@ -1,6 +1,9 @@
 import { loadConfig } from "../config/store.js";
-import { buildProviders, queryProviders } from "../providers/orchestrator.js";
+import { buildProviders } from "../providers/orchestrator.js";
+import { deriveRepoNeeds } from "../recommend/needs.js";
+import { buildRecommendationQueryPlan, type RecommendationQueryPlan } from "../recommend/queryPlan.js";
 import { recommendSkills } from "../recommend/recommend.js";
+import { retrieveRecommendationCandidates } from "../recommend/retrieval.js";
 import { scanRepo } from "../scanner/scanRepo.js";
 import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
 import type {
@@ -21,12 +24,19 @@ export interface PipelineResult {
   repoNeeds: RepoNeed[];
   recommendations: SkillRecommendation[];
   providerWarnings: string[];
-  providerSummaries: Array<{
-    providerId: string;
-    mode?: string;
-    candidateCount: number;
-    warnings?: string[];
-  }>;
+  providerSummaries: ProviderSummary[];
+  queryPlan?: RecommendationQueryPlan;
+  retrievalWarnings?: string[];
+}
+
+export interface ProviderSummary {
+  providerId: string;
+  mode?: string;
+  candidateCount: number;
+  warnings?: string[];
+  queryCount?: number;
+  queries?: string[];
+  dedupedCandidateCount?: number;
 }
 
 export type PipelinePhase =
@@ -42,6 +52,8 @@ export interface PipelinePhaseEvent {
   repoFacts?: RepoFacts;
   providerIds?: string[];
   providerResults?: SkillProviderResult[];
+  providerSummaries?: ProviderSummary[];
+  queryPlan?: RecommendationQueryPlan;
   result?: PipelineResult;
 }
 
@@ -74,16 +86,29 @@ export async function buildRecommendations(
   const providerIds = flags.provider.length > 0 ? flags.provider : config.defaultProviders;
   await hooks.onPhase?.({ phase: "providers:start", providerIds });
   const providers = buildProviders(providerIds);
-  const providerResults = await queryProviders(providers, {
-    mode: "recommend",
-    repoFacts,
-    targets: flags.target,
-    limit: 200
+  const repoNeeds = deriveRepoNeeds(repoFacts);
+  const queryPlan = buildRecommendationQueryPlan(repoFacts, repoNeeds);
+  const selectedTargets = flags.target.length > 0 ? flags.target : config.defaultTargets;
+  const retrieval = await retrieveRecommendationCandidates(providers, repoFacts, repoNeeds, queryPlan, {
+    targets: selectedTargets,
+    baseLimit: 200,
+    queryLimit: 40,
+    maxProviderQueries: 12
   });
-  await hooks.onPhase?.({ phase: "providers:done", providerIds, providerResults });
+  const providerSummaries = summarizeRecommendationProviders(
+    providerIds,
+    retrieval.providerResults,
+    queryPlan.providerQueries
+  );
+  await hooks.onPhase?.({
+    phase: "providers:done",
+    providerIds,
+    providerResults: retrieval.providerResults,
+    providerSummaries,
+    queryPlan
+  });
 
-  const candidates: SkillCandidate[] = providerResults
-    .flatMap((result) => result.candidates)
+  const candidates: SkillCandidate[] = retrieval.candidates
     .filter((candidate) => {
       const candidateScopedId = candidate.providerScopedId ?? toProviderScopedId(candidate.source.providerId, candidate.providerSkillId);
       return !installedIds.has(candidateScopedId);
@@ -99,24 +124,21 @@ export async function buildRecommendations(
     eligibleAssistants: eligibility.assistants,
     eligibilitySource: eligibility.source,
     allCompatible: flags.allCompatible,
-    maxResults: 10
+    maxResults: 10,
+    precomputedRepoNeeds: repoNeeds
   });
 
   const filteredRecommendations = filterInstalledRecommendations(recommendationResult.recommendations, installedIds);
-  const warnings = providerResults.flatMap((result) => result.warnings ?? []);
-  const providerSummaries = providerResults.map((result) => ({
-    providerId: result.providerId,
-    mode: result.mode,
-    candidateCount: result.candidates.length,
-    warnings: result.warnings
-  }));
+  const warnings = retrieval.warnings;
 
   const pipelineResult: PipelineResult = {
     repoFacts,
     repoNeeds: recommendationResult.repoNeeds,
     recommendations: filteredRecommendations,
     providerWarnings: warnings,
-    providerSummaries
+    providerSummaries,
+    queryPlan,
+    retrievalWarnings: warnings
   };
 
   await saveRecommendationCache(repoRoot, {
@@ -124,6 +146,7 @@ export async function buildRecommendations(
     repoNeeds: recommendationResult.repoNeeds,
     recommendations: filteredRecommendations,
     providerSummaries,
+    queryPlan,
     generatedAtIso: new Date().toISOString()
   });
 
@@ -143,7 +166,8 @@ export async function loadOrBuildRecommendations(repoRoot: string, flags: CliFla
     repoNeeds: cached.repoNeeds ?? [],
     recommendations: filterInstalledRecommendations(cached.recommendations, installedIds),
     providerWarnings: [],
-    providerSummaries: cached.providerSummaries ?? []
+    providerSummaries: cached.providerSummaries ?? [],
+    queryPlan: cached.queryPlan
   };
 }
 
@@ -200,4 +224,34 @@ function resolveEligibleAssistants(
     assistants: getAllTargetAssistantIds(),
     source: "fallback-all"
   };
+}
+
+function summarizeRecommendationProviders(
+  providerIds: string[],
+  providerResults: SkillProviderResult[],
+  providerQueries: string[]
+): ProviderSummary[] {
+  return providerIds.map((providerId) => {
+    const results = providerResults.filter((result) => result.providerId === providerId);
+    const warnings = results.flatMap((result) => result.warnings ?? []);
+    const dedupedCandidates = new Map<string, SkillCandidate>();
+    for (const result of results) {
+      for (const candidate of result.candidates) {
+        const key = candidate.providerScopedId ?? toProviderScopedId(candidate.source.providerId, candidate.providerSkillId);
+        if (!dedupedCandidates.has(key)) {
+          dedupedCandidates.set(key, candidate);
+        }
+      }
+    }
+
+    return {
+      providerId,
+      mode: "recommend+planned-search",
+      candidateCount: dedupedCandidates.size,
+      dedupedCandidateCount: dedupedCandidates.size,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      queryCount: 1 + providerQueries.length,
+      queries: providerQueries
+    };
+  });
 }

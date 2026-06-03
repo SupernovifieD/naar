@@ -1,5 +1,6 @@
 import pc from "picocolors";
 import type { CliFlags } from "../types/index.js";
+import { renderRecommendationQueryPlan } from "../recommend/queryPlan.js";
 import { printJson } from "../utils/json.js";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations } from "./pipeline.js";
@@ -13,6 +14,7 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
     printJson({
       repoFacts: pipeline.repoFacts,
       repoNeeds: pipeline.repoNeeds,
+      queryPlan: pipeline.queryPlan,
       providers: pipeline.providerSummaries,
       warnings: pipeline.providerWarnings,
       recommendations: pipeline.recommendations
@@ -31,10 +33,17 @@ export async function runRecommend(flags: CliFlags): Promise<void> {
     process.stdout.write(`\n${pc.bold("Providers")}:\n`);
     for (const provider of pipeline.providerSummaries) {
       const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
+      const queryCount = typeof provider.queryCount === "number" && provider.queryCount > 0
+        ? ` queries=${pc.cyan(String(provider.queryCount))}`
+        : "";
       process.stdout.write(
-        `- ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}\n`
+        `- ${pc.bold(provider.providerId)}${mode}${queryCount} candidates=${pc.cyan(String(provider.candidateCount))}\n`
       );
     }
+  }
+
+  if (flags.verbose && pipeline.queryPlan) {
+    process.stdout.write(`\n${renderRecommendationQueryPlan(pipeline.queryPlan)}\n`);
   }
 
   process.stdout.write(`\n${pc.bold("Recommendations")}:\n`);

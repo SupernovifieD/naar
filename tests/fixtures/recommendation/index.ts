@@ -1,4 +1,9 @@
 import type { RecommendationEvalFixture } from "../../../src/recommend/evaluation/fixtures.js";
+export { DOCS_SITE_FIXTURE } from "./docs-site.js";
+export { MONOREPO_PACKAGE_FIXTURE } from "./monorepo-package.js";
+export { NEXTJS_APP_FIXTURE } from "./nextjs-app.js";
+export { PYTHON_API_FIXTURE } from "./python-api.js";
+export { TYPESCRIPT_CLI_PACKAGE_FIXTURE } from "./typescript-cli-package.js";
 import { DOCS_SITE_FIXTURE } from "./docs-site.js";
 import { MONOREPO_PACKAGE_FIXTURE } from "./monorepo-package.js";
 import { NEXTJS_APP_FIXTURE } from "./nextjs-app.js";

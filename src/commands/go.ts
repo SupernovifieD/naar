@@ -6,6 +6,7 @@ import { buildRecommendations, type PipelinePhaseEvent } from "./pipeline.js";
 import { runInstallFlowFromRecommendations } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
 import { CLI_VERSION } from "../utils/version.js";
+import { renderRecommendationQueryPlan } from "../recommend/queryPlan.js";
 import {
   colorAssistantStatus,
   colorScore,
@@ -23,6 +24,7 @@ export async function runGo(flags: CliFlags): Promise<void> {
       repoRoot,
       repoFacts: pipeline.repoFacts,
       repoNeeds: pipeline.repoNeeds,
+      queryPlan: pipeline.queryPlan,
       providers: pipeline.providerSummaries,
       warnings: pipeline.providerWarnings,
       recommendations: pipeline.recommendations
@@ -83,17 +85,20 @@ function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: Pi
       case "providers:done": {
         activeSpinner?.succeed("Provider fetch complete");
         activeSpinner = null;
-        const providerResults = event.providerResults ?? [];
-        const hasWarnings = providerResults.some((result) => (result.warnings ?? []).length > 0);
+        const providerSummaries = event.providerSummaries ?? [];
+        const hasWarnings = providerSummaries.some((summary) => (summary.warnings ?? []).length > 0);
         if (hasWarnings) {
           process.stdout.write(`  Mode: ${pc.yellow("degraded (partial provider failures)")}\n`);
         }
-        if (providerResults.length > 0) {
+        if (providerSummaries.length > 0) {
           process.stdout.write("\n");
-          for (const provider of providerResults) {
+          for (const provider of providerSummaries) {
             const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
+            const queryCount = typeof provider.queryCount === "number" && provider.queryCount > 0
+              ? ` queries=${pc.cyan(String(provider.queryCount))}`
+              : "";
             process.stdout.write(
-              `    - ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidates.length))}\n`
+              `    - ${pc.bold(provider.providerId)}${mode}${queryCount} candidates=${pc.cyan(String(provider.candidateCount))}\n`
             );
           }
         }
@@ -150,6 +155,10 @@ function renderRankingSummary(
   flags: CliFlags
 ): void {
   const { recommendations, providerWarnings } = result;
+
+  if (flags.verbose && result.queryPlan) {
+    process.stdout.write(`${renderRecommendationQueryPlan(result.queryPlan)}\n\n`);
+  }
 
   if (recommendations.length === 0) {
     process.stdout.write(`  ${warningLine("No recommendations available for this run.")}\n`);

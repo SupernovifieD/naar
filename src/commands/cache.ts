@@ -1,6 +1,7 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { RepoFacts, RepoNeed, SkillRecommendation } from "../types/index.js";
+import type { RecommendationQueryPlan } from "../recommend/queryPlan.js";
 import { ensureNaarRuntimeGitignore } from "../utils/gitignore.js";
 import { SCAN_SCHEMA_VERSION } from "../scanner/scanRepo.js";
 
@@ -17,7 +18,11 @@ export interface RecommendationCache {
     mode?: string;
     candidateCount: number;
     warnings?: string[];
+    queryCount?: number;
+    queries?: string[];
+    dedupedCandidateCount?: number;
   }>;
+  queryPlan?: RecommendationQueryPlan;
   generatedAtIso: string;
 }
 
@@ -74,6 +79,12 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
       scoreBreakdown: recommendation.scoreBreakdown ?? []
     }));
     parsed.repoNeeds = parsed.repoNeeds ?? [];
+    parsed.providerSummaries = (parsed.providerSummaries ?? []).map((summary) => ({
+      ...summary,
+      queryCount: summary.queryCount ?? 0,
+      queries: summary.queries ?? [],
+      dedupedCandidateCount: summary.dedupedCandidateCount ?? summary.candidateCount
+    }));
     return parsed;
   } catch {
     return null;
