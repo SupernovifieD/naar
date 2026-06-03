@@ -22,7 +22,8 @@ function makeRecommendation(overrides: Partial<SkillRecommendation> = {}): Skill
         providerId: "anthropic",
         publisher: "anthropic",
         version: "1.0.0",
-        ref: "frontend-design@1.0.0"
+        ref: "frontend-design@1.0.0",
+        url: "https://example.com/skills/frontend-design"
       },
       summary: "Summary fallback",
       tags: ["nextjs"],
@@ -126,6 +127,7 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("Match score: 88%");
     expect(output).toContain("Pre-fetch risk estimate: 5%");
     expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("Page: https://example.com/skills/frontend-design");
     expect(output).toContain("Meta:");
     expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
     expect(output).toContain("Trust: official");
@@ -169,8 +171,24 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("Why:");
     expect(output).toContain("  Matched stack: Next.js");
     expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Page:");
     expect(output).not.toContain("Targets:");
     expect(output).not.toContain("Meta:");
+  });
+
+  it("does not render local source paths as skill web pages", () => {
+    const output = stripAnsi(renderRecommendationCard(makeRecommendation({
+      candidate: {
+        ...makeRecommendation().candidate,
+        source: {
+          providerId: "local",
+          publisher: "local",
+          url: "/tmp/local-skill/SKILL.md"
+        }
+      }
+    }), 1, { columns: 80 }));
+
+    expect(output).not.toContain("Page:");
   });
 
   it("renders eligibility section and hides penalties from card output", () => {
@@ -234,6 +252,7 @@ describe("recommendation card helpers", () => {
     const text = formatRecommendationChoiceDescription(makeRecommendation());
     expect(text).toContain("- Preliminary status: PRELIMINARILY ELIGIBLE");
     expect(text).toContain("- Why: Matched stack: Next.js; Assistant compatibility: claude");
+    expect(text).toContain("- Page: https://example.com/skills/frontend-design");
     expect(text).toContain("- Targets: claude, cursor, copilot");
     expect(text).toContain("- Publisher: anthropic");
     expect(text).toContain("- Trust: official");

@@ -182,6 +182,15 @@ export function renderRecommendationCard(
         value: description
       });
     }
+
+    const pageUrl = resolveSkillPageUrl(recommendation.candidate);
+    if (pageUrl) {
+      appendUrlField(lines, {
+        indent,
+        label: "Page",
+        value: pageUrl
+      });
+    }
   }
 
   const reasons = (recommendation.reasons ?? []).slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
@@ -373,11 +382,13 @@ export function formatRecommendationChoiceDescription(recommendation: SkillRecom
   const status = formatPreliminaryRecommendationStatus(resolveRecommendationStatus(recommendation));
   const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
   const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
+  const pageUrl = resolveSkillPageUrl(recommendation.candidate);
   const security = (recommendation.blockReasons ?? []).slice(0, 1).join("; ");
   return [
     `- Preliminary status: ${status}`,
     `- Why: ${why}`,
     ...(security ? [`- Security: ${security}`] : []),
+    ...(pageUrl ? [`- Page: ${pageUrl}`] : []),
     `- Targets: ${targets}`,
     `- Publisher: ${publisher}`,
     `- Trust: ${trust}`
@@ -402,6 +413,14 @@ function appendWrappedField(
   for (const segment of wrapped.slice(1)) {
     lines.push(`${continuationPrefix}${pc.white(segment)}`);
   }
+}
+
+function appendUrlField(
+  lines: string[],
+  options: { indent: string; label: string; value: string }
+): void {
+  const displayLabel = toDisplayLabel(options.label);
+  lines.push(`${options.indent}${pc.blue(displayLabel)}: ${pc.cyan(options.value)}`);
 }
 
 function appendWrappedReasonsField(
@@ -503,6 +522,19 @@ function formatRecommendationMetaFields(
   }
 
   return parts;
+}
+
+function resolveSkillPageUrl(candidate: SkillCandidate): string | null {
+  const rawUrl = candidate.source.url?.trim();
+  if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+    return null;
+  }
+
+  try {
+    return new URL(rawUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 function colorMetaValue(value: string, tone: MetaFieldTone | undefined): string {
