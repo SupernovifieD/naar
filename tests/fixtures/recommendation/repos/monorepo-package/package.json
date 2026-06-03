@@ -1,0 +1,16 @@
+{
+  "name": "fixture-monorepo-package",
+  "version": "1.0.0",
+  "description": "TypeScript monorepo package workspace with release automation",
+  "keywords": [
+    "monorepo",
+    "workspace",
+    "pnpm",
+    "turborepo"
+  ],
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "turbo": "^2.0.0"
+  }
+}

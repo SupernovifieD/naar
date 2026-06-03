@@ -1,0 +1,22 @@
+{
+  "name": "fixture-typescript-cli-package",
+  "version": "1.0.0",
+  "description": "TypeScript CLI package with provider integrations and install planning",
+  "keywords": [
+    "typescript",
+    "cli",
+    "npm-package",
+    "provider-integration",
+    "install-plan"
+  ],
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "undici": "^7.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  }
+}

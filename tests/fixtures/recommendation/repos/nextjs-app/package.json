@@ -1,0 +1,21 @@
+{
+  "name": "fixture-nextjs-app",
+  "version": "1.0.0",
+  "description": "Next.js React Tailwind web app with Vitest and Playwright",
+  "keywords": [
+    "nextjs",
+    "react",
+    "tailwind",
+    "web-app"
+  ],
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "playwright": "^1.0.0"
+  }
+}

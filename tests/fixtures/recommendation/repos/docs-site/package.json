@@ -1,0 +1,16 @@
+{
+  "name": "fixture-docs-site",
+  "version": "1.0.0",
+  "description": "Documentation site powered by VitePress",
+  "keywords": [
+    "docs",
+    "documentation",
+    "vitepress"
+  ],
+  "dependencies": {
+    "vitepress": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

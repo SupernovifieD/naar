@@ -24,6 +24,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli.ts",
+    "eval:recommendations": "tsx scripts/evaluateRecommendations.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test",
     "test": "vitest run",
