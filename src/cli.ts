@@ -14,6 +14,7 @@ import { runConfig } from "./commands/config.js";
 import { runTargetsInspect, runTargetsList } from "./commands/targets.js";
 import { runSearch } from "./commands/search.js";
 import { parseHistoryBooleanOption, registerHistoryCommand } from "./history/historyCommands.js";
+import { maybeNotifyUpdate } from "./utils/updateNotifier.js";
 import { CLI_VERSION } from "./utils/version.js";
 
 export function createCliProgram(): Command {
@@ -147,10 +148,24 @@ export function createCliProgram(): Command {
 }
 
 if (isMainModule()) {
-  createCliProgram().parseAsync(process.argv).catch((error: unknown) => {
+  runCli(process.argv).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`${pc.red(`Error: ${message}`)}\n`);
     process.exitCode = 1;
+  });
+}
+
+export async function runCli(argv: string[] = process.argv): Promise<void> {
+  const commandArgs = argv.slice(2);
+  await createCliProgram().parseAsync(argv);
+  await maybeNotifyUpdate({
+    currentVersion: CLI_VERSION,
+    packageName: "naar-cli",
+    commandArgs,
+    jsonMode: commandArgs.includes("--json"),
+    nonInteractive: commandArgs.includes("--non-interactive")
+      || commandArgs.includes("--yes")
+      || isTruthyEnvFlag(process.env.CI)
   });
 }
 
@@ -238,4 +253,9 @@ function isMainModule(): boolean {
   const entry = process.argv[1];
   if (!entry) return false;
   return path.resolve(entry) === fileURLToPath(import.meta.url);
+}
+
+function isTruthyEnvFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
