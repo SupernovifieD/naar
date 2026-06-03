@@ -62,9 +62,9 @@ export function renderSearchResults(options: SearchRenderOptions): string {
 
   for (const [index, result] of options.results.entries()) {
     if (options.compact) {
-      appendCompactResult(lines, result, query, columns);
+      appendCompactResult(lines, result, columns);
     } else {
-      appendFullResult(lines, result, query, columns, options.verbose === true);
+      appendFullResult(lines, result, columns, options.verbose === true);
     }
 
     if (index < options.results.length - 1) {
@@ -75,13 +75,13 @@ export function renderSearchResults(options: SearchRenderOptions): string {
   return `${lines.join("\n")}\n`;
 }
 
-export function toSearchJsonResult(result: SearchRankedCandidate, query: string): object {
+export function toSearchJsonResult(result: SearchRankedCandidate): object {
   return {
     candidate: result.candidate,
     searchScore: result.score,
     exact: result.exact,
     reasons: result.reasons,
-    install: formatInstallInfo(result.candidate, query)
+    install: formatInstallInfo(result.candidate)
   };
 }
 
@@ -94,18 +94,17 @@ export function providerResultsToSearchSummaries(providerResults: SkillProviderR
   }));
 }
 
-export function formatInstallInfo(candidate: SkillCandidate, query: string): SearchInstallInfo {
+export function formatInstallInfo(candidate: SkillCandidate): SearchInstallInfo {
   const from = `${candidate.source.providerId}:${candidate.providerSkillId}`;
   return {
     from,
-    command: `naar search ${shellQuote(query)} --install --from ${shellQuote(from)}`
+    command: `naar install ${shellQuote(from)}`
   };
 }
 
 function appendFullResult(
   lines: string[],
   result: SearchRankedCandidate,
-  query: string,
   columns: number,
   verbose: boolean
 ): void {
@@ -130,7 +129,7 @@ function appendFullResult(
     lines.push(`${pc.blue("Page")}: ${pc.cyan(pageUrl)}`);
   }
 
-  const install = formatInstallInfo(candidate, query);
+  const install = formatInstallInfo(candidate);
   lines.push(`${pc.blue("Install")}: ${pc.cyan(install.command)}`);
 
   if (verbose) {
@@ -153,7 +152,6 @@ function appendFullResult(
 function appendCompactResult(
   lines: string[],
   result: SearchRankedCandidate,
-  query: string,
   columns: number
 ): void {
   const candidate = result.candidate;
@@ -169,7 +167,7 @@ function appendCompactResult(
     resolveSkillPageUrl(candidate)
   ].filter((value): value is string => Boolean(value));
   lines.push(`  ${pc.dim(metadata.join(" · "))}`);
-  lines.push(`  ${pc.blue("install")}: ${pc.cyan(formatInstallInfo(candidate, query).command)}`);
+  lines.push(`  ${pc.blue("install")}: ${pc.cyan(formatInstallInfo(candidate).command)}`);
 }
 
 function appendProviderDiagnostics(

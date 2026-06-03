@@ -2,14 +2,14 @@ import type { CliFlags, RepoFacts, SkillRecommendation, SkillProviderResult } fr
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const buildRecommendationsMock = vi.hoisted(() => vi.fn());
-const runInstallFlowMock = vi.hoisted(() => vi.fn());
+const runInstallFlowFromRecommendationsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/commands/pipeline.js", () => ({
   buildRecommendations: buildRecommendationsMock
 }));
 
 vi.mock("../../src/commands/installFlow.js", () => ({
-  runInstallFlow: runInstallFlowMock
+  runInstallFlowFromRecommendations: runInstallFlowFromRecommendationsMock
 }));
 
 vi.mock("ora", () => ({
@@ -161,8 +161,8 @@ function stripAnsi(value: string): string {
 
 beforeEach(() => {
   buildRecommendationsMock.mockReset();
-  runInstallFlowMock.mockReset();
-  runInstallFlowMock.mockResolvedValue(undefined);
+  runInstallFlowFromRecommendationsMock.mockReset();
+  runInstallFlowFromRecommendationsMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {

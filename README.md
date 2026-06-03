@@ -61,7 +61,7 @@ npx -y naar-cli@latest go
 | `naar scan` | Prints structured repository facts. | You want to inspect what Naar detects. | `naar scan --json` |
 | `naar recommend` | Ranks matching skills from providers. | You want recommendations without installing yet. | `naar recommend --compact` |
 | `naar search <query>` | Searches provider catalogs directly without repo scanning. | You already know roughly what skill you want. | `naar search "github actions"` |
-| `naar install` | Installs selected skills with preview and confirmation. | You already know what to install or want a dry run. | `naar install --dry-run` |
+| `naar install <refs...>` | Installs explicit provider skill refs with preview and confirmation. | You already know what to install or want a dry run. | `naar install clawhub:ui-ux --dry-run` |
 | `naar list` | Lists skills Naar has installed in the repository. | You want to audit installed skills and locations. | `naar list` |
 | `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
 | `naar config` | Views or updates Naar config for the repo. | You want default providers, targets, or score settings. | `naar config --json` |
@@ -104,7 +104,7 @@ naar recommend --compact
 Preview installation without writing:
 
 ```bash
-naar install --dry-run
+naar install clawhub:ui-ux --dry-run
 ```
 
 JSON output for automation:
@@ -140,16 +140,17 @@ naar search "brewpage" --json
 naar search "brewpage" --include-installed
 ```
 
-Search is discovery-only by default, similar to `npm search`. Naar shows related skills from configured providers in a compact list and does not prompt for installation unless `--install` is passed. Search mode does not run repo scanning, repo-need inference, recommendation scoring, or recommendation storage.
+Search is discovery-only, similar to `npm search`. Naar shows related skills from configured providers in a compact list and prints a direct install command for each skill. Search mode does not run repo scanning, repo-need inference, recommendation scoring, recommendation storage, or installation.
 
-Direct install from arbitrary provider references is planned. For now, install from search results with `--install`; the result list prints the exact command for each skill:
+Install explicit provider references with `naar install`:
 
 ```bash
-naar search "brewpage" --install --from clawhub:brewpage
-naar search "brewpage" --install --provider clawhub --target codex_repo_skills --apply --yes --non-interactive
+naar install clawhub:brewpage
+naar install clawhub:brewpage@1.0.0
+naar install clawhub:brewpage --target codex_repo_skills --apply --yes --non-interactive
 ```
 
-Search installs still use the safe install flow: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all apply. Ambiguous fuzzy results are not auto-installed in automation. Re-run with a more specific query or use `--from <provider:skill@version>`.
+Direct installs still use the safe install flow: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all apply. Standalone `naar install` never scans the repository, builds recommendations, reads recommendation storage, or falls back to search results.
 
 ## Flags and Options
 
@@ -161,8 +162,6 @@ Search installs still use the safe install flow: fetched-bundle security analysi
 | `--provider <id>` | Limit provider discovery to one or more provider ids. Repeatable. |
 | `--target <id>` | Limit recommendation or install behavior to one or more assistant targets. Accepts aliases such as `claude` and full target ids. Repeatable. |
 | `--all-compatible` | Select all compatible unblocked recommendations in automated flows. |
-| `--from <provider:skill@version>` | Select a provider skill reference from the current recommendation or search result set. |
-| `--from-plan <file>` | Load install selections from a plan JSON file. |
 | `--history <true\|false>` | Enable or disable local lifecycle history for this invocation. |
 
 ### Output and Automation
@@ -182,6 +181,7 @@ Search installs still use the safe install flow: fetched-bundle security analysi
 | `--apply` | Apply writes in non-interactive or JSON modes. Use intentionally. |
 | `--yes` | Skip ordinary confirmation prompts. Does not silently bypass post-fetch security concerns. |
 | `--force` | Allow overwrite on install conflicts. Review carefully before using. |
+| `--reinstall` | Reinstall an already-installed skill. Without this, direct install skips installed provider refs. |
 
 ### Safety Controls
 

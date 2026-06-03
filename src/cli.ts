@@ -60,36 +60,33 @@ export function createCliProgram(): Command {
       await runRecommend(flags);
     }));
 
-  applySharedOptions(program
+  applySearchOptions(program
     .command("search <query...>")
     .alias("s")
     .description("Search provider catalogs for skills")
     .option("--include-installed", "Include already-installed skills in search results")
-    .option("--install", "Install selected search result through the safe install flow")
     .option("--limit <n>", "Maximum number of search results to display", parseSearchLimit)
     .option("--all", "Show all meaningful search results")
     .action(async (queryParts: string[], _opts, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
       const opts = cmd.optsWithGlobals() as {
         includeInstalled?: boolean;
-        install?: boolean;
         limit?: number;
         all?: boolean;
       };
       await runSearch(flags, queryParts.join(" "), {
         includeInstalled: opts.includeInstalled === true,
-        install: opts.install === true,
         limit: opts.limit,
         all: opts.all === true
       });
     }));
 
   applySharedOptions(program
-    .command("install")
-    .description("Install selected skills with preview and confirmation")
-    .action(async (_args, cmd) => {
+    .command("install [refs...]")
+    .description("Install explicit provider skill refs with preview and confirmation")
+    .action(async (refs: string[], _opts, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
-      await runInstall(flags);
+      await runInstall(flags, refs ?? []);
     }));
 
   applySharedOptions(program
@@ -192,12 +189,21 @@ function applySharedOptions(command: Command): Command {
     .option("--dry-run", "Preview only, no writes")
     .option("--all-compatible", "Install all compatible unblocked recommendations")
     .option("--force", "Allow overwrite on install conflicts")
-    .option("--from <provider:skill@version>", "Install a specific provider skill reference")
-    .option("--from-plan <file>", "Load install selections from plan JSON")
+    .option("--reinstall", "Reinstall skills that are already installed")
     .option("--history <true|false>", "Enable or disable local lifecycle history for this invocation", parseHistoryBooleanOption)
     .option("--no-scripts", "Disallow script-bearing skills")
     .option("--allow-scripts", "Allow script-bearing skills (unsafe)")
     .option("--allow-risky", "Acknowledge risky security concerns; required for non-interactive concern overrides (unsafe)");
+}
+
+function applySearchOptions(command: Command): Command {
+  return command
+    .option("--repo <path>", "Repository path", process.cwd())
+    .option("--provider <id>", "Provider id (repeatable)", collectOption, [])
+    .option("--target <id>", "Target id for provider compatibility hints (repeatable)", collectOption, [])
+    .option("--json", "Emit JSON output")
+    .option("--compact", "Compact search output")
+    .option("--verbose", "Verbose output");
 }
 
 function colorizeCommanderOutput(content: string): string {

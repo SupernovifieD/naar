@@ -46,8 +46,7 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     verbose: Boolean(raw.verbose),
     allCompatible: Boolean(raw.allCompatible),
     history: coerceOptionalBoolean(raw.history),
-    from: typeof raw.from === "string" ? raw.from : undefined,
-    fromPlan: typeof raw.fromPlan === "string" ? raw.fromPlan : undefined
+    reinstall: Boolean(raw.reinstall)
   };
 }
 

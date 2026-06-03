@@ -191,6 +191,8 @@ export function renderRecommendationCard(
         value: pageUrl
       });
     }
+
+    lines.push(`${indent}${pc.blue("Install")}: ${pc.cyan(formatSkillInstallCommand(recommendation.candidate))}`);
   }
 
   const reasons = (recommendation.reasons ?? []).slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
@@ -421,6 +423,16 @@ function appendUrlField(
 ): void {
   const displayLabel = toDisplayLabel(options.label);
   lines.push(`${options.indent}${pc.blue(displayLabel)}: ${pc.cyan(options.value)}`);
+}
+
+function formatSkillInstallCommand(candidate: SkillCandidate): string {
+  const ref = `${candidate.source.providerId}:${candidate.providerSkillId}`;
+  return `naar install ${shellQuote(ref)}`;
+}
+
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@+-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function appendWrappedReasonsField(

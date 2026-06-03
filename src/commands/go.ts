@@ -3,7 +3,7 @@ import ora from "ora";
 import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
 import { buildRecommendations, type PipelinePhaseEvent } from "./pipeline.js";
-import { runInstallFlow } from "./installFlow.js";
+import { runInstallFlowFromRecommendations } from "./installFlow.js";
 import { printJson } from "../utils/json.js";
 import { CLI_VERSION } from "../utils/version.js";
 import {
@@ -30,14 +30,22 @@ export async function runGo(flags: CliFlags): Promise<void> {
     if (flags.apply === false) {
       return;
     }
-    await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
+    await runInstallFlowFromRecommendations(flags, pipeline.recommendations, {
+      repoFacts: pipeline.repoFacts,
+      source: "go",
+      printHeader: true
+    });
     return;
   }
 
   const progress = createGoProgressRenderer(repoRoot, flags);
-  await buildRecommendations(repoRoot, flags, { onPhase: (event) => progress(event) });
+  const pipeline = await buildRecommendations(repoRoot, flags, { onPhase: (event) => progress(event) });
 
-  await runInstallFlow(flags, { forceFreshRecommendations: false, printHeader: true });
+  await runInstallFlowFromRecommendations(flags, pipeline.recommendations, {
+    repoFacts: pipeline.repoFacts,
+    source: "go",
+    printHeader: true
+  });
 }
 
 function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: PipelinePhaseEvent) => void {
