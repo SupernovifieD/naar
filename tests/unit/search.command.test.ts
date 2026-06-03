@@ -13,6 +13,10 @@ const loadScanCacheMock = vi.hoisted(() => vi.fn());
 const saveScanCacheMock = vi.hoisted(() => vi.fn());
 const runInstallFlowFromRecommendationsMock = vi.hoisted(() => vi.fn());
 const checkboxMock = vi.hoisted(() => vi.fn());
+const oraStartMock = vi.hoisted(() => vi.fn());
+const oraSucceedMock = vi.hoisted(() => vi.fn());
+const oraFailMock = vi.hoisted(() => vi.fn());
+const oraMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/config/store.js", () => ({
   loadConfig: loadConfigMock
@@ -54,6 +58,10 @@ vi.mock("@inquirer/prompts", () => ({
   checkbox: checkboxMock
 }));
 
+vi.mock("ora", () => ({
+  default: oraMock
+}));
+
 import { runSearch } from "../../src/commands/search.js";
 
 const defaultTargets: InstallTarget[] = ["claude_project_skills", "codex_repo_skills"];
@@ -84,6 +92,11 @@ const baseFlags: CliFlags = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  oraMock.mockReturnValue({
+    start: oraStartMock.mockReturnThis(),
+    succeed: oraSucceedMock.mockReturnThis(),
+    fail: oraFailMock.mockReturnThis()
+  });
   runInstallFlowFromRecommendationsMock.mockResolvedValue(undefined);
   loadConfigMock.mockResolvedValue(config);
   buildProvidersMock.mockReturnValue([{ id: "anthropic" }, { id: "clawhub" }]);
@@ -118,6 +131,9 @@ describe("runSearch", () => {
       targets: defaultTargets,
       limit: 200
     }));
+    expect(oraMock).toHaveBeenCalledWith("Searching providers for \"brewpage\"");
+    expect(oraStartMock).toHaveBeenCalledTimes(1);
+    expect(oraSucceedMock).toHaveBeenCalledWith("Search complete");
     expect(scanRepoMock).not.toHaveBeenCalled();
     expect(recommendSkillsMock).not.toHaveBeenCalled();
     expect(loadRecommendationCacheMock).not.toHaveBeenCalled();
@@ -152,6 +168,7 @@ describe("runSearch", () => {
     expect(parsed.results[0].reasons[0]).toContain("Search query");
     expect(parsed.results[0].install.from).toBe("anthropic:brewpage");
     expect(parsed.results[0].install.command).toBe("naar search brewpage --install --from anthropic:brewpage");
+    expect(oraMock).not.toHaveBeenCalled();
   });
 
   it("filters already-installed skills by default", async () => {

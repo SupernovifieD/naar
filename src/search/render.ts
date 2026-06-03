@@ -164,7 +164,7 @@ function appendCompactResult(
 
   const metadata = [
     candidate.metadata.publisher ?? candidate.source.publisher ?? candidate.source.providerId,
-    formatLicense(candidate),
+    colorLicense(candidate),
     formatUpdated(candidate.metadata.lastUpdatedIso),
     resolveSkillPageUrl(candidate)
   ].filter((value): value is string => Boolean(value));
@@ -203,15 +203,17 @@ function appendProviderDiagnostics(
 function formatMetadataLine(candidate: SkillCandidate): string {
   const fields = [
     `${pc.blue("Publisher")}: ${pc.white(candidate.metadata.publisher ?? candidate.source.publisher ?? candidate.source.providerId)}`,
-    `${pc.blue("License")}: ${pc.white(formatLicense(candidate))}`,
+    `${pc.blue("License")}: ${colorLicense(candidate)}`,
     `${pc.blue("Updated")}: ${pc.white(formatUpdated(candidate.metadata.lastUpdatedIso) ?? "unknown")}`
   ];
   return fields.join(pc.dim("   "));
 }
 
-function formatLicense(candidate: SkillCandidate): string {
+function colorLicense(candidate: SkillCandidate): string {
   const license = candidate.metadata.license?.trim();
-  return license && license.length > 0 ? license : "No license declared";
+  return license && license.length > 0
+    ? pc.white(license)
+    : pc.yellow("No license declared");
 }
 
 function formatUpdated(value: string | undefined): string | undefined {

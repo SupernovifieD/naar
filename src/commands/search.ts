@@ -1,4 +1,5 @@
 import { checkbox } from "@inquirer/prompts";
+import ora from "ora";
 import { loadConfig } from "../config/store.js";
 import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
 import { buildProviders, queryProviders } from "../providers/orchestrator.js";
@@ -38,12 +39,20 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
   const selectedTargets: InstallTarget[] = flags.target.length > 0 ? flags.target : config.defaultTargets;
   const providers = buildProviders(providerIds);
 
-  const providerResults = await queryProviders(providers, {
-    mode: "search",
-    term: normalizedQuery,
-    targets: selectedTargets,
-    limit: PROVIDER_SEARCH_LIMIT
-  });
+  const spinner = flags.json ? null : ora(`Searching providers for "${normalizedQuery}"`).start();
+  let providerResults: Awaited<ReturnType<typeof queryProviders>>;
+  try {
+    providerResults = await queryProviders(providers, {
+      mode: "search",
+      term: normalizedQuery,
+      targets: selectedTargets,
+      limit: PROVIDER_SEARCH_LIMIT
+    });
+    spinner?.succeed("Search complete");
+  } catch (error) {
+    spinner?.fail("Search failed");
+    throw error;
+  }
 
   const installedIds = options.includeInstalled === true
     ? new Set<string>()
