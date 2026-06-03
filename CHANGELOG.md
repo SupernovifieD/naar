@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-06-03
+
+### Added
+- Added provider catalog search with `naar search <query>`, including JSON output and compact npm-like discovery rendering.
+- Added direct provider-ref installs with `naar install <provider:skill>` and `naar install <provider:skill@version>`.
+- Added explicit ref parsing/resolution for standalone installs, including validation for malformed refs and clear unknown-provider errors.
+- Added `--reinstall` for reinstalling already-installed provider refs without changing normal safety checks.
+- Added skill page links in recommendation cards and search results when providers expose a canonical skill URL.
+- Added lifecycle-aware local history that tracks current installed state alongside install/uninstall events across projects.
+
+### Changed
+- Simplified the command model so `search` is discovery-only, `install` installs only explicit provider refs, and `go` remains the guided scan/recommend/install flow.
+- Removed recommendation-backed fallback behavior from standalone `naar install`; direct installs no longer scan the repo, build recommendations, read recommendation cache, or depend on search selection paths.
+- Updated `go` to build recommendations once and hand the selected results into the shared install engine instead of re-entering recommendation loading during install.
+- Improved search presentation with fetch-time spinner feedback, npm-like result formatting, highlighted missing-license output, and direct install commands in rendered results.
+- Refined local history into a lifecycle model that preserves current installed state, uninstall history, current-vs-ever-used summaries, and recent activity views.
+
+### Docs
+- Added Naar logotype artwork to the README and refreshed search/install guidance around the new direct-install command model.
+- Updated maintainer release guidance and user-facing examples to match the current search/install split.
+
 ## [0.3.0] - 2026-06-03
 
 ### Added
