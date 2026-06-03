@@ -1,6 +1,16 @@
-# Naar
+# Naar — Skill Package Manager
 
-**Repo-aware skill discovery and installation for AI coding assistants.**
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/naar-logotype-light.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/naar-logotype-dark.png">
+    <img src="docs/assets/naar-logotype-dark.png" alt="Naar" width="520">
+  </picture>
+</p>
+
+<p align="center">
+  <strong>Repo-aware skill discovery and installation for AI coding assistants</strong>
+</p>
 
 Naar is a CLI and package manager for AI-agent skills. It scans your repository, understands your stack and assistant setup, recommends relevant skills from providers, explains security risk, previews file changes, and installs only what you approve.
 
