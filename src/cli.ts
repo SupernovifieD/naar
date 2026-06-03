@@ -66,12 +66,21 @@ export function createCliProgram(): Command {
     .description("Search provider catalogs for skills")
     .option("--include-installed", "Include already-installed skills in search results")
     .option("--install", "Install selected search result through the safe install flow")
+    .option("--limit <n>", "Maximum number of search results to display", parseSearchLimit)
+    .option("--all", "Show all meaningful search results")
     .action(async (queryParts: string[], _opts, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
-      const opts = cmd.optsWithGlobals() as { includeInstalled?: boolean; install?: boolean };
+      const opts = cmd.optsWithGlobals() as {
+        includeInstalled?: boolean;
+        install?: boolean;
+        limit?: number;
+        all?: boolean;
+      };
       await runSearch(flags, queryParts.join(" "), {
         includeInstalled: opts.includeInstalled === true,
-        install: opts.install === true
+        install: opts.install === true,
+        limit: opts.limit,
+        all: opts.all === true
       });
     }));
 
@@ -156,6 +165,14 @@ function parseIntOption(value: string): number {
   const n = Number.parseInt(value, 10);
   if (Number.isNaN(n)) {
     throw new Error(`Invalid integer value: ${value}`);
+  }
+  return n;
+}
+
+function parseSearchLimit(value: string): number {
+  const n = parseIntOption(value);
+  if (n < 1) {
+    throw new Error(`Search limit must be greater than 0: ${value}`);
   }
   return n;
 }

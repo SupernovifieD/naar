@@ -2,8 +2,12 @@ import type { SkillCandidate } from "../types/index.js";
 import { toProviderScopedId } from "../installer/state.js";
 import type { SearchRankedCandidate } from "./types.js";
 
-const MAX_FUZZY_RESULTS = 3;
 const MIN_MEANINGFUL_SCORE = 18;
+
+export interface SearchRankOptions {
+  limit?: number;
+  all?: boolean;
+}
 
 interface CandidateSearchText {
   name: string;
@@ -16,7 +20,11 @@ interface CandidateSearchText {
   publisher: string;
 }
 
-export function rankSearchCandidates(candidates: SkillCandidate[], query: string): SearchRankedCandidate[] {
+export function rankSearchCandidates(
+  candidates: SkillCandidate[],
+  query: string,
+  options: SearchRankOptions = {}
+): SearchRankedCandidate[] {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return [];
 
@@ -27,12 +35,11 @@ export function rankSearchCandidates(candidates: SkillCandidate[], query: string
     .filter((result) => result.score >= MIN_MEANINGFUL_SCORE || result.exact)
     .sort(compareRankedCandidates);
 
-  const exact = ranked.filter((result) => result.exact);
-  if (exact.length === 1) {
-    return exact;
+  if (options.all === true || typeof options.limit !== "number") {
+    return ranked;
   }
 
-  return ranked.slice(0, MAX_FUZZY_RESULTS);
+  return ranked.slice(0, Math.max(0, options.limit));
 }
 
 export function filterCandidatesForSearchTerm(candidates: SkillCandidate[], query: string, limit?: number): SkillCandidate[] {
@@ -56,7 +63,7 @@ export function tokenizeSearchText(value: string | undefined): string[] {
 
 function scoreCandidate(candidate: SkillCandidate, normalizedQuery: string, queryTokens: string[]): SearchRankedCandidate {
   const text = candidateSearchText(candidate);
-  const reasons: string[] = [`Matched search term: "${normalizedQuery}"`];
+  const reasons: string[] = [`Search query: "${normalizedQuery}"`];
   let score = 0;
   let exact = false;
 

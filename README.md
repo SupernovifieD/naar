@@ -124,20 +124,22 @@ naar search "github actions"
 naar s brewpage
 naar search "brewpage" --provider clawhub
 naar search "brewpage" --target claude_project_skills
+naar search "github actions" --limit 10
+naar search "design" --all
 naar search "brewpage" --json
 naar search "brewpage" --include-installed
-naar search "brewpage" --install
 ```
 
-Naar shows one exact match or up to three close matches from your configured providers. Search mode does not run repo scanning, repo-need inference, recommendation scoring, or recommendation storage. It is useful when you already know roughly what skill you want.
+Search is discovery-only by default, similar to `npm search`. Naar shows related skills from configured providers in a compact list and does not prompt for installation unless `--install` is passed. Search mode does not run repo scanning, repo-need inference, recommendation scoring, or recommendation storage.
 
-Use `--install` to install selected search results through the same safe install flow as `naar install`: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all still apply. Automated search installs must be explicit, for example:
+Direct install from arbitrary provider references is planned. For now, install from search results with `--install`; the result list prints the exact command for each skill:
 
 ```bash
+naar search "brewpage" --install --from clawhub:brewpage
 naar search "brewpage" --install --provider clawhub --target codex_repo_skills --apply --yes --non-interactive
 ```
 
-Ambiguous fuzzy results are not auto-installed in automation. Re-run with a more specific query or use `--from <provider:skill@version>`.
+Search installs still use the safe install flow: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all apply. Ambiguous fuzzy results are not auto-installed in automation. Re-run with a more specific query or use `--from <provider:skill@version>`.
 
 ## Flags and Options
 
@@ -149,7 +151,7 @@ Ambiguous fuzzy results are not auto-installed in automation. Re-run with a more
 | `--provider <id>` | Limit provider discovery to one or more provider ids. Repeatable. |
 | `--target <id>` | Limit recommendation or install behavior to one or more assistant targets. Accepts aliases such as `claude` and full target ids. Repeatable. |
 | `--all-compatible` | Select all compatible unblocked recommendations in automated flows. |
-| `--from <provider:skill@version>` | Install a specific provider skill reference. |
+| `--from <provider:skill@version>` | Select a provider skill reference from the current recommendation or search result set. |
 | `--from-plan <file>` | Load install selections from a plan JSON file. |
 | `--history <true\|false>` | Enable or disable local lifecycle history for this invocation. |
 

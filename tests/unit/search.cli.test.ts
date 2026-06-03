@@ -11,6 +11,8 @@ describe("search CLI registration", () => {
     expect(command?.description()).toBe("Search provider catalogs for skills");
     expect(command?.helpInformation()).toContain("--include-installed");
     expect(command?.helpInformation()).toContain("--install");
+    expect(command?.helpInformation()).toContain("--limit <n>");
+    expect(command?.helpInformation()).toContain("--all");
   });
 
   it("exposes the s alias on the main program", () => {

@@ -100,14 +100,23 @@ describe("runSearch", () => {
     });
 
     expect(output).toContain("Search results for \"brewpage\"");
-    expect(output).toContain("BrewPage Publish [anthropic]");
-    expect(output).toContain("Search match:");
+    expect(output).toContain("brewpage  [anthropic]");
+    expect(output).toContain("Publisher: anthropic");
+    expect(output).toContain("License: MIT");
+    expect(output).toContain("Page: https://example.com/anthropic/brewpage");
+    expect(output).toContain("Install: naar search brewpage --install --from anthropic:brewpage");
+    expect(output).not.toContain("Search match:");
     expect(output).not.toContain("Match score:");
+    expect(output).not.toContain("Pre-fetch risk estimate:");
+    expect(output).not.toContain("Status:");
+    expect(output).not.toContain("Eligibility:");
+    expect(output).not.toContain("Providers:");
+    expect(output).not.toContain("--------------------------------------------------------------------------------");
     expect(queryProvidersMock).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
       mode: "search",
       term: "brewpage",
       targets: defaultTargets,
-      limit: 80
+      limit: 200
     }));
     expect(scanRepoMock).not.toHaveBeenCalled();
     expect(recommendSkillsMock).not.toHaveBeenCalled();
@@ -122,13 +131,27 @@ describe("runSearch", () => {
     const output = await captureStdout(async () => {
       await runSearch({ ...baseFlags, json: true }, "brewpage");
     });
-    const parsed = JSON.parse(output) as { query: string; results: Array<{ searchScore: number; exact: boolean; reasons: string[] }> };
+    const parsed = JSON.parse(output) as {
+      query: string;
+      limit: number;
+      totalResults: number;
+      results: Array<{
+        searchScore: number;
+        exact: boolean;
+        reasons: string[];
+        install: { from: string; command: string };
+      }>;
+    };
 
     expect(parsed.query).toBe("brewpage");
+    expect(parsed.limit).toBe(20);
+    expect(parsed.totalResults).toBe(1);
     expect(parsed.results).toHaveLength(1);
     expect(parsed.results[0].exact).toBe(true);
     expect(parsed.results[0].searchScore).toBeGreaterThan(90);
-    expect(parsed.results[0].reasons[0]).toContain("Matched search term");
+    expect(parsed.results[0].reasons[0]).toContain("Search query");
+    expect(parsed.results[0].install.from).toBe("anthropic:brewpage");
+    expect(parsed.results[0].install.command).toBe("naar search brewpage --install --from anthropic:brewpage");
   });
 
   it("filters already-installed skills by default", async () => {
@@ -176,10 +199,10 @@ describe("runSearch", () => {
       await runSearch(baseFlags, "brewpage", { includeInstalled: true });
     });
 
-    expect(output).toContain("BrewPage Publish [anthropic]");
+    expect(output).toContain("brewpage  [anthropic]");
   });
 
-  it("shows provider warnings while keeping successful results", async () => {
+  it("hides provider warnings and summaries by default when results are available", async () => {
     queryProvidersMock.mockResolvedValue([
       makeProviderResult("anthropic", [], ["Anthropic failed"]),
       makeProviderResult("clawhub", [makeCandidate("brewpage", { source: { providerId: "clawhub", publisher: "clawhub" } })])
@@ -189,9 +212,28 @@ describe("runSearch", () => {
       await runSearch(baseFlags, "brewpage");
     });
 
-    expect(output).toContain("Provider notes");
+    expect(output).not.toContain("Provider notes");
+    expect(output).not.toContain("Anthropic failed");
+    expect(output).not.toContain("Providers:");
+    expect(output).toContain("brewpage  [clawhub]");
+  });
+
+  it("shows provider summaries and notes in verbose mode", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("anthropic", [], ["Anthropic failed"]),
+      makeProviderResult("clawhub", [makeCandidate("brewpage", { source: { providerId: "clawhub", publisher: "clawhub" } })])
+    ]);
+
+    const output = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, verbose: true }, "brewpage");
+    });
+
+    expect(output).toContain("Providers:");
+    expect(output).toContain("- anthropic mode=test candidates=0");
+    expect(output).toContain("Provider notes:");
     expect(output).toContain("Anthropic failed");
-    expect(output).toContain("brewpage [clawhub]");
+    expect(output).toContain("Search match: 100%");
+    expect(output).toContain("Reasons:");
   });
 
   it("shows a clear no-result message when all providers fail", async () => {
@@ -219,6 +261,90 @@ describe("runSearch", () => {
     expect(queryProvidersMock).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
       targets: ["claude_project_skills"]
     }));
+  });
+
+  it("uses the default display limit of 20 results", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("anthropic", Array.from({ length: 25 }, (_, index) =>
+        makeCandidate(`design-${String(index + 1).padStart(2, "0")}`, {
+          name: `Design ${index + 1}`,
+          summary: "Design system guidance",
+          tags: ["design"]
+        })
+      ))
+    ]);
+
+    const output = await captureStdout(async () => {
+      await runSearch(baseFlags, "design");
+    });
+
+    expect(output).toContain("Showing 20 of 25 matches");
+    expect((output.match(/Install: /g) ?? []).length).toBe(20);
+  });
+
+  it("honors --limit for display and JSON output", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("anthropic", Array.from({ length: 8 }, (_, index) =>
+        makeCandidate(`publish-${index + 1}`, {
+          name: `Publish ${index + 1}`,
+          summary: "Publish workflow helper",
+          tags: ["publish"]
+        })
+      ))
+    ]);
+
+    const textOutput = await captureStdout(async () => {
+      await runSearch(baseFlags, "publish", { limit: 5 });
+    });
+    expect(textOutput).toContain("Showing 5 of 8 matches");
+    expect(textOutput).toContain("publish-5");
+    expect(textOutput).not.toContain("publish-6");
+
+    const jsonOutput = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, json: true }, "publish", { limit: 5 });
+    });
+    const parsed = JSON.parse(jsonOutput) as { limit: number; totalResults: number; results: unknown[] };
+    expect(parsed.limit).toBe(5);
+    expect(parsed.totalResults).toBe(8);
+    expect(parsed.results).toHaveLength(5);
+  });
+
+  it("honors --all for display and JSON output", async () => {
+    queryProvidersMock.mockResolvedValue([
+      makeProviderResult("anthropic", Array.from({ length: 22 }, (_, index) =>
+        makeCandidate(`actions-${index + 1}`, {
+          name: `GitHub Actions ${index + 1}`,
+          summary: "GitHub Actions workflow helper",
+          tags: ["github", "actions"]
+        })
+      ))
+    ]);
+
+    const textOutput = await captureStdout(async () => {
+      await runSearch(baseFlags, "github actions", { all: true });
+    });
+    expect(textOutput).not.toContain("Showing 20 of");
+    expect(textOutput).toContain("actions-22");
+
+    const jsonOutput = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, json: true }, "github actions", { all: true });
+    });
+    const parsed = JSON.parse(jsonOutput) as { limit: null; all: boolean; totalResults: number; results: unknown[] };
+    expect(parsed.limit).toBeNull();
+    expect(parsed.all).toBe(true);
+    expect(parsed.totalResults).toBe(22);
+    expect(parsed.results).toHaveLength(22);
+  });
+
+  it("uses compact search result blocks", async () => {
+    const output = await captureStdout(async () => {
+      await runSearch({ ...baseFlags, compact: true }, "brewpage");
+    });
+
+    expect(output).toContain("brewpage [anthropic] - Searchable skill description");
+    expect(output).toContain("anthropic · MIT");
+    expect(output).toContain("install: naar search brewpage --install --from anthropic:brewpage");
+    expect(output).not.toContain("Targets:");
   });
 
   it("skips JSON search installation without explicit apply and yes confirmation", async () => {
@@ -336,7 +462,12 @@ function makeCandidate(id: string, overrides: Partial<SkillCandidate> = {}): Ski
     providerSkillId: id,
     canonicalSkillId: id,
     name: id,
-    source: { providerId, publisher: providerId, ...overrides.source },
+    source: {
+      providerId,
+      publisher: providerId,
+      url: `https://example.com/${providerId}/${id}`,
+      ...overrides.source
+    },
     summary: "Searchable skill summary",
     tags: ["search"],
     compatibility: { assistants: ["claude", "codex", "generic"] },
@@ -345,6 +476,7 @@ function makeCandidate(id: string, overrides: Partial<SkillCandidate> = {}): Ski
       description: "Searchable skill description",
       trustLevel: "trusted",
       license: "MIT",
+      lastUpdatedIso: "2026-06-03T00:00:00.000Z",
       hasScripts: false,
       hasBinaries: false,
       hasPackageManifests: false,

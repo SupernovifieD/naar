@@ -1,20 +1,29 @@
 import { checkbox } from "@inquirer/prompts";
-import pc from "picocolors";
 import { loadConfig } from "../config/store.js";
 import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
 import { buildProviders, queryProviders } from "../providers/orchestrator.js";
 import type { CliFlags, InstallTarget, SkillCandidate, SkillRecommendation } from "../types/index.js";
 import { printJson } from "../utils/json.js";
-import { renderRecommendationCards, warningHeader, warningLine } from "../utils/output.js";
+import { warningLine } from "../utils/output.js";
 import { rankSearchCandidates } from "../search/rank.js";
+import {
+  providerResultsToSearchSummaries,
+  renderSearchResults,
+  toSearchJsonResult
+} from "../search/render.js";
 import { searchResultsToRecommendations } from "../search/results.js";
 import type { SearchRankedCandidate } from "../search/types.js";
 import { runInstallFlowFromRecommendations } from "./installFlow.js";
 import { resolveRepoRoot } from "./shared.js";
 
+const DEFAULT_SEARCH_DISPLAY_LIMIT = 20;
+const PROVIDER_SEARCH_LIMIT = 200;
+
 export interface SearchCommandOptions {
   includeInstalled?: boolean;
   install?: boolean;
+  limit?: number;
+  all?: boolean;
 }
 
 export async function runSearch(flags: CliFlags, query: string, options: SearchCommandOptions = {}): Promise<void> {
@@ -33,7 +42,7 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
     mode: "search",
     term: normalizedQuery,
     targets: selectedTargets,
-    limit: 80
+    limit: PROVIDER_SEARCH_LIMIT
   });
 
   const installedIds = options.includeInstalled === true
@@ -42,29 +51,34 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
   const candidates = providerResults
     .flatMap((result) => result.candidates)
     .filter((candidate) => !installedIds.has(scopedId(candidate)));
-  const ranked = rankSearchCandidates(candidates, normalizedQuery);
+  const allRanked = rankSearchCandidates(candidates, normalizedQuery);
+  const displayLimit = resolveSearchDisplayLimit(options.limit);
+  const ranked = options.all === true
+    ? allRanked
+    : allRanked.slice(0, displayLimit);
   const recommendations = searchResultsToRecommendations(ranked, selectedTargets);
   const warnings = providerResults.flatMap((result) => result.warnings ?? []);
-  const providerSummaries = providerResults.map((result) => ({
-    providerId: result.providerId,
-    mode: result.mode,
-    candidateCount: result.candidates.length,
-    warnings: result.warnings ?? []
-  }));
+  const providerSummaries = providerResultsToSearchSummaries(providerResults);
 
   if (flags.json && !options.install) {
     printJson({
       query: normalizedQuery,
+      limit: options.all === true ? null : displayLimit,
+      all: options.all === true,
+      totalResults: allRanked.length,
       providers: providerSummaries,
       warnings,
-      results: ranked.map(toJsonResult)
+      results: ranked.map((result) => toSearchJsonResult(result, normalizedQuery))
     });
     return;
   }
 
-  if (flags.json && options.install && ranked.length === 0) {
+  if (flags.json && options.install && allRanked.length === 0) {
     printJson({
       query: normalizedQuery,
+      limit: options.all === true ? null : displayLimit,
+      all: options.all === true,
+      totalResults: 0,
       providers: providerSummaries,
       warnings,
       results: [],
@@ -77,9 +91,12 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
   if (flags.json && options.install && !hasExplicitJsonInstallConfirmation(flags)) {
     printJson({
       query: normalizedQuery,
+      limit: options.all === true ? null : displayLimit,
+      all: options.all === true,
+      totalResults: allRanked.length,
       providers: providerSummaries,
       warnings,
-      results: ranked.map(toJsonResult),
+      results: ranked.map((result) => toSearchJsonResult(result, normalizedQuery)),
       installSkipped: true,
       installSkippedDueToMissingConfirmation: true,
       error: "Search installation in JSON mode requires --apply and --yes."
@@ -92,9 +109,12 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
     if (!selected.ok) {
       printJson({
         query: normalizedQuery,
+        limit: options.all === true ? null : displayLimit,
+        all: options.all === true,
+        totalResults: allRanked.length,
         providers: providerSummaries,
         warnings,
-        results: ranked.map(toJsonResult),
+        results: ranked.map((result) => toSearchJsonResult(result, normalizedQuery)),
         installSkipped: true,
         error: selected.error
       });
@@ -107,37 +127,19 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
     return;
   }
 
-  if (warnings.length > 0) {
-    process.stdout.write(`\n${warningHeader("Provider notes")}:\n`);
-    for (const warning of warnings) {
-      process.stdout.write(`- ${warningLine(warning)}\n`);
-    }
-  }
-
-  if (providerSummaries.length > 0) {
-    process.stdout.write(`\n${pc.bold("Providers")}:\n`);
-    for (const provider of providerSummaries) {
-      const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
-      process.stdout.write(
-        `- ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}\n`
-      );
-    }
-  }
-
-  if (ranked.length === 0) {
-    process.stdout.write(`\n${warningLine(`No skills found for "${normalizedQuery}".`)}\n`);
-    process.stdout.write(`Try a broader term or search a specific provider with ${pc.cyan("--provider <id>")}.\n`);
-    return;
-  }
-
-  process.stdout.write(`\n${pc.bold(`Search results for "${normalizedQuery}"`)}:\n`);
-  process.stdout.write(renderRecommendationCards(recommendations, {
-    indent: "  ",
-    reasonLimit: 3,
+  process.stdout.write(renderSearchResults({
+    query: normalizedQuery,
+    results: ranked,
+    totalResults: allRanked.length,
+    limit: options.all === true ? undefined : displayLimit,
+    all: options.all === true,
     compact: flags.compact,
     verbose: flags.verbose,
-    scoreLabel: "Search match"
+    providerSummaries,
+    warnings
   }));
+
+  if (ranked.length === 0) return;
 
   if (!options.install) {
     return;
@@ -179,18 +181,16 @@ function scopedId(candidate: SkillCandidate): string {
   return candidate.providerScopedId ?? toProviderScopedId(candidate.source.providerId, candidate.providerSkillId);
 }
 
-function toJsonResult(result: SearchRankedCandidate): object {
-  return {
-    candidate: result.candidate,
-    searchScore: result.score,
-    exact: result.exact,
-    reasons: result.reasons
-  };
-}
-
 type SearchInstallSelection =
   | { ok: true; recommendations: SkillRecommendation[] }
   | { ok: false; error: string };
+
+function resolveSearchDisplayLimit(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SEARCH_DISPLAY_LIMIT;
+  }
+  return Math.max(1, Math.floor(value));
+}
 
 function hasExplicitJsonInstallConfirmation(flags: CliFlags): boolean {
   return flags.apply && flags.yes;

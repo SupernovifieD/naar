@@ -27,15 +27,16 @@ function makeCandidate(id: string, overrides: Partial<SkillCandidate> = {}): Ski
 }
 
 describe("rankSearchCandidates", () => {
-  it("returns one exact canonical id match", () => {
+  it("keeps exact canonical id match first without suppressing related matches", () => {
     const results = rankSearchCandidates([
       makeCandidate("brewpage"),
       makeCandidate("brewpage-helper", { name: "BrewPage Helper" })
     ], "brewpage");
 
-    expect(results).toHaveLength(1);
+    expect(results).toHaveLength(2);
     expect(results[0].exact).toBe(true);
     expect(results[0].candidate.canonicalSkillId).toBe("brewpage");
+    expect(results[1].candidate.canonicalSkillId).toBe("brewpage-helper");
   });
 
   it("returns one exact provider skill id match", () => {
@@ -46,6 +47,7 @@ describe("rankSearchCandidates", () => {
     expect(results).toHaveLength(1);
     expect(results[0].exact).toBe(true);
     expect(results[0].candidate.providerSkillId).toBe("brewpage");
+    expect(results[0].reasons[0]).toBe("Search query: \"brewpage\"");
   });
 
   it("returns one exact name match", () => {
@@ -58,16 +60,28 @@ describe("rankSearchCandidates", () => {
     expect(results[0].candidate.name).toBe("BrewPage Publish");
   });
 
-  it("returns at most three fuzzy matches", () => {
+  it("returns more than three fuzzy matches", () => {
+    const results = rankSearchCandidates([
+      makeCandidate("github-actions-one", { name: "GitHub Actions One" }),
+      makeCandidate("github-actions-two", { name: "GitHub Actions Two" }),
+      makeCandidate("github-actions-three", { name: "GitHub Actions Three" }),
+      makeCandidate("github-actions-four", { name: "GitHub Actions Four" }),
+      makeCandidate("github-actions-five", { name: "GitHub Actions Five" })
+    ], "github actions");
+
+    expect(results).toHaveLength(5);
+    expect(results.every((result) => result.score > 0)).toBe(true);
+  });
+
+  it("can apply an explicit limit when requested", () => {
     const results = rankSearchCandidates([
       makeCandidate("github-actions-one", { name: "GitHub Actions One" }),
       makeCandidate("github-actions-two", { name: "GitHub Actions Two" }),
       makeCandidate("github-actions-three", { name: "GitHub Actions Three" }),
       makeCandidate("github-actions-four", { name: "GitHub Actions Four" })
-    ], "github actions");
+    ], "github actions", { limit: 2 });
 
-    expect(results).toHaveLength(3);
-    expect(results.every((result) => result.score > 0)).toBe(true);
+    expect(results).toHaveLength(2);
   });
 
   it("returns no results for irrelevant queries", () => {
