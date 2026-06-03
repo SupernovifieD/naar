@@ -11,6 +11,7 @@ interface RecommendationCardRenderOptions {
   columns?: number;
   compact?: boolean;
   verbose?: boolean;
+  scoreLabel?: string;
 }
 
 type MetaFieldTone = "default" | "warning" | "danger";
@@ -160,12 +161,13 @@ export function renderRecommendationCard(
     `${indent}${pc.bold(`${rank}) ${recommendation.candidate.name}`)} ${pc.cyan(`[${recommendation.candidate.source.providerId}]`)}`
   );
   const status = resolveRecommendationStatus(recommendation);
+  const scoreLabel = options.scoreLabel ?? "Match score";
   const publisher = recommendation.candidate.metadata.publisher
     ?? recommendation.candidate.source.publisher
     ?? recommendation.candidate.source.providerId;
   lines.push(
     `${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`
-    + `   ${pc.blue("Match score")}: ${colorScore(recommendation.score, { percent: true })}`
+    + `   ${pc.blue(scoreLabel)}: ${colorScore(recommendation.score, { percent: true })}`
     + `   ${pc.blue("Pre-fetch risk estimate")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
     + `   ${pc.blue("Status")}: ${colorPreliminaryRecommendationStatus(status)}`
   );

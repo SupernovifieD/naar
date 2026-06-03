@@ -75,6 +75,7 @@ export async function buildRecommendations(
   await hooks.onPhase?.({ phase: "providers:start", providerIds });
   const providers = buildProviders(providerIds);
   const providerResults = await queryProviders(providers, {
+    mode: "recommend",
     repoFacts,
     targets: flags.target,
     limit: 200

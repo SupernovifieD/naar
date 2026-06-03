@@ -50,6 +50,7 @@ npx -y naar-cli@latest go
 | `naar go` | Runs the guided scan, recommend, select, and install flow. | You want the complete experience. | `naar go` |
 | `naar scan` | Prints structured repository facts. | You want to inspect what Naar detects. | `naar scan --json` |
 | `naar recommend` | Ranks matching skills from providers. | You want recommendations without installing yet. | `naar recommend --compact` |
+| `naar search <query>` | Searches provider catalogs directly without repo scanning. | You already know roughly what skill you want. | `naar search "github actions"` |
 | `naar install` | Installs selected skills with preview and confirmation. | You already know what to install or want a dry run. | `naar install --dry-run` |
 | `naar list` | Lists skills Naar has installed in the repository. | You want to audit installed skills and locations. | `naar list` |
 | `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
@@ -75,6 +76,13 @@ Get recommendations:
 
 ```bash
 naar recommend
+```
+
+Search provider catalogs directly:
+
+```bash
+naar search "github actions"
+naar s brewpage
 ```
 
 Compact recommendations:
@@ -106,6 +114,23 @@ Recommend for a specific assistant target:
 ```bash
 naar recommend --target claude
 ```
+
+### Search for Skills
+
+Search provider catalogs directly without scanning your repository:
+
+```bash
+naar search "github actions"
+naar s brewpage
+naar search "brewpage" --provider clawhub
+naar search "brewpage" --target claude_project_skills
+naar search "brewpage" --json
+naar search "brewpage" --include-installed
+```
+
+Naar shows one exact match or up to three close matches from your configured providers. Search mode does not run repo scanning, repo-need inference, recommendation scoring, or recommendation storage. It is useful when you already know roughly what skill you want.
+
+Installation from search results is intentionally not part of this release step; it will be added in a follow-up.
 
 ## Flags and Options
 

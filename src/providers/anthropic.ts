@@ -2,6 +2,7 @@ import { extractZipBundle } from "./bundle.js";
 import { ProviderHttpClient, ProviderHttpError } from "./http.js";
 import { buildCandidate, describeFiles, inferMetadataFromFiles, parseFrontmatter, toCanonicalSkillId } from "./normalize.js";
 import { resolveProviderRuntimeConfig } from "./runtime.js";
+import { filterCandidatesForSearchTerm } from "../search/rank.js";
 import type {
   ProviderSearchQuery,
   SkillCandidate,
@@ -72,25 +73,46 @@ export class OfficialAnthropicSkillsProvider implements SkillProvider {
 
   async search(query: ProviderSearchQuery): Promise<SkillProviderResult> {
     const warnings: string[] = [];
+    const searchMode = query.mode === "search";
+    const term = searchMode ? query.term?.trim() : undefined;
+    const limit = query.limit ?? 80;
 
     if (this.runtime.anthropic.apiKey) {
       try {
-        const apiResult = await this.searchViaApi(query.limit ?? 80);
+        const apiResult = await this.searchViaApi(limit, term);
         return {
           ...apiResult,
           warnings
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        warnings.push(`Anthropic Skills API unavailable; falling back to GitHub catalog. ${message}`);
+        warnings.push(searchMode
+          ? `Anthropic Skills API unavailable; falling back to catalog filtering. ${message}`
+          : `Anthropic Skills API unavailable; falling back to GitHub catalog. ${message}`);
+
+        if (searchMode && term) {
+          try {
+            const catalogResult = await this.searchViaApi(limit);
+            return {
+              ...catalogResult,
+              candidates: filterCandidatesForSearchTerm(catalogResult.candidates, term, limit),
+              warnings: [...warnings, ...(catalogResult.warnings ?? [])]
+            };
+          } catch {
+            // Continue to GitHub fallback below.
+          }
+        }
       }
     } else {
       warnings.push("ANTHROPIC_API_KEY not set; using Anthropic GitHub fallback catalog.");
     }
 
-    const fallback = await this.searchViaGitHub(query.limit ?? 80);
+    const fallback = await this.searchViaGitHub(limit);
     return {
       ...fallback,
+      candidates: searchMode && term
+        ? filterCandidatesForSearchTerm(fallback.candidates, term, limit)
+        : fallback.candidates,
       warnings: [...warnings, ...(fallback.warnings ?? [])]
     };
   }
@@ -112,8 +134,12 @@ export class OfficialAnthropicSkillsProvider implements SkillProvider {
     return this.fetchFilesViaGitHub(skillId);
   }
 
-  private async searchViaApi(limit: number): Promise<SkillProviderResult> {
-    const url = `${this.runtime.anthropic.baseUrl}/v1/skills?limit=${Math.max(1, Math.min(limit, 200))}`;
+  private async searchViaApi(limit: number, term?: string): Promise<SkillProviderResult> {
+    const params = new URLSearchParams({ limit: String(Math.max(1, Math.min(limit, 200))) });
+    if (term && term.trim().length > 0) {
+      params.set("search", term.trim());
+    }
+    const url = `${this.runtime.anthropic.baseUrl}/v1/skills?${params.toString()}`;
     const response = await this.http.getJson<AnthropicApiListResponse>(url, this.anthropicHeaders());
     const payload = response.data;
     const items = payload.data ?? payload.skills ?? payload.items ?? [];

@@ -132,6 +132,96 @@ describe("ClawHubProvider", () => {
     expect(result.candidates).toHaveLength(0);
   });
 
+  it("uses query.term in search mode without inferring from repo facts", async () => {
+    const pool = mockAgent.get("https://clawhub.ai");
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/search?q=brewpage&limit=10&nonSuspiciousOnly=true" })
+      .reply(200, {
+        results: [{ slug: "brewpage", displayName: "BrewPage Publish" }]
+      });
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/skills/brewpage" })
+      .reply(200, {
+        skill: {
+          slug: "brewpage",
+          displayName: "BrewPage Publish",
+          summary: "Publish BrewPage sites",
+          tags: { publish: "publish" },
+          stats: { downloads: 10, stars: 1 },
+          updatedAt: 1748000000000
+        },
+        latestVersion: { version: "1.0.0", createdAt: 1747900000000, license: "MIT" },
+        owner: { handle: "brew" },
+        moderation: { isSuspicious: false, isMalwareBlocked: false }
+      });
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/skills/brewpage/scan?version=1.0.0" })
+      .reply(200, { security: { status: "ok" } });
+
+    const provider = new ClawHubProvider();
+    const result = await provider.search({ mode: "search", term: "brewpage", repoFacts, limit: 10 });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].providerScopedId).toBe("clawhub:brewpage");
+  });
+
+  it("falls back to catalog listing when search mode endpoint fails", async () => {
+    const pool = mockAgent.get("https://clawhub.ai");
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/search?q=brewpage&limit=10&nonSuspiciousOnly=true" })
+      .reply(503, { error: "unavailable" });
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/skills?limit=10&nonSuspiciousOnly=true" })
+      .reply(200, {
+        items: [{ slug: "brewpage", displayName: "BrewPage Publish" }]
+      });
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/skills/brewpage" })
+      .reply(200, {
+        skill: {
+          slug: "brewpage",
+          displayName: "BrewPage Publish",
+          summary: "Publish BrewPage sites",
+          tags: { publish: "publish" },
+          stats: { downloads: 10, stars: 1 },
+          updatedAt: 1748000000000
+        },
+        latestVersion: { version: "1.0.0", createdAt: 1747900000000, license: "MIT" },
+        owner: { handle: "brew" },
+        moderation: { isSuspicious: false, isMalwareBlocked: false }
+      });
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/skills/brewpage/scan?version=1.0.0" })
+      .reply(200, { security: { status: "ok" } });
+
+    const provider = new ClawHubProvider();
+    const result = await provider.search({ mode: "search", term: "brewpage", limit: 10 });
+
+    expect(result.warnings?.some((warning) => warning.includes("ClawHub search failed"))).toBe(true);
+    expect(result.candidates).toHaveLength(1);
+  });
+
+  it("does not list catalog when search mode succeeds with no results", async () => {
+    const pool = mockAgent.get("https://clawhub.ai");
+
+    pool
+      .intercept({ method: "GET", path: "/api/v1/search?q=nope&limit=10&nonSuspiciousOnly=true" })
+      .reply(200, { results: [] });
+
+    const provider = new ClawHubProvider();
+    const result = await provider.search({ mode: "search", term: "nope", limit: 10 });
+
+    expect(result.warnings ?? []).toHaveLength(0);
+    expect(result.candidates).toHaveLength(0);
+  });
+
   it("fetches ZIP bundles and extracts security-relevant metadata", async () => {
     const pool = mockAgent.get("https://clawhub.ai");
 

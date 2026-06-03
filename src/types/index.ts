@@ -272,9 +272,11 @@ export interface ProviderCapabilities {
 }
 
 export interface ProviderSearchQuery {
-  repoFacts: RepoFacts;
+  repoFacts?: RepoFacts;
   targets?: InstallTarget[];
   limit?: number;
+  term?: string;
+  mode?: "recommend" | "search";
 }
 
 export interface SkillRef {

@@ -100,41 +100,47 @@ export class ClawHubProvider implements SkillProvider {
     const mode = this.runtime.clawhub.token ? "token" : "public";
     const limit = Math.max(1, Math.min(query.limit ?? 80, 200));
     const authHeaders = this.authHeaders();
-
-    const listUrl = `${this.runtime.clawhub.baseUrl}/api/v1/skills?limit=${limit}&nonSuspiciousOnly=true`;
-
-    let listItems: ClawHubListItem[] = [];
-    let nextCursor: string | undefined;
-    try {
-      const response = await this.http.getJson<ClawHubListResponse>(listUrl, authHeaders);
-      listItems = response.data.items ?? [];
-      nextCursor = response.data.nextCursor;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      warnings.push(`ClawHub list failed: ${message}`);
-      return {
-        providerId: this.id,
-        fetchedAtIso: new Date().toISOString(),
-        mode,
-        candidates: [],
-        warnings
-      };
-    }
-
+    const searchMode = query.mode === "search";
     const queryTerm = inferQueryTerm(query);
+
+    let nextCursor: string | undefined;
+    let listItems: ClawHubListItem[] = [];
     let searchItems: ClawHubListItem[] = [];
+    let searchFailed = false;
     if (queryTerm) {
       try {
         const searchUrl = `${this.runtime.clawhub.baseUrl}/api/v1/search?q=${encodeURIComponent(queryTerm)}&limit=${Math.min(limit, 20)}&nonSuspiciousOnly=true`;
         const searchResponse = await this.http.getJson<ClawHubSearchResponse>(searchUrl, authHeaders);
         searchItems = searchResponse.data.results ?? [];
       } catch (error) {
+        searchFailed = true;
         const message = error instanceof Error ? error.message : String(error);
         warnings.push(`ClawHub search failed for "${queryTerm}": ${message}`);
       }
     }
 
-    const merged = dedupeBySlug([...searchItems, ...listItems]);
+    if (!searchMode || !queryTerm || searchFailed) {
+      const listUrl = `${this.runtime.clawhub.baseUrl}/api/v1/skills?limit=${limit}&nonSuspiciousOnly=true`;
+      try {
+        const response = await this.http.getJson<ClawHubListResponse>(listUrl, authHeaders);
+        listItems = response.data.items ?? [];
+        nextCursor = response.data.nextCursor;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        warnings.push(`ClawHub list failed: ${message}`);
+        return {
+          providerId: this.id,
+          fetchedAtIso: new Date().toISOString(),
+          mode,
+          candidates: [],
+          warnings
+        };
+      }
+    }
+
+    const merged = searchMode && queryTerm && !searchFailed
+      ? dedupeBySlug(searchItems)
+      : dedupeBySlug([...searchItems, ...listItems]);
     const limited = merged.slice(0, limit);
 
     const details = await Promise.all(
@@ -337,9 +343,13 @@ function dedupeBySlug(items: ClawHubListItem[]): ClawHubListItem[] {
 }
 
 function inferQueryTerm(query: ProviderSearchQuery): string | null {
-  const firstFramework = query.repoFacts.frameworks[0]?.id;
+  if (query.mode === "search") {
+    const term = query.term?.trim();
+    return term && term.length > 0 ? term : null;
+  }
+  const firstFramework = query.repoFacts?.frameworks[0]?.id;
   if (firstFramework) return firstFramework;
-  const firstLanguage = query.repoFacts.languages[0];
+  const firstLanguage = query.repoFacts?.languages[0];
   if (firstLanguage) return firstLanguage;
   return null;
 }

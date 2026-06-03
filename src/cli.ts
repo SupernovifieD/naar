@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import pc from "picocolors";
 import { coerceFlags, parseTargets } from "./commands/shared.js";
@@ -10,120 +12,139 @@ import { runList } from "./commands/list.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runConfig } from "./commands/config.js";
 import { runTargetsInspect, runTargetsList } from "./commands/targets.js";
+import { runSearch } from "./commands/search.js";
 import { parseHistoryBooleanOption, registerHistoryCommand } from "./history/historyCommands.js";
 import { CLI_VERSION } from "./utils/version.js";
 
-const program = new Command();
+export function createCliProgram(): Command {
+  const program = new Command();
 
-program.configureOutput({
-  writeOut: (str) => {
-    process.stdout.write(colorizeCommanderOutput(str));
-  },
-  writeErr: (str) => {
-    process.stderr.write(colorizeCommanderOutput(str));
-  },
-  outputError: (str, write) => {
-    write(pc.red(str));
-  }
-});
+  program.configureOutput({
+    writeOut: (str) => {
+      process.stdout.write(colorizeCommanderOutput(str));
+    },
+    writeErr: (str) => {
+      process.stderr.write(colorizeCommanderOutput(str));
+    },
+    outputError: (str, write) => {
+      write(pc.red(str));
+    }
+  });
 
-program
-  .name("naar")
-  .description("Naar: a repo-aware package manager for AI-agent skills, rules, and instructions")
-  .version(CLI_VERSION);
+  program
+    .name("naar")
+    .description("Naar: a repo-aware package manager for AI-agent skills, rules, and instructions")
+    .version(CLI_VERSION);
 
-applySharedOptions(program
-  .command("go")
-  .description("Scan, recommend, and install with guided flow")
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runGo(flags);
-  }));
+  applySharedOptions(program
+    .command("go")
+    .description("Scan, recommend, and install with guided flow")
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runGo(flags);
+    }));
 
-applySharedOptions(program
-  .command("scan")
-  .description("Audit repository and output repo facts")
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runScan(flags);
-  }));
+  applySharedOptions(program
+    .command("scan")
+    .description("Audit repository and output repo facts")
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runScan(flags);
+    }));
 
-applySharedOptions(program
-  .command("recommend")
-  .description("Recommend skills from configured providers")
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runRecommend(flags);
-  }));
+  applySharedOptions(program
+    .command("recommend")
+    .description("Recommend skills from configured providers")
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runRecommend(flags);
+    }));
 
-applySharedOptions(program
-  .command("install")
-  .description("Install selected skills with preview and confirmation")
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runInstall(flags);
-  }));
+  applySharedOptions(program
+    .command("search <query...>")
+    .alias("s")
+    .description("Search provider catalogs for skills")
+    .option("--include-installed", "Include already-installed skills in search results")
+    .action(async (queryParts: string[], _opts, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      const opts = cmd.optsWithGlobals() as { includeInstalled?: boolean };
+      await runSearch(flags, queryParts.join(" "), {
+        includeInstalled: opts.includeInstalled === true
+      });
+    }));
 
-applySharedOptions(program
-  .command("list")
-  .description("List installed skills and provenance")
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runList(flags);
-  }));
+  applySharedOptions(program
+    .command("install")
+    .description("Install selected skills with preview and confirmation")
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runInstall(flags);
+    }));
 
-applySharedOptions(program
-  .command("uninstall [skills...]")
-  .description("Remove installed skills by canonical skill id")
-  .action(async (skills: string[], _opts, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    await runUninstall(flags, skills ?? []);
-  }));
+  applySharedOptions(program
+    .command("list")
+    .description("List installed skills and provenance")
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runList(flags);
+    }));
 
-applySharedOptions(program
-  .command("config")
-  .description("View or update Naar config")
-  .option("--set-provider <id>", "Set default provider (repeatable)", collectOption, [])
-  .option("--set-target <id>", "Set default target (repeatable)", collectOption, [])
-  .option("--set-min-security-score <n>", "Set default min security score", parseIntOption)
-  .action(async (_args, cmd) => {
-    const flags = coerceFlags(cmd.optsWithGlobals());
-    const opts = cmd.opts();
-    await runConfig(flags, {
-      setProvider: opts.setProvider,
-      setTarget: parseTargets(opts.setTarget),
-      setMinSecurityScore: opts.setMinSecurityScore,
-      allowScripts: opts.allowScripts === true ? true : undefined
+  applySharedOptions(program
+    .command("uninstall [skills...]")
+    .description("Remove installed skills by canonical skill id")
+    .action(async (skills: string[], _opts, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      await runUninstall(flags, skills ?? []);
+    }));
+
+  applySharedOptions(program
+    .command("config")
+    .description("View or update Naar config")
+    .option("--set-provider <id>", "Set default provider (repeatable)", collectOption, [])
+    .option("--set-target <id>", "Set default target (repeatable)", collectOption, [])
+    .option("--set-min-security-score <n>", "Set default min security score", parseIntOption)
+    .action(async (_args, cmd) => {
+      const flags = coerceFlags(cmd.optsWithGlobals());
+      const opts = cmd.opts();
+      await runConfig(flags, {
+        setProvider: opts.setProvider,
+        setTarget: parseTargets(opts.setTarget),
+        setMinSecurityScore: opts.setMinSecurityScore,
+        allowScripts: opts.allowScripts === true ? true : undefined
+      });
+    }));
+
+  const targetsCommand = program
+    .command("targets")
+    .description("List and inspect supported assistant targets");
+
+  targetsCommand
+    .command("list")
+    .description("List supported assistant targets")
+    .option("--json", "Emit JSON output")
+    .action((options: { json?: boolean }) => {
+      runTargetsList({ json: Boolean(options.json) });
     });
-  }));
 
-const targetsCommand = program
-  .command("targets")
-  .description("List and inspect supported assistant targets");
+  targetsCommand
+    .command("inspect <target>")
+    .description("Inspect a supported assistant target or target group")
+    .option("--json", "Emit JSON output")
+    .action((target: string, options: { json?: boolean }) => {
+      runTargetsInspect(target, { json: Boolean(options.json) });
+    });
 
-targetsCommand
-  .command("list")
-  .description("List supported assistant targets")
-  .option("--json", "Emit JSON output")
-  .action((options: { json?: boolean }) => {
-    runTargetsList({ json: Boolean(options.json) });
+  registerHistoryCommand(program);
+  return program;
+}
+
+if (isMainModule()) {
+  createCliProgram().parseAsync(process.argv).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${pc.red(`Error: ${message}`)}\n`);
+    process.exitCode = 1;
   });
-
-targetsCommand
-  .command("inspect <target>")
-  .description("Inspect a supported assistant target or target group")
-  .option("--json", "Emit JSON output")
-  .action((target: string, options: { json?: boolean }) => {
-    runTargetsInspect(target, { json: Boolean(options.json) });
-  });
-
-registerHistoryCommand(program);
-
-program.parseAsync(process.argv).catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${pc.red(`Error: ${message}`)}\n`);
-  process.exitCode = 1;
-});
+}
 
 function collectOption(value: string, previous: string[]): string[] {
   return [...previous, value];
@@ -186,4 +207,10 @@ function colorizeCommanderOutput(content: string): string {
       return line;
     })
     .join("\n");
+}
+
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return path.resolve(entry) === fileURLToPath(import.meta.url);
 }

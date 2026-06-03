@@ -88,6 +88,74 @@ describe("OfficialAnthropicSkillsProvider", () => {
     expect(result.candidates[0].metadata.pinnedRef).toBe("1.2.3");
   });
 
+  it("uses Anthropic API text search in search mode when API key is present", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+
+    const anthropicPool = mockAgent.get("https://api.anthropic.com");
+    anthropicPool
+      .intercept({ method: "GET", path: "/v1/skills?limit=3&search=frontend" })
+      .reply(200, {
+        data: [
+          {
+            id: "official/frontend-design",
+            name: "Frontend Design",
+            description: "Guidance for React + Next.js + Tailwind",
+            tags: ["react", "nextjs", "tailwind"],
+            latest_version: {
+              version: "1.2.3",
+              license: "MIT",
+              updated_at: "2026-05-20T00:00:00.000Z"
+            }
+          }
+        ]
+      });
+
+    const provider = new OfficialAnthropicSkillsProvider();
+    const result = await provider.search({ mode: "search", term: "frontend", limit: 3 });
+
+    expect(result.mode).toBe("api");
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].providerScopedId).toBe("anthropic:official/frontend-design");
+  });
+
+  it("falls back to API catalog filtering when API text search is unavailable", async () => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+
+    const anthropicPool = mockAgent.get("https://api.anthropic.com");
+    anthropicPool
+      .intercept({ method: "GET", path: "/v1/skills?limit=10&search=brewpage" })
+      .reply(404, { error: "not found" });
+
+    anthropicPool
+      .intercept({ method: "GET", path: "/v1/skills?limit=10" })
+      .reply(200, {
+        data: [
+          {
+            id: "brewpage",
+            name: "BrewPage Publish",
+            description: "Publish BrewPage websites",
+            tags: ["publish"],
+            latest_version: { version: "1.0.0", license: "MIT" }
+          },
+          {
+            id: "frontend-design",
+            name: "Frontend Design",
+            description: "Frontend UI guidance",
+            tags: ["react"],
+            latest_version: { version: "1.0.0", license: "MIT" }
+          }
+        ]
+      });
+
+    const provider = new OfficialAnthropicSkillsProvider();
+    const result = await provider.search({ mode: "search", term: "brewpage", limit: 10 });
+
+    expect(result.mode).toBe("api");
+    expect(result.warnings?.some((warning) => warning.includes("catalog filtering"))).toBe(true);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].providerSkillId).toBe("brewpage");
+  });
+
   it("falls back to GitHub catalog when API key is missing", async () => {
     const githubPool = mockAgent.get("https://api.github.com");
     const rawPool = mockAgent.get("https://raw.githubusercontent.com");
