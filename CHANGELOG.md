@@ -10,7 +10,7 @@ All notable changes to this project are documented in this file.
 - Added target group aliases including `all`, `all-skills`, `all-rules`, `all-instructions`, `agents-md`, `experimental`, `deprecated`, and `research`.
 - Added verified write-capable targets for Claude memory, Copilot path instructions, Gemini context, AGENTS.md, Windsurf, Cline, Roo, Continue, and Kiro integrations.
 - Added research-only target entries for tools without verified project-level write targets, including Trae and other agent ecosystems.
-- Added local-only install history with `naar history`, `list`, `skills`, `show`, `prune`, `forget`, and `clear`.
+- Added local-only lifecycle history with `naar history`, `list`, `skills`, `show`, `prune`, `forget`, and `clear`.
 - Added global history storage with OS-specific paths, `NAAR_HOME` override, versioned schema validation, corrupt-file backup, restrictive permissions, and atomic writes.
 - Added `--history <true|false>` and `NAAR_HISTORY=0|false` controls for disabling history recording.
 
@@ -20,13 +20,16 @@ All notable changes to this project are documented in this file.
 - Rendered non-skill-folder targets as concise managed rules/instructions/context hints instead of copying full `SKILL.md` into always-on files.
 - Made managed block writes idempotent with target-specific markers while preserving legacy Copilot block handling.
 - Updated scanner assistant detection to use registry-driven target patterns and group product-level detections.
+- Upgraded history to schema v2 with current project skill state plus install/uninstall lifecycle events.
+- Updated history summaries to distinguish currently installed projects, ever-used projects, uninstalled projects, install counts, and uninstall counts.
 - Updated history terminal timestamps to show local machine time and date while keeping JSON timestamps as ISO strings.
 
 ### Security and Privacy
 - Prevented research-only targets from producing install actions.
 - Required explicit confirmation for broad target groups such as `all`, `experimental`, and `deprecated`, with `--yes` required in non-interactive/JSON flows.
-- Recorded history only after successful applied installs, never during dry runs, failed installs, or recommendation-only runs.
+- Recorded history only after successful applied installs and uninstalls, never during dry runs, canceled runs, failed operations, or recommendation-only runs.
 - Kept install success best-effort when history recording fails.
+- Kept uninstall success best-effort when history recording fails.
 - Limited history data to local project paths, path hashes, timestamps, broad detected stack facts, installed skill metadata, targets, and security scores.
 - Documented that history must not store source code, file contents, secrets, environment variables, tokens, remote URLs, shell history, or terminal commands.
 

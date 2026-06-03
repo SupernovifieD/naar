@@ -69,18 +69,18 @@ These files support provenance and lifecycle operations (`list`, `uninstall`, re
 
 ## 4. Local History Privacy
 
-Naar may write a local history file outside the project directory to remember which projects installed which skills. This file is stored in the operating system's user data directory:
+Naar may write a local history file outside the project directory to remember current Naar-managed skills and install/uninstall lifecycle events. This file is stored in the operating system's user data directory:
 
 - macOS: `~/Library/Application Support/naar/history.json`
 - Linux: `$XDG_DATA_HOME/naar/history.json`, or `~/.local/share/naar/history.json`
 - Windows: `%APPDATA%/naar/history.json`
 - Override: `$NAAR_HOME/history.json`
 
-The history file may contain local project paths, project names, path hashes, timestamps, broad detected stack facts, installed Naar skill metadata, target names, and security scores.
+The history file may contain local project paths, project names, path hashes, timestamps, broad detected stack facts, Naar skill metadata, target names, security scores, and install/uninstall event metadata.
 
 The history file must not contain source code, file contents, environment variables, secrets, API keys, tokens, remote repository URLs, terminal history, shell commands, or private package registry URLs.
 
-Users can inspect project paths, prune missing projects, forget individual projects, clear all history, or disable install recording with `--history false`, `NAAR_HISTORY=0`, or `NAAR_HISTORY=false`.
+Users can inspect project paths, prune missing projects, forget individual projects, clear all history, or disable lifecycle recording with `--history false`, `NAAR_HISTORY=0`, or `NAAR_HISTORY=false`.
 
 ## 5. How Skill Vetting Works
 

@@ -1,8 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
-import type { CliFlags, InstalledSkillRecord, RepoFacts } from "../types/index.js";
+import type { InstalledSkillRecord, RepoFacts } from "../types/index.js";
 import { getHistoryFilePath, loadHistory, saveHistory, resetHistory, type HistoryStoreOptions } from "./historyStore.js";
 import { projectIdForPath, normalizeProjectPath } from "./historyPaths.js";
-import type { HistoryInstalledSkill, HistoryProject, HistorySkillSummary, NaarHistory } from "./historySchema.js";
+import type {
+  HistoryEvent,
+  HistoryEventSkill,
+  HistoryInstalledSkill,
+  HistoryProject,
+  HistorySkillSummary,
+  NaarHistory
+} from "./historySchema.js";
 
 export interface HistoryRuntimeOptions extends HistoryStoreOptions {
   history?: boolean;
@@ -12,6 +20,13 @@ export interface RecordInstallHistoryOptions extends HistoryRuntimeOptions {
   repoPath: string;
   repoFacts?: RepoFacts;
   installedSkills: InstalledSkillRecord[];
+  currentInstalledSkills?: InstalledSkillRecord[];
+}
+
+export interface RecordUninstallHistoryOptions extends HistoryRuntimeOptions {
+  repoPath: string;
+  remainingInstalledSkills: InstalledSkillRecord[];
+  uninstalledSkills: InstalledSkillRecord[];
 }
 
 export interface HistoryCommandResult<T> {
@@ -51,33 +66,54 @@ export async function recordInstallHistory(options: RecordInstallHistoryOptions)
     return { recorded: false, disabled: true };
   }
 
-  if (options.installedSkills.length === 0) {
+  const currentInstalledSkills = options.currentInstalledSkills ?? options.installedSkills;
+  if (currentInstalledSkills.length === 0 && options.installedSkills.length === 0) {
     return { recorded: false, disabled: false };
   }
 
   const loaded = await loadHistory(options);
   const now = nowIso(options);
-  const projectInfo = projectIdForPath(options.repoPath, options);
-  const existing = loaded.history.projects[projectInfo.projectId];
-  const project: HistoryProject = existing ?? {
-    projectId: projectInfo.projectId,
-    name: projectNameFromPath(projectInfo.normalizedPath),
-    path: projectInfo.normalizedPath,
-    pathHash: projectInfo.pathHash,
-    firstSeenAt: now,
-    lastSeenAt: now,
-    installedSkills: []
-  };
+  const project = ensureProject(loaded.history, options.repoPath, now, options);
+  const previousCurrentKeys = new Set(project.installedSkills.map(historySkillKey));
 
-  project.name = projectNameFromPath(projectInfo.normalizedPath);
-  project.path = projectInfo.normalizedPath;
-  project.pathHash = projectInfo.pathHash;
   project.lastSeenAt = now;
   project.lastInstallAt = now;
-  project.detected = extractDetectedFacts(options.repoFacts);
+  project.detected = extractDetectedFacts(options.repoFacts) ?? project.detected;
+  syncProjectCurrentInstalledSkills(project, currentInstalledSkills, now);
+  preserveInstallCountsForNewSync(project, options.installedSkills, previousCurrentKeys);
 
-  for (const installed of options.installedSkills) {
-    mergeInstalledSkill(project, installed, now);
+  if (options.installedSkills.length > 0) {
+    project.events.push(createHistoryEvent("install", "install_flow", options.installedSkills, now));
+  }
+
+  loaded.history.projects[project.projectId] = project;
+  const next = rebuildSkillSummaries({
+    ...loaded.history,
+    updatedAt: now
+  });
+  await saveHistory(next, options);
+
+  return { recorded: true, disabled: false, projectId: project.projectId, filePath: loaded.filePath };
+}
+
+export async function recordUninstallHistory(options: RecordUninstallHistoryOptions): Promise<RecordHistoryResult> {
+  if (!isHistoryEnabled(options)) {
+    return { recorded: false, disabled: true };
+  }
+
+  if (options.remainingInstalledSkills.length === 0 && options.uninstalledSkills.length === 0) {
+    return { recorded: false, disabled: false };
+  }
+
+  const loaded = await loadHistory(options);
+  const now = nowIso(options);
+  const project = ensureProject(loaded.history, options.repoPath, now, options);
+
+  project.lastSeenAt = now;
+  project.lastUninstallAt = now;
+  syncProjectCurrentInstalledSkills(project, options.remainingInstalledSkills, now);
+  if (options.uninstalledSkills.length > 0) {
+    project.events.push(createHistoryEvent("uninstall", "uninstall_flow", options.uninstalledSkills, now));
   }
 
   loaded.history.projects[project.projectId] = project;
@@ -198,66 +234,185 @@ export function listSkillSummaries(history: NaarHistory): HistorySkillSummary[] 
 
 export function rebuildSkillSummaries(history: NaarHistory): NaarHistory {
   const skills: Record<string, HistorySkillSummary> = {};
+
   for (const project of Object.values(history.projects)) {
     for (const installed of project.installedSkills) {
-      const existing = skills[installed.canonicalId];
-      if (!existing) {
-        skills[installed.canonicalId] = {
-          canonicalId: installed.canonicalId,
-          providerIds: [installed.providerId],
-          skillIds: [installed.skillId],
-          name: installed.name,
-          targets: [...installed.targets],
-          usedInProjects: [project.projectId],
-          firstSeenAt: installed.installedAt,
-          lastSeenAt: installed.lastSeenAt,
-          installCount: installed.installCount
-        };
-        continue;
-      }
+      const summary = ensureSummary(skills, installed.canonicalId, installed.installedAt);
+      applySkillIdentity(summary, installed);
+      summary.currentlyInstalledInProjects = mergeStrings(summary.currentlyInstalledInProjects, [project.projectId]);
+      summary.everInstalledInProjects = mergeStrings(summary.everInstalledInProjects, [project.projectId]);
+      summary.usedInProjects = summary.currentlyInstalledInProjects;
+      summary.firstSeenAt = minIso(summary.firstSeenAt, installed.installedAt);
+      summary.lastSeenAt = maxIso(summary.lastSeenAt, installed.lastSeenAt);
+      summary.lastInstalledAt = maxOptionalIso(summary.lastInstalledAt, installed.installedAt);
+    }
 
-      existing.providerIds = mergeStrings(existing.providerIds, [installed.providerId]);
-      existing.skillIds = mergeStrings(existing.skillIds, [installed.skillId]);
-      existing.targets = mergeStrings(existing.targets, installed.targets);
-      existing.usedInProjects = mergeStrings(existing.usedInProjects, [project.projectId]);
-      existing.firstSeenAt = minIso(existing.firstSeenAt, installed.installedAt);
-      existing.lastSeenAt = maxIso(existing.lastSeenAt, installed.lastSeenAt);
-      existing.installCount += installed.installCount;
-      existing.name = existing.name ?? installed.name;
+    for (const event of project.events) {
+      for (const skill of event.skills) {
+        const summary = ensureSummary(skills, skill.canonicalId, event.at);
+        applySkillIdentity(summary, skill);
+        summary.everInstalledInProjects = mergeStrings(summary.everInstalledInProjects, [project.projectId]);
+        summary.firstSeenAt = minIso(summary.firstSeenAt, event.at);
+        summary.lastSeenAt = maxIso(summary.lastSeenAt, event.at);
+        if (event.type === "install") {
+          summary.installCount += 1;
+          summary.lastInstalledAt = maxOptionalIso(summary.lastInstalledAt, event.at);
+        } else {
+          summary.uninstallCount += 1;
+          summary.uninstalledFromProjects = mergeStrings(summary.uninstalledFromProjects, [project.projectId]);
+          summary.lastUninstalledAt = maxOptionalIso(summary.lastUninstalledAt, event.at);
+        }
+      }
     }
   }
+
+  for (const summary of Object.values(skills)) {
+    summary.usedInProjects = summary.currentlyInstalledInProjects;
+  }
+
   return { ...history, skills };
 }
 
-function mergeInstalledSkill(project: HistoryProject, installed: InstalledSkillRecord, now: string): void {
-  const existing = project.installedSkills.find((entry) =>
-    entry.providerId === installed.providerId
-    && entry.skillId === installed.providerSkillId
-    && entry.canonicalId === installed.canonicalSkillId
-  );
+export function countHistoryEvents(history: NaarHistory, type: HistoryEvent["type"]): number {
+  return Object.values(history.projects)
+    .reduce((count, project) => count + project.events.filter((event) => event.type === type).length, 0);
+}
 
-  if (!existing) {
-    project.installedSkills.push({
-      providerId: installed.providerId,
-      skillId: installed.providerSkillId,
-      canonicalId: installed.canonicalSkillId,
-      version: installed.installedVersion,
-      ref: installed.pinnedRef,
-      targets: [...installed.targets],
-      securityScore: installed.securityScoreAtInstall,
-      installedAt: installed.installedAtIso || now,
-      lastSeenAt: now,
-      installCount: 1
-    });
-    return;
+export function projectUninstalledSkillIds(project: HistoryProject): string[] {
+  return mergeStrings([], project.events
+    .filter((event) => event.type === "uninstall")
+    .flatMap((event) => event.skills.map((skill) => skill.canonicalId)))
+}
+
+export function listRecentActivity(history: NaarHistory, limit = 5): Array<{ project: HistoryProject; event: HistoryEvent; skill: HistoryEventSkill }> {
+  const activity: Array<{ project: HistoryProject; event: HistoryEvent; skill: HistoryEventSkill }> = [];
+  for (const project of Object.values(history.projects)) {
+    for (const event of project.events) {
+      for (const skill of event.skills) {
+        activity.push({ project, event, skill });
+      }
+    }
   }
+  return activity
+    .sort((left, right) => right.event.at.localeCompare(left.event.at))
+    .slice(0, limit);
+}
 
-  existing.version = installed.installedVersion;
-  existing.ref = installed.pinnedRef;
-  existing.targets = mergeStrings(existing.targets, installed.targets);
-  existing.securityScore = installed.securityScoreAtInstall;
-  existing.lastSeenAt = now;
-  existing.installCount += 1;
+function ensureProject(history: NaarHistory, repoPath: string, now: string, options: HistoryRuntimeOptions): HistoryProject {
+  const projectInfo = projectIdForPath(repoPath, options);
+  const existing = history.projects[projectInfo.projectId];
+  const project: HistoryProject = existing ?? {
+    projectId: projectInfo.projectId,
+    name: projectNameFromPath(projectInfo.normalizedPath),
+    path: projectInfo.normalizedPath,
+    pathHash: projectInfo.pathHash,
+    firstSeenAt: now,
+    lastSeenAt: now,
+    installedSkills: [],
+    events: []
+  };
+
+  project.name = projectNameFromPath(projectInfo.normalizedPath);
+  project.path = projectInfo.normalizedPath;
+  project.pathHash = projectInfo.pathHash;
+  project.events = project.events ?? [];
+  project.installedSkills = project.installedSkills ?? [];
+  history.projects[project.projectId] = project;
+  return project;
+}
+
+function syncProjectCurrentInstalledSkills(project: HistoryProject, currentInstalledSkills: InstalledSkillRecord[], now: string): void {
+  const existingByKey = new Map(project.installedSkills.map((skill) => [historySkillKey(skill), skill]));
+  project.installedSkills = currentInstalledSkills
+    .map((installed) => toHistoryInstalledSkill(installed, now, existingByKey.get(installedSkillRecordKey(installed))))
+    .sort((left, right) => left.canonicalId.localeCompare(right.canonicalId) || left.providerId.localeCompare(right.providerId));
+}
+
+function preserveInstallCountsForNewSync(project: HistoryProject, installedSkills: InstalledSkillRecord[], previousCurrentKeys: Set<string>): void {
+  for (const installed of installedSkills) {
+    const key = installedSkillRecordKey(installed);
+    if (!previousCurrentKeys.has(key)) continue;
+    const current = project.installedSkills.find((skill) => historySkillKey(skill) === key);
+    if (current) current.installCount += 1;
+  }
+}
+
+function toHistoryInstalledSkill(installed: InstalledSkillRecord, now: string, existing: HistoryInstalledSkill | undefined): HistoryInstalledSkill {
+  return {
+    providerId: installed.providerId,
+    skillId: installed.providerSkillId,
+    canonicalId: installed.canonicalSkillId,
+    version: installed.installedVersion,
+    ref: installed.pinnedRef,
+    targets: mergeStrings(existing?.targets ?? [], installed.targets),
+    securityScore: installed.securityScoreAtInstall,
+    installedAt: existing?.installedAt ?? (installed.installedAtIso || now),
+    lastSeenAt: now,
+    installCount: existing?.installCount ?? 1
+  };
+}
+
+function createHistoryEvent(
+  type: HistoryEvent["type"],
+  source: HistoryEvent["source"],
+  installedSkills: InstalledSkillRecord[],
+  now: string
+): HistoryEvent {
+  return {
+    eventId: randomUUID(),
+    type,
+    at: now,
+    source,
+    skills: installedSkills.map(toHistoryEventSkill)
+  };
+}
+
+function toHistoryEventSkill(installed: InstalledSkillRecord): HistoryEventSkill {
+  return {
+    providerId: installed.providerId,
+    skillId: installed.providerSkillId,
+    canonicalId: installed.canonicalSkillId,
+    version: installed.installedVersion,
+    ref: installed.pinnedRef,
+    targets: [...installed.targets],
+    securityScore: installed.securityScoreAtInstall
+  };
+}
+
+function ensureSummary(skills: Record<string, HistorySkillSummary>, canonicalId: string, seenAt: string): HistorySkillSummary {
+  const existing = skills[canonicalId];
+  if (existing) return existing;
+  const created: HistorySkillSummary = {
+    canonicalId,
+    providerIds: [],
+    skillIds: [],
+    targets: [],
+    currentlyInstalledInProjects: [],
+    everInstalledInProjects: [],
+    uninstalledFromProjects: [],
+    usedInProjects: [],
+    firstSeenAt: seenAt,
+    lastSeenAt: seenAt,
+    installCount: 0,
+    uninstallCount: 0
+  };
+  skills[canonicalId] = created;
+  return created;
+}
+
+function applySkillIdentity(summary: HistorySkillSummary, skill: HistoryInstalledSkill | HistoryEventSkill): void {
+  summary.providerIds = mergeStrings(summary.providerIds, [skill.providerId]);
+  summary.skillIds = mergeStrings(summary.skillIds, [skill.skillId]);
+  summary.targets = mergeStrings(summary.targets, skill.targets);
+  summary.name = summary.name ?? skill.name;
+}
+
+function installedSkillRecordKey(installed: InstalledSkillRecord): string {
+  return `${installed.providerId}:${installed.providerSkillId}:${installed.canonicalSkillId}`;
+}
+
+function historySkillKey(skill: HistoryInstalledSkill): string {
+  return `${skill.providerId}:${skill.skillId}:${skill.canonicalId}`;
 }
 
 function extractDetectedFacts(repoFacts: RepoFacts | undefined): HistoryProject["detected"] {
@@ -290,6 +445,10 @@ function minIso(left: string, right: string): string {
 
 function maxIso(left: string, right: string): string {
   return left >= right ? left : right;
+}
+
+function maxOptionalIso(left: string | undefined, right: string): string {
+  return left ? maxIso(left, right) : right;
 }
 
 async function exists(filePath: string): Promise<boolean> {

@@ -38,7 +38,7 @@ export function parseHistoryBooleanOption(value: string): boolean {
 export function registerHistoryCommand(program: Command): void {
   const history = program
     .command("history")
-    .description("View and manage Naar's local skill-install history across projects");
+    .description("View and manage Naar's local skill lifecycle history across projects");
 
   addHistoryOptions(history)
     .action(async function (this: Command) {
@@ -181,7 +181,7 @@ export async function runHistoryClear(flags: HistoryCommandFlags = {}): Promise<
 
   await clearHistory(flags);
   if (flags.json) {
-    printJson({ cleared: true, projectCount: 0, skillCount: 0 });
+    printJson({ cleared: true, projectCount: 0, skillCount: 0, currentSkillCount: 0, installEventCount: 0, uninstallEventCount: 0 });
     return;
   }
   process.stdout.write(`${pc.green("Naar local history cleared.")}\n`);
@@ -192,7 +192,7 @@ function addHistoryOptions(command: Command): Command {
     .option("--json", "Emit JSON output")
     .option("--verbose", "Show extra history metadata")
     .option("--yes", "Skip confirmation prompts for destructive history commands")
-    .option("--history <true|false>", "Enable or disable history for this invocation", parseHistoryBooleanOption);
+    .option("--history <true|false>", "Enable or disable lifecycle history for this invocation", parseHistoryBooleanOption);
 }
 
 function toHistoryFlags(command: Command): HistoryCommandFlags {

@@ -55,7 +55,7 @@ npx -y naar-cli@latest go
 | `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
 | `naar config` | Views or updates Naar config for the repo. | You want default providers, targets, or score settings. | `naar config --json` |
 | `naar targets` | Lists and inspects supported assistant targets. | You want to see stable, experimental, deprecated, and research targets. | `naar targets list` |
-| `naar history` | Views and manages local skill-install history across projects. | You want to inspect where Naar has installed skills on this machine. | `naar history` |
+| `naar history` | Views and manages local skill lifecycle history across projects. | You want to inspect current and past Naar-managed skills on this machine. | `naar history` |
 
 ## Common Examples
 
@@ -119,7 +119,7 @@ naar recommend --target claude
 | `--all-compatible` | Select all compatible unblocked recommendations in automated flows. |
 | `--from <provider:skill@version>` | Install a specific provider skill reference. |
 | `--from-plan <file>` | Load install selections from a plan JSON file. |
-| `--history <true\|false>` | Enable or disable local install history for this invocation. |
+| `--history <true\|false>` | Enable or disable local lifecycle history for this invocation. |
 
 ### Output and Automation
 
@@ -261,7 +261,7 @@ Naar helps you make safer decisions, but it cannot prove that a third-party skil
 
 ## Local History
 
-Naar can remember, locally on your machine, which projects have installed which skills. This helps you inspect your own usage patterns and prepares for future personal recommendations.
+Naar can remember, locally on your machine, which projects currently have Naar-managed skills and which install/uninstall lifecycle events happened there. This helps you inspect your own usage patterns and prepares for future personal recommendations.
 
 Naar history is local-only. It does not upload source code, file contents, secrets, environment variables, or full repositories.
 
@@ -278,6 +278,8 @@ naar history clear
 ```
 
 History can be disabled for a run with `--history false`, or through the environment with `NAAR_HISTORY=0` or `NAAR_HISTORY=false`. Set `NAAR_HOME=/custom/path` to store history at `$NAAR_HOME/history.json`.
+
+Uninstalling a skill removes it from the project's current history state and records an uninstall event. Projects remain in local history after all skills are uninstalled until you run `naar history forget`, `naar history prune`, or `naar history clear`.
 
 ## Files Naar Writes
 

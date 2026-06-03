@@ -154,7 +154,7 @@ function applySharedOptions(command: Command): Command {
     .option("--force", "Allow overwrite on install conflicts")
     .option("--from <provider:skill@version>", "Install a specific provider skill reference")
     .option("--from-plan <file>", "Load install selections from plan JSON")
-    .option("--history <true|false>", "Enable or disable local install history for this invocation", parseHistoryBooleanOption)
+    .option("--history <true|false>", "Enable or disable local lifecycle history for this invocation", parseHistoryBooleanOption)
     .option("--no-scripts", "Disallow script-bearing skills")
     .option("--allow-scripts", "Allow script-bearing skills (unsafe)")
     .option("--allow-risky", "Acknowledge risky security concerns; required for non-interactive concern overrides (unsafe)");

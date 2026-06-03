@@ -6,6 +6,7 @@ import { loadInstalledState, loadLockfile, saveInstalledState, saveLockfile } fr
 import { uninstallManagedFiles } from "../installer/apply.js";
 import { printJson } from "../utils/json.js";
 import { warningLine } from "../utils/output.js";
+import { recordUninstallHistory } from "../history/historyService.js";
 
 export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -66,6 +67,14 @@ export async function runUninstall(flags: CliFlags, skillIdsFromArgs: string[]):
   await saveLockfile(repoRoot, lock);
 
   process.stdout.write(`${pc.green("✔ Uninstall complete")}: removed ${pc.cyan(String(removed.length))} managed entries.\n`);
+  const historyWarning = await updateUninstallHistoryBestEffort(flags, repoRoot, state.skills, selected);
+  if (historyWarning) {
+    if (flags.json) {
+      printJson({ historyWarning });
+    } else {
+      process.stdout.write(`${warningLine(historyWarning)}\n`);
+    }
+  }
 }
 
 async function chooseSkills(
@@ -85,4 +94,23 @@ async function chooseSkills(
     message: "Select skills to uninstall",
     choices: available.map((id) => ({ name: pc.bold(id), value: id }))
   });
+}
+
+async function updateUninstallHistoryBestEffort(
+  flags: CliFlags,
+  repoRoot: string,
+  remainingInstalledSkills: Parameters<typeof recordUninstallHistory>[0]["remainingInstalledSkills"],
+  uninstalledSkills: Parameters<typeof recordUninstallHistory>[0]["uninstalledSkills"]
+): Promise<string | undefined> {
+  try {
+    await recordUninstallHistory({
+      repoPath: repoRoot,
+      remainingInstalledSkills,
+      uninstalledSkills,
+      history: flags.history
+    });
+  } catch {
+    return "Uninstall succeeded, but Naar could not update local history.";
+  }
+  return undefined;
 }

@@ -665,6 +665,7 @@ async function updateInstallHistoryBestEffort(
     await recordInstallHistory({
       repoPath: repoRoot,
       repoFacts,
+      currentInstalledSkills: state.skills,
       installedSkills,
       history: flags.history
     });
