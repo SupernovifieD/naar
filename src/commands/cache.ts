@@ -68,6 +68,14 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
       rawScore: recommendation.rawScore ?? recommendation.score,
       relevanceRaw: recommendation.relevanceRaw ?? recommendation.score,
       qualityRaw: recommendation.qualityRaw ?? 0,
+      dimensionScores: recommendation.dimensionScores ?? {
+        relevance: recommendation.relevanceRaw ?? recommendation.score ?? 0,
+        specificity: 0,
+        compatibility: 0,
+        quality: recommendation.qualityRaw ?? 0,
+        safety: recommendation.candidate?.risk?.score ?? 0,
+        final: recommendation.score ?? 0
+      },
       matchedNeeds: recommendation.matchedNeeds ?? [],
       matchedNeedDetails: recommendation.matchedNeedDetails ?? [],
       matchedFacts: recommendation.matchedFacts ?? [],

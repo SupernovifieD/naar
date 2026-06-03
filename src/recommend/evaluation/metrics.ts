@@ -1,4 +1,4 @@
-import type { SkillRecommendation } from "../../types/index.js";
+import type { RecommendationDimensionScores, SkillRecommendation } from "../../types/index.js";
 import type { RecommendationEvalCategory, RecommendationExpectations } from "./fixtures.js";
 
 export interface RecommendationRelevantSet {
@@ -12,7 +12,10 @@ export interface RecommendationMetrics {
   badDomainCountAtK: Record<string, number>;
   blockedCountAtK: Record<string, number>;
   riskyCountAtK: Record<string, number>;
+  averageDimensionsAtK?: Record<string, RecommendationDimensionScores>;
 }
+
+export type RecommendationDimensionName = keyof RecommendationDimensionScores;
 
 export function createRelevantSet(expectations: RecommendationExpectations): RecommendationRelevantSet {
   return {
@@ -92,6 +95,23 @@ export function topKContainsAny(
 
     return probes.some((probe) => haystack.some((item) => item.includes(probe) || probe.includes(item)));
   });
+}
+
+export function averageDimensionAtK(
+  recommendations: SkillRecommendation[],
+  dimension: RecommendationDimensionName,
+  k: number
+): number {
+  const topK = recommendations.slice(0, Math.max(0, k));
+  if (topK.length === 0) return 0;
+  const total = topK.reduce((sum, recommendation) => {
+    const dimensionScores = recommendation.dimensionScores;
+    if (!dimensionScores) {
+      return sum + fallbackDimensionValue(recommendation, dimension);
+    }
+    return sum + dimensionScores[dimension];
+  }, 0);
+  return roundMetric(total / topK.length);
 }
 
 export function collectBadDomainRefsAtK(
@@ -180,6 +200,17 @@ function matchedRelevantTargetsAtK(
 
 function normalizeValue(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function fallbackDimensionValue(
+  recommendation: SkillRecommendation,
+  dimension: RecommendationDimensionName
+): number {
+  if (dimension === "relevance") return recommendation.relevanceRaw ?? recommendation.score ?? 0;
+  if (dimension === "quality") return recommendation.qualityRaw ?? 0;
+  if (dimension === "safety") return recommendation.candidate.risk.score ?? 0;
+  if (dimension === "final") return recommendation.score ?? 0;
+  return 0;
 }
 
 function roundMetric(value: number): number {

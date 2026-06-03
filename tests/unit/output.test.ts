@@ -50,6 +50,14 @@ function makeRecommendation(overrides: Partial<SkillRecommendation> = {}): Skill
     },
     score: 88,
     reasons: ["Matched stack: Next.js", "Assistant compatibility: claude"],
+    dimensionScores: {
+      relevance: 82,
+      specificity: 68,
+      compatibility: 100,
+      quality: 72,
+      safety: 95,
+      final: 88
+    },
     matchedNeeds: [],
     matchedFacts: [],
     eligibilityReasons: [],
@@ -235,6 +243,13 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("Domain Signals:");
     expect(output).toContain("Match Score Model:");
     expect(output).toContain("relevanceRaw=");
+    expect(output).toContain("Score:");
+    expect(output).toContain("Relevance: 82");
+    expect(output).toContain("Specificity: 68");
+    expect(output).toContain("Compatibility: 100");
+    expect(output).toContain("Quality: 72");
+    expect(output).toContain("Safety: 95");
+    expect(output).toContain("Final: 88");
     expect(output).toContain("Matched Needs:");
     expect(output).toContain("node_cli_development, vitest_testing");
     expect(output).toContain("Matched Need Details:");

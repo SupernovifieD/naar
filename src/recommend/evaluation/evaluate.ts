@@ -3,6 +3,7 @@ import type { RepoNeed, SkillRecommendation } from "../../types/index.js";
 import type { RecommendationEvalFixture } from "./fixtures.js";
 import { DEFAULT_RECOMMEND_EVAL_OPTIONS } from "./fixtures.js";
 import {
+  averageDimensionAtK,
   badDomainCountAtK,
   blockedCountAtK,
   collectBadDomainRefsAtK,
@@ -62,6 +63,7 @@ function computeMetrics(
   const badDomainK = fixture.expectations.maxBadDomainInTopK?.k ?? 5;
   const blockedK = fixture.expectations.maxBlockedInTopK?.k ?? 5;
   const riskyK = Math.max(5, blockedK);
+  const dimensionK = 5;
 
   return {
     precisionAtK: {
@@ -78,6 +80,16 @@ function computeMetrics(
     },
     riskyCountAtK: {
       [riskyK]: riskyCountAtK(recommendations, riskyK)
+    },
+    averageDimensionsAtK: {
+      [dimensionK]: {
+        relevance: averageDimensionAtK(recommendations, "relevance", dimensionK),
+        specificity: averageDimensionAtK(recommendations, "specificity", dimensionK),
+        compatibility: averageDimensionAtK(recommendations, "compatibility", dimensionK),
+        quality: averageDimensionAtK(recommendations, "quality", dimensionK),
+        safety: averageDimensionAtK(recommendations, "safety", dimensionK),
+        final: averageDimensionAtK(recommendations, "final", dimensionK)
+      }
     }
   };
 }

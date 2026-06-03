@@ -14,6 +14,18 @@ export function renderRecommendationEvaluationReport(results: RecommendationEval
     lines.push(`  recall@${recallK}: ${formatMetric(result.metrics.recallAtK[recallK] ?? 0)}`);
     lines.push(`  bad-domain@${badDomainK}: ${result.metrics.badDomainCountAtK[badDomainK] ?? 0}`);
     lines.push(`  blocked@${blockedK}: ${result.metrics.blockedCountAtK[blockedK] ?? 0}`);
+    const averageDimensions = result.metrics.averageDimensionsAtK ?? {};
+    const averageDimensionK = firstMetricKey(averageDimensions, 5);
+    const dimensionValues = averageDimensions[averageDimensionK];
+    if (dimensionValues) {
+      lines.push(`  avg dimensions@${averageDimensionK}:`);
+      lines.push(`    relevance: ${formatMetric(dimensionValues.relevance)}`);
+      lines.push(`    specificity: ${formatMetric(dimensionValues.specificity)}`);
+      lines.push(`    compatibility: ${formatMetric(dimensionValues.compatibility)}`);
+      lines.push(`    quality: ${formatMetric(dimensionValues.quality)}`);
+      lines.push(`    safety: ${formatMetric(dimensionValues.safety)}`);
+      lines.push(`    final: ${formatMetric(dimensionValues.final)}`);
+    }
     lines.push("  top 5:");
 
     for (const [index, recommendation] of result.recommendations.slice(0, 5).entries()) {
@@ -41,7 +53,7 @@ export function renderRecommendationEvaluationReport(results: RecommendationEval
   return lines.join("\n").trimEnd();
 }
 
-function firstMetricKey(record: Record<string, number>, fallback: number): number {
+function firstMetricKey(record: Record<string, unknown>, fallback: number): number {
   const keys = Object.keys(record);
   if (keys.length === 0) return fallback;
   return Number.parseInt(keys[0] ?? String(fallback), 10);

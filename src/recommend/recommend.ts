@@ -24,6 +24,14 @@ import {
   detectDomainSignals,
   evaluateSpecializedGates
 } from "./specializedGates.js";
+import {
+  applyRecommendationCaps,
+  clampRecommendationScore,
+  computeDimensionScores,
+  computeScorePartitions,
+  normalizePositiveScore,
+  roundDimension
+} from "./scoring.js";
 
 const ALL_ASSISTANTS: AssistantId[] = ["claude", "cursor", "copilot", "codex", "generic"];
 
@@ -169,8 +177,9 @@ export function recommendSkills(
     let sawStrongNeedMatch = false;
     let sawWeakNeedMatch = false;
     let sawNeedNegativeMatch = false;
+    const includedByAllCompatible = assistantMatches.length === 0 && options.allCompatible === true;
 
-    if (assistantMatches.length === 0 && options.allCompatible) {
+    if (includedByAllCompatible) {
       score = applyScoreComponent(score, scoreBreakdown, {
         kind: "all_compatible_override_penalty",
         points: -10,
@@ -483,7 +492,7 @@ export function recommendSkills(
     }
 
     const { rawScore, relevanceRaw, qualityRaw } = computeScorePartitions(scoreBreakdown);
-    const normalizedRelevance = 100 * (1 - Math.exp(-(Math.max(0, relevanceRaw) / 90)));
+    const normalizedRelevance = normalizePositiveScore(relevanceRaw, 90);
     const baseQualityBonus = Math.min(8, qualityRaw * 0.4);
     let qualityBonus = baseQualityBonus;
     if (normalizedRelevance < 25 && qualityBonus > 0) {
@@ -494,27 +503,75 @@ export function recommendSkills(
 
     scoreBreakdown.push({
       kind: "normalized_relevance",
-      points: roundScore(normalizedRelevance),
-      detail: `From relevanceRaw=${roundScore(relevanceRaw)}`
+      points: roundDimension(normalizedRelevance),
+      detail: `From relevanceRaw=${roundDimension(relevanceRaw)}`
     });
     scoreBreakdown.push({
       kind: "normalized_quality_bonus",
-      points: roundScore(qualityBonus),
-      detail: `From qualityRaw=${roundScore(qualityRaw)}`
+      points: roundDimension(qualityBonus),
+      detail: `From qualityRaw=${roundDimension(qualityRaw)}`
     });
 
-    const effectiveCap = capsApplied.length > 0
-      ? Math.min(...capsApplied.map((cap) => cap.cap))
-      : null;
-    let finalScore = normalizedRelevance + qualityBonus;
-    if (effectiveCap !== null && finalScore > effectiveCap) {
-      const beforeCap = finalScore;
-      finalScore = effectiveCap;
+    const preCapDimensions = computeDimensionScores({
+      scoreBreakdown,
+      capsApplied,
+      penalties,
+      reasons,
+      matchedNeeds,
+      matchedNeedDetails,
+      matchedFacts,
+      candidate,
+      riskScore: risk.score,
+      assistantMatches,
+      eligibleAssistants,
+      hasDeepMatch,
+      skillCategories,
+      domainSignals,
+      includedByAllCompatible,
+      noScripts: options.noScripts
+    });
+
+    scoreBreakdown.push({
+      kind: "dimension_relevance",
+      points: preCapDimensions.relevance,
+      detail: "Dimensional relevance score"
+    });
+    scoreBreakdown.push({
+      kind: "dimension_specificity",
+      points: preCapDimensions.specificity,
+      detail: "Dimensional specificity score"
+    });
+    scoreBreakdown.push({
+      kind: "dimension_compatibility",
+      points: preCapDimensions.compatibility,
+      detail: "Dimensional compatibility score"
+    });
+    scoreBreakdown.push({
+      kind: "dimension_quality",
+      points: preCapDimensions.quality,
+      detail: "Dimensional quality score"
+    });
+    scoreBreakdown.push({
+      kind: "dimension_safety",
+      points: preCapDimensions.safety,
+      detail: "Dimensional safety score"
+    });
+    scoreBreakdown.push({
+      kind: "dimension_final_weighted",
+      points: preCapDimensions.final,
+      detail: "Weighted dimensional score before caps"
+    });
+
+    const cappedScore = applyRecommendationCaps(preCapDimensions.final, capsApplied);
+    let finalScore = cappedScore.score;
+    if (cappedScore.appliedCap) {
+      const beforeCap = preCapDimensions.final;
+      finalScore = cappedScore.appliedCap.cap;
       scoreBreakdown.push({
         kind: "score_cap_applied",
-        points: roundScore(finalScore - beforeCap),
-        detail: `Score capped at ${effectiveCap}`,
-        reason: capsApplied.find((cap) => cap.cap === effectiveCap)?.reason
+        points: roundDimension(finalScore - beforeCap),
+        detail: `Score capped at ${cappedScore.appliedCap.cap}`,
+        reason: cappedScore.appliedCap.reason
       });
     }
 
@@ -546,13 +603,19 @@ export function recommendSkills(
     const normalizedReasons = dedupeStrings(reasons).slice(0, 8);
     const normalizedPenalties = dedupeStrings(penalties);
     const normalizedEligibility = dedupeStrings(eligibilityReasons);
+    const finalRoundedScore = clampRecommendationScore(finalScore);
+    const dimensionScores = {
+      ...preCapDimensions,
+      final: finalRoundedScore
+    };
 
     const recommendation: SkillRecommendation = {
       candidate,
-      score: clampScore(finalScore),
-      rawScore: roundScore(rawScore),
-      relevanceRaw: roundScore(relevanceRaw),
-      qualityRaw: roundScore(qualityRaw),
+      score: finalRoundedScore,
+      rawScore: roundDimension(rawScore),
+      relevanceRaw: roundDimension(relevanceRaw),
+      qualityRaw: roundDimension(qualityRaw),
+      dimensionScores,
       status,
       overrideable: securityDecision.overrideable,
       hardBlocked: securityDecision.hardBlocked,
@@ -757,46 +820,6 @@ function applyScoreComponent(
 ): number {
   scoreBreakdown.push(component);
   return score + component.points;
-}
-
-function computeScorePartitions(scoreBreakdown: RecommendationScoreComponent[]): {
-  rawScore: number;
-  relevanceRaw: number;
-  qualityRaw: number;
-} {
-  let rawScore = 0;
-  let relevanceRaw = 0;
-  let qualityRaw = 0;
-
-  for (const component of scoreBreakdown) {
-    rawScore += component.points;
-    if (isQualityComponent(component.kind)) {
-      qualityRaw += component.points;
-    } else {
-      relevanceRaw += component.points;
-    }
-  }
-
-  return { rawScore, relevanceRaw, qualityRaw };
-}
-
-function isQualityComponent(kind: string): boolean {
-  return kind === "assistant_tiebreak"
-    || kind === "publisher_trust"
-    || kind === "publisher_trust_penalty"
-    || kind === "low_risk_bonus"
-    || kind === "popularity_bonus";
-}
-
-function roundScore(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.round(value * 100) / 100;
-}
-
-function clampScore(value: number): number {
-  if (value < 0) return 0;
-  if (value > 100) return 100;
-  return Math.round(value);
 }
 
 function trustRank(trust: SkillCandidate["metadata"]["trustLevel"]): number {

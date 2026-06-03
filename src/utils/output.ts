@@ -233,6 +233,22 @@ export function renderRecommendationCard(
   }
 
   if (verbose) {
+    if (recommendation.dimensionScores) {
+      appendMetaFields(lines, {
+        cardWidth,
+        indent,
+        label: "Score",
+        fields: [
+          { key: "relevance", value: formatNumericValue(recommendation.dimensionScores.relevance) },
+          { key: "specificity", value: formatNumericValue(recommendation.dimensionScores.specificity) },
+          { key: "compatibility", value: formatNumericValue(recommendation.dimensionScores.compatibility) },
+          { key: "quality", value: formatNumericValue(recommendation.dimensionScores.quality) },
+          { key: "safety", value: formatNumericValue(recommendation.dimensionScores.safety) },
+          { key: "final", value: formatNumericValue(recommendation.dimensionScores.final) }
+        ]
+      });
+    }
+
     appendWrappedField(lines, {
       cardWidth,
       indent,
@@ -502,6 +518,12 @@ function toDisplayLabel(value: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatNumericValue(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function formatTargets(assistants: AssistantId[]): string {

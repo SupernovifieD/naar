@@ -16,5 +16,14 @@ describe("recommendation evaluation", () => {
     }
 
     expect(failures.map((failure) => failure.message)).toEqual([]);
+    for (const result of results) {
+      for (const recommendation of result.recommendations) {
+        expect(recommendation.dimensionScores).toBeDefined();
+        expect(recommendation.dimensionScores?.final).toBe(recommendation.score);
+      }
+
+      const topRecommendation = result.recommendations[0];
+      expect((topRecommendation?.dimensionScores?.relevance ?? 0)).toBeGreaterThan(0);
+    }
   });
 });

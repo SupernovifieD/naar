@@ -98,6 +98,14 @@ function makeRecommendation(description?: string, summary = "Summary fallback"):
       risk: { score: 100, level: "low", signals: [], requiresOverride: false }
     },
     score: 91,
+    dimensionScores: {
+      relevance: 84,
+      specificity: 69,
+      compatibility: 100,
+      quality: 70,
+      safety: 95,
+      final: 91
+    },
     reasons: ["Matched stack: React"],
     matchedNeeds: [],
     matchedFacts: [],
@@ -365,6 +373,13 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Matched Facts:");
     expect(output).toContain("Score Breakdown:");
     expect(output).toContain("Caps Applied:");
+    expect(output).toContain("Score:");
+    expect(output).toContain("Relevance:");
+    expect(output).toContain("Specificity:");
+    expect(output).toContain("Compatibility:");
+    expect(output).toContain("Quality:");
+    expect(output).toContain("Safety:");
+    expect(output).toContain("Final:");
     expect(output).toContain("Match Score Model:");
     expect(output).toContain("Cap Summary:");
   });

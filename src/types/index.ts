@@ -357,6 +357,15 @@ export interface RecommendationScoreComponent {
   reason?: string;
 }
 
+export interface RecommendationDimensionScores {
+  relevance: number;
+  specificity: number;
+  compatibility: number;
+  quality: number;
+  safety: number;
+  final: number;
+}
+
 export interface RepoNeed {
   id: string;
   weight: number;
@@ -396,6 +405,7 @@ export interface SkillRecommendation {
   rawScore?: number;
   relevanceRaw?: number;
   qualityRaw?: number;
+  dimensionScores?: RecommendationDimensionScores;
   status?: RecommendationStatus;
   overrideable?: boolean;
   hardBlocked?: boolean;
