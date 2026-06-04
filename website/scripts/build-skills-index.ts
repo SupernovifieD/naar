@@ -9,6 +9,7 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WEBSITE_ROOT = path.resolve(SCRIPT_DIR, "..");
 const OUTPUT_PATH = path.join(WEBSITE_ROOT, "public", "data", "skills-index.json");
 const OUTPUT_DIR = path.dirname(OUTPUT_PATH);
+const MAX_INDEX_WARNINGS_TO_PRINT = 8;
 
 async function main(): Promise<void> {
   const providers = buildProviders([]);
@@ -18,7 +19,7 @@ async function main(): Promise<void> {
   try {
     const results = await queryProviders(providers, {
       mode: "search",
-      limit: 120
+      limit: 80
     });
 
     const skills = dedupeCandidates(results.flatMap((result) => {
@@ -40,9 +41,7 @@ async function main(): Promise<void> {
     });
 
     console.log(`[website] Built skills index with ${skills.length} records from ${providerIds.join(", ")}.`);
-    for (const warning of warnings) {
-      console.warn(`[website] Warning: ${warning}`);
-    }
+    printWarnings(warnings);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     warnings.push(`Skill index build failed: ${message}`);
@@ -102,9 +101,7 @@ async function preserveOrWriteEmpty(providerIds: string[], warnings: string[]): 
   const existing = await readExistingIndex();
   if (existing !== null) {
     console.warn("[website] Warning: provider index refresh failed. Keeping the previously generated skills-index.json.");
-    for (const warning of warnings) {
-      console.warn(`[website] Warning: ${warning}`);
-    }
+    printWarnings(warnings);
     return;
   }
 
@@ -117,9 +114,7 @@ async function preserveOrWriteEmpty(providerIds: string[], warnings: string[]): 
   await writePayload(payload);
 
   console.warn("[website] Warning: provider index refresh failed. Wrote an empty skills-index.json instead.");
-  for (const warning of warnings) {
-    console.warn(`[website] Warning: ${warning}`);
-  }
+  printWarnings(warnings);
 }
 
 async function readExistingIndex(): Promise<SkillsIndexPayload | null> {
@@ -143,6 +138,17 @@ async function readExistingIndex(): Promise<SkillsIndexPayload | null> {
 async function writePayload(payload: SkillsIndexPayload): Promise<void> {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   await fs.writeFile(OUTPUT_PATH, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function printWarnings(warnings: string[]): void {
+  const visibleWarnings = warnings.slice(0, MAX_INDEX_WARNINGS_TO_PRINT);
+  for (const warning of visibleWarnings) {
+    console.warn(`[website] Warning: ${warning}`);
+  }
+
+  if (warnings.length > visibleWarnings.length) {
+    console.warn(`[website] Warning: ${warnings.length - visibleWarnings.length} additional provider warnings were omitted from build output.`);
+  }
 }
 
 await main();

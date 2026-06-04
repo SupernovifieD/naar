@@ -3,28 +3,292 @@ import SiteLayout from "../layouts/SiteLayout.astro";
 import Container from "../components/Container.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import TerminalFrame from "../components/TerminalFrame.astro";
-import DocsContent from "../content/docs.mdx";
+import CommandCard from "../components/CommandCard.astro";
+import Callout from "../components/Callout.astro";
+import Button from "../components/Button.astro";
+import { packageInfo } from "../lib/package";
+import { siteMeta } from "../data/site";
+
+const sectionLinks = [
+  ["getting-started", "Getting started"],
+  ["installation", "Installation"],
+  ["two-ways", "Two ways to use Naar"],
+  ["search-workflow", "Search workflow"],
+  ["guided-go-workflow", "Guided go workflow"],
+  ["install-workflow", "Install workflow"],
+  ["common-commands", "Common commands"],
+  ["flags-and-safety-controls", "Flags and safety controls"],
+  ["targets", "Targets"],
+  ["providers", "Providers"],
+  ["local-history", "Local history"],
+  ["troubleshooting", "Troubleshooting"]
+] as const;
+
+const commandRows = [
+  ["Guided flow", "`naar go`", "Scan the repo, fetch providers, rank matches, and move into the reviewed install flow."],
+  ["Direct discovery", "`naar search \"github actions\"`", "Search provider catalogs directly without scanning the repo or installing anything."],
+  ["Explicit install", "`naar install clawhub:brewpage --dry-run`", "Fetch one explicit skill ref, run security checks, and preview changes before write."],
+  ["Repo facts", "`naar scan --json`", "Inspect the structured repository facts that recommendation uses."],
+  ["Installed state", "`naar list`", "See what Naar currently manages in this repository."],
+  ["Lifecycle history", "`naar history`", "Inspect local install and uninstall activity across projects on this machine."],
+  ["Target inspection", "`naar targets list`", "Review stable, experimental, deprecated, and research-only assistant targets."],
+] as const;
+
+const flagRows = [
+  ["`--json`", "Emit structured JSON. Install flows still do not write unless `--apply` is present."],
+  ["`--dry-run`", "Preview the install plan without writing files."],
+  ["`--yes`", "Accept normal confirmation prompts in automation, but it does not bypass risky security review by itself."],
+  ["`--non-interactive`", "Disable prompts. Risky installs still require explicit flags."],
+  ["`--allow-risky`", "Required to proceed non-interactively when fetched-bundle review marks a selection risky."],
+  ["`--target <id>`", "Constrain install or recommendation behavior to one or more assistant targets."],
+  ["`--provider <id>`", "Limit discovery to one or more providers."],
+  ["`--history false`", "Disable local lifecycle-history recording for the current run."],
+  ["`--reinstall`", "Allow reinstalling a provider ref that is already installed."],
+] as const;
 ---
-<SiteLayout title="Docs" description="How to use Naar through search-first and repo-guided workflows.">
+<SiteLayout title="Docs" description="Product documentation for Naar's search, go, install, targets, providers, and safety controls.">
   <section class="pt-16">
     <Container>
       <SectionHeader
         eyebrow="Docs"
-        title="Two ways to use Naar"
-        description="Start with search when you know what you want. Start with go when you want Naar to infer what fits the current repo."
+        title="Use Naar quickly, then go deeper only where it matters"
+        description="Naar has three distinct moves: search for discovery, go for repo-guided selection, and install for explicit writes. This page is the fastest path to understanding that model."
       />
-      <div class="mt-10 grid gap-6 lg:grid-cols-2">
-        <TerminalFrame title="Search-first" copyText="naar search &quot;github actions&quot;">
+
+      <nav class="mt-10 flex flex-wrap gap-3" aria-label="Docs sections">
+        {sectionLinks.map(([id, label]) => (
+          <a href={`#${id}`} class="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-text-muted transition-colors duration-200 ease-glide hover:border-white/20 hover:text-text">{label}</a>
+        ))}
+      </nav>
+
+      <div class="mt-12 space-y-14">
+        <section id="getting-started" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Getting started" description="If you only remember one thing: search is read-only discovery, go is repo-guided discovery, and install is the only write path." />
+          <Callout title="Mental model" tone="info">
+            Two doors lead into the same safe installer. Use <code>{packageInfo.cliCommand} search</code> when you already know the kind of skill you want. Use <code>{packageInfo.cliCommand} go</code> when you want Naar to infer what fits the current repository.
+          </Callout>
+          <div class="grid gap-6 lg:grid-cols-3">
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">1. Search</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Browse provider catalogs directly and copy an explicit skill reference.</p>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">2. Go</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Scan the repo, fetch candidates, rank them, and review what fits.</p>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">3. Install</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Fetch the selected bundle, run content checks, preview writes, and confirm.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="installation" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Installation" description="Naar runs on Node.js and can be installed globally or used directly with npx." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <CommandCard title="Global install" body="Best for regular use. The command stays short and predictable." command={siteMeta.installCommand} eyebrow="CLI" />
+            <CommandCard title="No global install" body="Useful for quick trials, CI, or one-off runs." command={`npx -y ${packageInfo.npmPackageName}@latest ${packageInfo.cliCommand} go`} eyebrow="Ephemeral" />
+          </div>
+          <Callout title="Prerequisite" tone="warning">
+            Naar requires Node.js <code>{packageInfo.nodeEngine}</code>. If the CLI behaves unexpectedly, check your local Node version first.
+          </Callout>
+        </section>
+
+        <section id="two-ways" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Two ways to use Naar" description="Choose the door that fits your current task. The distinction matters because it keeps discovery fast without weakening install review." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <div class="glass-panel p-6">
+              <h3 class="text-2xl font-semibold text-text">Search-first</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Use this when you already know the theme of the skill you want: testing, GitHub Actions, React, security, docs, deployment.</p>
+              <ul class="mt-4 space-y-2 text-sm leading-7 text-text-muted">
+                <li>Does not scan the repo.</li>
+                <li>Does not install anything by itself.</li>
+                <li>Returns install-ready refs such as <code>clawhub:brewpage</code>.</li>
+              </ul>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-2xl font-semibold text-text">Repo-guided</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Use this when repo context matters more than the exact skill name. Naar will detect stack, tools, assistants, and readiness before ranking skills.</p>
+              <ul class="mt-4 space-y-2 text-sm leading-7 text-text-muted">
+                <li>Scans local files for structured facts.</li>
+                <li>Fetches provider candidates and ranks fit.</li>
+                <li>Leads into the same reviewed install flow.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="search-workflow" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Search workflow" description="Search behaves more like npm search than a recommender. It is a catalog lookup with provider-aware result formatting." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <TerminalFrame title="Direct search" copyText='naar search "github actions"'>
 $ naar search "github actions"
-$ naar install clawhub:brewpage --dry-run
-        </TerminalFrame>
-        <TerminalFrame title="Repo-guided" copyText="naar go">
+1. brewpage [clawhub]
+Install: naar install clawhub:brewpage
+            </TerminalFrame>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">What search is for</h3>
+              <ul class="mt-4 space-y-2 text-sm leading-7 text-text-muted">
+                <li>Browsing provider catalogs directly.</li>
+                <li>Finding explicit install refs without recommendation overhead.</li>
+                <li>Comparing publisher, license, freshness, and skill page URLs.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-3">
+            <CommandCard title="Basic search" command='naar search "github actions"' />
+            <CommandCard title="Alias" command='naar s "design"' />
+            <CommandCard title="Automation output" command='naar search "next" --json' />
+          </div>
+        </section>
+
+        <section id="guided-go-workflow" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Guided `go` workflow" description="`naar go` is the fastest way to answer: what belongs in this repo, for these assistants, and what will it write?" />
+          <div class="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+            <div class="glass-panel p-6">
+              <ol class="space-y-3 text-sm leading-7 text-text-muted">
+                <li><strong class="text-text">1. Scan</strong> the repository for languages, frameworks, tools, project shape, and assistant readiness.</li>
+                <li><strong class="text-text">2. Fetch</strong> provider candidates and reuse repo needs for broader retrieval.</li>
+                <li><strong class="text-text">3. Rank</strong> candidates by fit while keeping trust and risk separate.</li>
+                <li><strong class="text-text">4. Select</strong> skills and targets interactively.</li>
+                <li><strong class="text-text">5. Install</strong> through the same post-fetch security and plan review path.</li>
+              </ol>
+            </div>
+            <TerminalFrame title="Guided flow" copyText="naar go">
 $ naar go
-$ naar recommend --limit 5
-        </TerminalFrame>
-      </div>
-      <div class="prose-naar mt-14">
-        <DocsContent />
+[1/5] Scan
+[2/5] Providers
+[3/5] Recommendations
+[4/5] Selection
+[5/5] Install
+            </TerminalFrame>
+          </div>
+        </section>
+
+        <section id="install-workflow" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Install workflow" description="Install is shared by both entry points and remains explicit even when the rest of the flow is automated." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <CommandCard title="Preview before writing" body="Dry runs show the install plan without touching the repo." command="naar install clawhub:brewpage --dry-run" />
+            <CommandCard title="Direct install" body="When you already know the ref, install it directly without scanning the repo." command="naar install clawhub:brewpage" />
+          </div>
+          <Callout title="What always happens in install" tone="success">
+            Fetched bundles are analyzed again at install time. Naar builds a write plan, surfaces conflicts, and requires confirmation before writing managed files.
+          </Callout>
+        </section>
+
+        <section id="common-commands" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Common commands" description="These are the commands you are most likely to use after the first install." />
+          <div class="overflow-hidden rounded-[1.75rem] border border-white/10 bg-surface/60">
+            <table class="w-full border-collapse text-left text-sm">
+              <thead class="bg-white/5 text-text-soft">
+                <tr>
+                  <th class="px-5 py-4 font-semibold">Use case</th>
+                  <th class="px-5 py-4 font-semibold">Command</th>
+                  <th class="px-5 py-4 font-semibold">What it does</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commandRows.map(([useCase, command, description]) => (
+                  <tr class="border-t border-white/10 align-top text-text-muted">
+                    <td class="px-5 py-4 font-medium text-text">{useCase}</td>
+                    <td class="px-5 py-4"><code>{command}</code></td>
+                    <td class="px-5 py-4">{description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="flags-and-safety-controls" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Flags and safety controls" description="Automation and safety are both first-class. These are the flags that affect write behavior and trust decisions the most." />
+          <div class="overflow-hidden rounded-[1.75rem] border border-white/10 bg-surface/60">
+            <table class="w-full border-collapse text-left text-sm">
+              <thead class="bg-white/5 text-text-soft">
+                <tr>
+                  <th class="px-5 py-4 font-semibold">Flag</th>
+                  <th class="px-5 py-4 font-semibold">Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flagRows.map(([flag, description]) => (
+                  <tr class="border-t border-white/10 align-top text-text-muted">
+                    <td class="px-5 py-4"><code>{flag}</code></td>
+                    <td class="px-5 py-4">{description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="targets" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Targets" description="Targets describe where Naar can write managed skills, rules, or instructions for different AI coding tools." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Stable defaults</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Claude project skills, Cursor rules, GitHub Copilot repo instructions, and Codex repo skills are the conservative default set.</p>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Beyond the defaults</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Experimental, deprecated, AGENTS.md, and research-only targets are visible through the CLI but are opt-in or non-writeable where appropriate.</p>
+            </div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-2">
+            <CommandCard title="List targets" command="naar targets list" />
+            <CommandCard title="Inspect one target" command="naar targets inspect codex_repo_skills" />
+          </div>
+        </section>
+
+        <section id="providers" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Providers" description="Providers are the upstream catalogs that Naar queries for skills." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Current providers</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Anthropic and ClawHub are supported today. Anthropic can fall back to GitHub-backed catalog discovery when API credentials are not set.</p>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Provider filtering</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">Use <code>--provider</code> when you want to constrain search, recommendation, or guided flows to a smaller source set.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="local-history" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Local history" description="Naar records install and uninstall lifecycle data locally so you can inspect what it manages across repositories." />
+          <div class="grid gap-6 lg:grid-cols-3">
+            <CommandCard title="Summary" command="naar history" />
+            <CommandCard title="Project list" command="naar history list" />
+            <CommandCard title="Skill usage" command="naar history skills" />
+          </div>
+          <Callout title="Privacy boundary" tone="info">
+            Local history is local-only. It stores project paths, timestamps, broad stack facts, skill metadata, and lifecycle events. It must not store source code, secrets, or terminal history.
+          </Callout>
+        </section>
+
+        <section id="troubleshooting" class="space-y-6 scroll-mt-28">
+          <SectionHeader title="Troubleshooting" description="Most issues fall into a few buckets: environment, provider access, target mismatch, or intentional security blocking." />
+          <div class="grid gap-6 lg:grid-cols-2">
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Quick checks</h3>
+              <ul class="mt-4 space-y-2 text-sm leading-7 text-text-muted">
+                <li>Check Node.js version first.</li>
+                <li>Run <code>{packageInfo.cliCommand} scan --json</code> if recommendations seem wrong.</li>
+                <li>Run <code>{packageInfo.cliCommand} targets list</code> if a target behaves differently than expected.</li>
+                <li>Use <code>--dry-run</code> when install results are surprising.</li>
+              </ul>
+            </div>
+            <div class="glass-panel p-6">
+              <h3 class="text-xl font-semibold text-text">Need help?</h3>
+              <p class="mt-3 text-sm leading-7 text-text-muted">If behavior looks wrong, open an issue with the exact command, terminal output, and whether you were using search, go, or direct install.</p>
+              <div class="mt-5">
+                <Button href={siteMeta.issuesUrl} target="_blank" rel="noreferrer" variant="secondary">
+                  Report an issue
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </Container>
   </section>

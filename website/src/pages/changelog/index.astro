@@ -2,40 +2,63 @@
 import SiteLayout from "../../layouts/SiteLayout.astro";
 import Container from "../../components/Container.astro";
 import SectionHeader from "../../components/SectionHeader.astro";
-import { releases } from "../../data/changelog";
+import { releases } from "../../lib/changelog";
 import { withBase } from "../../data/site";
+
+const releaseCards = releases.map((release) => ({
+  ...release,
+  summaryBullets: release.sections.flatMap((section) =>
+    section.bullets.filter((bullet) => bullet.depth === 0).slice(0, 2).map((bullet) => bullet.text)
+  ).slice(0, 4)
+}));
 ---
-<SiteLayout title="Changelog" description="Release history for Naar.">
+<SiteLayout title="Changelog" description="Versioned release notes for Naar, including command-model, safety, target, and website changes.">
   <section class="pt-16">
     <Container>
       <SectionHeader
         eyebrow="Changelog"
         title="Release history"
-        description="A readable release trail for Naar's CLI, search workflow, targets, safety model, and install UX improvements."
+        description="Every release page is generated from the root changelog at build time, so the website stays aligned with the repo source of truth."
       />
+
       <div class="mt-12 space-y-6">
-        {releases.map((release) => (
-          <article class="glass-panel p-7 sm:p-8">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">{release.date}</p>
-                <h2 class="mt-2 text-2xl font-semibold text-text">{release.slug}</h2>
-              </div>
-              <a href={withBase(`/changelog/${release.slug}`)} class="text-sm font-medium text-accent-gold transition-colors duration-200 ease-glide hover:text-text">
-                Read release notes →
-              </a>
-            </div>
-            <div class="mt-6 grid gap-4 md:grid-cols-2">
-              {release.sections.slice(0, 2).map((section) => (
-                <div class="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">{section.title}</h3>
-                  <ul class="mt-3 space-y-2 text-sm leading-6 text-text-muted">
-                    {section.bullets.slice(0, 3).map((bullet) => (
-                      <li class="pl-4" style={`margin-left: ${bullet.depth * 0.75}rem`}>• {bullet.text}</li>
-                    ))}
-                  </ul>
+        {releaseCards.map((release, index) => (
+          <article class="group rounded-[1.9rem] border border-white/10 bg-white/[0.03] p-6 transition-colors duration-200 ease-glide hover:border-white/20 hover:bg-white/[0.05] sm:p-8">
+            <div class="grid gap-4 lg:grid-cols-[auto_1fr] lg:gap-6">
+              <div class="flex gap-4">
+                <div class="flex w-12 flex-col items-center">
+                  <span class="inline-flex h-4 w-4 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)]"></span>
+                  {index < releaseCards.length - 1 && <span class="mt-3 h-full w-px bg-white/10"></span>}
                 </div>
-              ))}
+                <div class="space-y-4">
+                  <div class="space-y-2">
+                    <p class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">{release.date}</p>
+                    <h2 class="text-2xl font-semibold text-text">{release.slug}</h2>
+                  </div>
+                  <div class="grid gap-3 md:grid-cols-2">
+                    {release.sections.slice(0, 3).map((section) => (
+                      <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">{section.title}</h3>
+                        <ul class="mt-3 space-y-2 text-sm leading-6 text-text-muted">
+                          {section.bullets.slice(0, 2).map((bullet) => (
+                            <li>{bullet.text}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                  {release.summaryBullets.length > 0 && (
+                    <ul class="space-y-2 text-sm leading-7 text-text-muted">
+                      {release.summaryBullets.map((bullet) => (
+                        <li>{bullet}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <a href={withBase(`/changelog/${release.slug}`)} class="inline-flex items-center text-sm font-medium text-accent-gold transition-colors duration-200 ease-glide hover:text-text">
+                    Read full release →
+                  </a>
+                </div>
+              </div>
             </div>
           </article>
         ))}

@@ -4,6 +4,16 @@ import Container from "./Container.astro";
 import { navLinks, siteMeta, withBase } from "../data/site";
 
 const logoDark = withBase("/assets/naar/naar-logotype-light.png");
+const currentPath = Astro.url.pathname.replace(/\/$/, "") || "/";
+
+function isActive(pathname: string): boolean {
+  const target = withBase(pathname).replace(/\/$/, "") || "/";
+  const homeTarget = withBase("/").replace(/\/$/, "") || "/";
+  if (target === homeTarget) {
+    return currentPath === homeTarget;
+  }
+  return currentPath === target || currentPath.startsWith(`${target}/`);
+}
 ---
 <header class="sticky top-0 z-50 pt-4">
   <Container>
@@ -12,12 +22,22 @@ const logoDark = withBase("/assets/naar/naar-logotype-light.png");
         <img src={logoDark} alt="Naar" class="h-7 w-auto" />
       </a>
 
-      <nav class="hidden items-center gap-7 md:flex">
-        {navLinks.map((link) => (
-          <a href={withBase(link.href)} class="text-sm font-medium text-text-muted transition-colors duration-200 ease-glide hover:text-text">
-            {link.label}
-          </a>
-        ))}
+      <nav class="hidden items-center gap-2 md:flex" aria-label="Primary navigation">
+        {navLinks.map((link) => {
+          const active = isActive(link.href);
+          return (
+            <a
+              href={withBase(link.href)}
+              aria-current={active ? "page" : undefined}
+              class:list={[
+                "rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 ease-glide",
+                active ? "bg-white/10 text-text" : "text-text-muted hover:text-text"
+              ]}
+            >
+              {link.label}
+            </a>
+          );
+        })}
       </nav>
 
       <div class="hidden md:block">
@@ -30,12 +50,24 @@ const logoDark = withBase("/assets/naar/naar-logotype-light.png");
         </summary>
         <div class="absolute inset-x-0 top-[calc(100%+0.75rem)] px-6">
           <div class="glass-panel space-y-4 rounded-3xl p-5">
-            <nav class="flex flex-col gap-3">
-              {navLinks.map((link) => (
-                <a href={withBase(link.href)} class="rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm font-medium text-text-muted transition-colors duration-200 ease-glide hover:text-text">
-                  {link.label}
-                </a>
-              ))}
+            <nav class="flex flex-col gap-3" aria-label="Mobile navigation">
+              {navLinks.map((link) => {
+                const active = isActive(link.href);
+                return (
+                  <a
+                    href={withBase(link.href)}
+                    aria-current={active ? "page" : undefined}
+                    class:list={[
+                      "rounded-2xl border px-4 py-3 text-sm font-medium transition-colors duration-200 ease-glide",
+                      active
+                        ? "border-white/15 bg-white/10 text-text"
+                        : "border-white/5 bg-white/5 text-text-muted hover:text-text"
+                    ]}
+                  >
+                    {link.label}
+                  </a>
+                );
+              })}
             </nav>
             <InstallCta client:load command={siteMeta.installCommand} />
           </div>

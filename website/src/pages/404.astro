@@ -1,0 +1,29 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Container from "../components/Container.astro";
+import Button from "../components/Button.astro";
+import TerminalFrame from "../components/TerminalFrame.astro";
+import { withBase } from "../data/site";
+---
+<SiteLayout title="404" description="Page not found." noIndex={true}>
+  <section class="flex min-h-[70vh] items-center pt-12">
+    <Container>
+      <div class="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+        <div class="space-y-6">
+          <span class="eyebrow">404</span>
+          <h1 class="text-4xl font-semibold text-text sm:text-5xl">That page is not here.</h1>
+          <p class="max-w-2xl text-base leading-7 text-text-muted">The route may have moved, the link may be stale, or the page may never have existed. The docs and homepage are the best places to restart.</p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <Button href={withBase("/")}>Go home</Button>
+            <Button href={withBase("/docs")} variant="secondary">Open docs</Button>
+          </div>
+        </div>
+        <TerminalFrame title="Terminal" copyText="naar --help">
+$ naar --help
+error: page not found
+hint: try /docs or run naar go
+        </TerminalFrame>
+      </div>
+    </Container>
+  </section>
+</SiteLayout>

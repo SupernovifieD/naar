@@ -2,18 +2,53 @@
 import SiteLayout from "../layouts/SiteLayout.astro";
 import Container from "../components/Container.astro";
 import SectionHeader from "../components/SectionHeader.astro";
-import FaqContent from "../content/faq.mdx";
+import Button from "../components/Button.astro";
+import { siteMeta } from "../data/site";
+
+const faqs = [
+  ["What is Naar?", "Naar is a repo-aware CLI for discovering, reviewing, and installing AI-agent skills from provider catalogs."],
+  ["Is Naar a skill marketplace?", "No. Naar is an installer and review layer that works with external providers. It does not operate its own hosted marketplace."],
+  ["Does Naar send my source code anywhere?", "Not by default for recommendation. Naar scans repository files locally and providers receive structured repo facts rather than the full codebase."],
+  ["What is the difference between `naar search` and `naar go`?", "`naar search` is direct catalog discovery. `naar go` is the guided repo-aware flow that scans, ranks, and then leads into install review."],
+  ["Does search install anything?", "No. Search is discovery-only and never writes files by itself."],
+  ["Can I review before installing?", "Yes. Naar builds an install plan, supports dry runs, and requires confirmation before writes."],
+  ["Which providers are supported?", "Anthropic and ClawHub are supported today, with fallback behavior where the provider integration supports it."],
+  ["Which AI coding tools does Naar support?", "The stable target set includes Claude, Cursor, Copilot, Codex, Gemini context, AGENTS.md, and generic agent-skill conventions. Additional targets exist behind opt-in flags."],
+  ["What files can Naar write?", "Managed target files plus `.naar/installed.json`, `naar.lock.json`, and a local `.naar/skills/` copy for provenance and uninstall support."],
+  ["Can I uninstall skills?", "Yes. `naar uninstall` removes Naar-managed files and updates project state and local lifecycle history."],
+  ["Does Naar work without global install?", "Yes. You can run it through `npx -y naar-cli@latest ...` if you do not want a global install."],
+  ["Is Naar safe for private repositories?", "It is safer than blind installation, but it is not a guarantee. Review plans, inspect `git diff`, and treat heuristic scores as advisory."],
+  ["How do I report an issue?", "Open a GitHub issue with the exact command, output, and context that produced the problem."],
+  ["Can I contribute a provider?", "Yes. The repo is open-source and provider work belongs in the contributor workflow, not in a hosted control panel."],
+] as const;
 ---
-<SiteLayout title="FAQ" description="Common questions about Naar's search-first and repo-guided workflows.">
+<SiteLayout title="FAQ" description="Short answers to common questions about Naar's search, go, install, providers, and safety model.">
   <section class="pt-16">
     <Container>
       <SectionHeader
         eyebrow="FAQ"
-        title="Common questions, straight answers"
-        description="Naar is small enough to learn quickly, but broad enough that the entry points, trust model, and install behavior deserve explicit answers."
+        title="Common questions, direct answers"
+        description="The product model is simple once the boundaries are explicit. These are the questions most users ask first."
       />
-      <div class="prose-naar mt-14 rounded-[2rem] border border-white/10 bg-surface/60 p-8 shadow-panel shadow-black/20 sm:p-10">
-        <FaqContent />
+
+      <div class="mt-12 space-y-4">
+        {faqs.map(([question, answer], index) => (
+          <details class="glass-panel p-6" open={index === 0}>
+            <summary class="cursor-pointer list-none text-lg font-semibold text-text marker:hidden">
+              {question}
+            </summary>
+            <p class="mt-4 text-sm leading-7 text-text-muted">{answer}</p>
+          </details>
+        ))}
+      </div>
+
+      <div class="mt-12 flex flex-col gap-3 sm:flex-row">
+        <Button href={siteMeta.issuesUrl} target="_blank" rel="noreferrer" variant="secondary">
+          Report an issue
+        </Button>
+        <Button href={siteMeta.githubUrl + "/blob/main/CONTRIBUTING.md"} target="_blank" rel="noreferrer" variant="secondary">
+          Contribute a provider
+        </Button>
       </div>
     </Container>
   </section>

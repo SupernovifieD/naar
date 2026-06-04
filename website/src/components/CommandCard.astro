@@ -1,0 +1,23 @@
+---
+import CopyButton from "./CopyButton";
+
+interface Props {
+  title: string;
+  body?: string;
+  command: string;
+  eyebrow?: string;
+}
+
+const { title, body, command, eyebrow } = Astro.props as Props;
+---
+<div class="glass-panel p-6">
+  {eyebrow && <p class="text-xs font-semibold uppercase tracking-[0.18em] text-text-soft">{eyebrow}</p>}
+  <h3 class="mt-2 text-xl font-semibold text-text">{title}</h3>
+  {body && <p class="mt-3 text-sm leading-7 text-text-muted">{body}</p>}
+  <div class="mt-5 rounded-2xl border border-white/10 bg-bg-soft/80 p-4">
+    <div class="flex items-center justify-between gap-4">
+      <code class="min-w-0 break-all text-sm text-cyan-300">{command}</code>
+      <CopyButton client:load text={command} label="Copy" />
+    </div>
+  </div>
+</div>

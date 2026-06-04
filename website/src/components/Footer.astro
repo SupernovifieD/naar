@@ -1,6 +1,7 @@
 ---
 import Container from "./Container.astro";
 import { navLinks, productLinks, siteMeta, withBase } from "../data/site";
+import { packageInfo } from "../lib/package";
 
 const footerLogo = withBase("/assets/naar/naar-logotype-light.png");
 const communityLinks = [
@@ -15,9 +16,9 @@ const communityLinks = [
       <div class="space-y-4">
         <img src={footerLogo} alt="Naar" class="h-8 w-auto" />
         <p class="max-w-md text-sm leading-7 text-text-muted">
-          Find, evaluate, and safely install AI-agent skills with a local-first workflow.
+          {siteMeta.description}
         </p>
-        <p class="text-sm text-text-soft">Naar is open-source and local-first.</p>
+        <p class="text-sm text-text-soft">{packageInfo.cliCommand} v{packageInfo.version} · Node {packageInfo.nodeEngine}</p>
       </div>
 
       <div>

@@ -2,31 +2,135 @@
 import SiteLayout from "../layouts/SiteLayout.astro";
 import Container from "../components/Container.astro";
 import SectionHeader from "../components/SectionHeader.astro";
-import TerminalFrame from "../components/TerminalFrame.astro";
-import SecurityContent from "../content/security.mdx";
+import Callout from "../components/Callout.astro";
+import CommandCard from "../components/CommandCard.astro";
+import Button from "../components/Button.astro";
+import { siteMeta, withBase } from "../data/site";
+
+const fileRows = [
+  ["`.claude/skills/<skill>/SKILL.md`", "Stable write target for Claude project skills."],
+  ["`.cursor/rules/naar-<skill>.mdc`", "Stable write target for Cursor rules."],
+  ["`.github/copilot-instructions.md`", "Managed block updates for GitHub Copilot repo instructions."],
+  ["`.agents/skills/<skill>/SKILL.md`", "Stable write target for Codex repo skills and generic agent skills."],
+  ["`.naar/installed.json`", "Project-local managed state for currently installed skills."],
+  ["`naar.lock.json`", "Pinned provider/version history for reproducible lifecycle operations."],
+  ["`.naar/skills/<skill>/SKILL.md`", "Local copied source of fetched skill markdown for provenance and uninstall support."],
+] as const;
+
+const checklist = [
+  "Prefer `--dry-run` before installing a new skill into a sensitive repository.",
+  "Read the generated install plan and then inspect the resulting `git diff`.",
+  "Treat risk and security scores as heuristics, not guarantees.",
+  "Be extra careful with skills that mention scripts, binaries, API keys, or shell access.",
+  "Use `naar uninstall` to remove managed files instead of deleting them manually."
+] as const;
 ---
-<SiteLayout title="Security" description="Naar's safety model for discovery, fetched-bundle review, and explicit installation approval.">
+<SiteLayout title="Security" description="How Naar reduces risk during discovery and install, and where its trust boundaries stop.">
   <section class="pt-16">
     <Container>
       <SectionHeader
         eyebrow="Security"
-        title="Review stays in the loop"
-        description="Naar helps users make safer decisions before third-party instructions are written into a repository. It does not claim to prove that third-party skills are harmless."
+        title="Naar is a safety layer, not a sandbox"
+        description="Naar adds review, policy checks, and explicit confirmation before writes. It helps users make better decisions, but it does not claim to prove that third-party skills are harmless."
       />
+
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
+        <Callout title="What Naar does" tone="success">
+          Naar scans repository files locally, fetches provider candidates, re-checks fetched bundles during install, previews writes, and asks for explicit approval before writing managed files.
+        </Callout>
+        <Callout title="What Naar does not do" tone="danger">
+          Naar is not a sandbox, not an antivirus engine, not a formal security audit, and not a guarantee that a third-party skill is safe for production or private infrastructure.
+        </Callout>
+      </div>
+
+      <div class="mt-12 grid gap-6 lg:grid-cols-2">
         <div class="glass-panel p-7">
-          <h3 class="text-xl font-semibold text-text">Read-only discovery</h3>
-          <p class="mt-3 text-sm leading-7 text-text-muted">Search is discovery-only. It does not write files and it does not bypass install review.</p>
+          <h2 class="text-2xl font-semibold text-text">What Naar does</h2>
+          <ul class="mt-5 space-y-3 text-sm leading-7 text-text-muted">
+            <li>Scans repository files locally to infer structured facts.</li>
+            <li>Keeps scan and recommendation separate from file writes.</li>
+            <li>Runs fetched-bundle content checks before install writes.</li>
+            <li>Blocks scripts by default and surfaces risky findings explicitly.</li>
+            <li>Requires review and confirmation during the install flow.</li>
+          </ul>
         </div>
-        <TerminalFrame title="Dry-run review" copyText="naar install clawhub:brewpage --dry-run">
-$ naar install clawhub:brewpage --dry-run
-Installation plan
-Summary: 2 write · 0 update · 0 blocked
-        </TerminalFrame>
+        <div class="glass-panel p-7">
+          <h2 class="text-2xl font-semibold text-text">What Naar does not do</h2>
+          <ul class="mt-5 space-y-3 text-sm leading-7 text-text-muted">
+            <li>It does not upload your full source code to providers.</li>
+            <li>It does not rewrite application source files during scan or recommendation.</li>
+            <li>It does not silently install from search results.</li>
+            <li>It does not treat heuristic scores as security proof.</li>
+            <li>It does not replace careful review of installed files.</li>
+          </ul>
+        </div>
       </div>
-      <div class="prose-naar mt-14">
-        <SecurityContent />
+
+      <div class="mt-12 grid gap-6 lg:grid-cols-2">
+        <div class="glass-panel p-7">
+          <h2 class="text-2xl font-semibold text-text">Trust boundaries</h2>
+          <p class="mt-4 text-sm leading-7 text-text-muted">Scan and recommendation stay local-first. Providers may receive structured repo facts like frameworks, languages, or assistant targets, but Naar does not ship your full codebase for recommendation-time analysis.</p>
+          <p class="mt-4 text-sm leading-7 text-text-muted">Writes happen only in the install flow, after fetched-bundle review and an explicit install plan.</p>
+        </div>
+        <div class="glass-panel p-7">
+          <h2 class="text-2xl font-semibold text-text">Review workflow</h2>
+          <p class="mt-4 text-sm leading-7 text-text-muted">The install flow fetches the selected bundle, analyzes metadata and file content, shows a plan, and requires confirmation before writes. Risky installs can require stronger confirmation or explicit override flags.</p>
+          <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <CommandCard title="Preview first" command="naar go --dry-run" />
+            <CommandCard title="Direct bundle preview" command="naar install clawhub:brewpage --dry-run" />
+          </div>
+        </div>
       </div>
+
+      <section class="mt-14 space-y-6">
+        <SectionHeader title="Files Naar may write" description="These are the managed project files Naar may create or update during install, depending on selected targets." />
+        <div class="overflow-hidden rounded-[1.75rem] border border-white/10 bg-surface/60">
+          <table class="w-full border-collapse text-left text-sm">
+            <thead class="bg-white/5 text-text-soft">
+              <tr>
+                <th class="px-5 py-4 font-semibold">Path</th>
+                <th class="px-5 py-4 font-semibold">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fileRows.map(([path, reason]) => (
+                <tr class="border-t border-white/10 align-top text-text-muted">
+                  <td class="px-5 py-4"><code>{path}</code></td>
+                  <td class="px-5 py-4">{reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="mt-14 space-y-6">
+        <SectionHeader title="Safe usage checklist" description="These habits are still your responsibility, even when Naar is doing the heavy lifting." />
+        <div class="grid gap-4 lg:grid-cols-2">
+          {checklist.map((item) => (
+            <div class="glass-panel p-5 text-sm leading-7 text-text-muted">{item}</div>
+          ))}
+        </div>
+      </section>
+
+      <section class="mt-14 space-y-6">
+        <SectionHeader title="Local history" description="Naar's lifecycle history is local-only and exists to support auditing and cleanup, not telemetry." />
+        <Callout title="History scope" tone="info">
+          Local history can store project paths, path hashes, timestamps, broad stack facts, installed skill metadata, targets, security scores, and install/uninstall lifecycle events. It must not store source code, file contents, secrets, tokens, or shell history.
+        </Callout>
+      </section>
+
+      <section class="mt-14 space-y-6">
+        <SectionHeader title="Need the full policy text?" description="The repository security document remains the detailed source of truth for exact policy thresholds and signal behavior." />
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <Button href={siteMeta.githubUrl + "/blob/main/SECURITY.md"} target="_blank" rel="noreferrer" variant="secondary">
+            Read SECURITY.md
+          </Button>
+          <Button href={withBase("/docs#flags-and-safety-controls")} variant="secondary">
+            Read safety flags
+          </Button>
+        </div>
+      </section>
     </Container>
   </section>
 </SiteLayout>

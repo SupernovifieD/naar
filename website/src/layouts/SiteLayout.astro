@@ -7,15 +7,19 @@ import { siteMeta, withBase } from "../data/site";
 interface Props {
   title?: string;
   description?: string;
+  socialImage?: string;
+  noIndex?: boolean;
 }
 
 const {
   title,
-  description = siteMeta.description
+  description = siteMeta.description,
+  socialImage = withBase("/assets/naar/naar-logotype-dark.png"),
+  noIndex = false
 } = Astro.props as Props;
 
 const pageTitle = title ? `${title} · ${siteMeta.name}` : `${siteMeta.name} · ${siteMeta.tagline}`;
-const socialImage = withBase("/assets/naar/naar-logotype-dark.png");
+const canonicalUrl = Astro.url.href;
 ---
 <!doctype html>
 <html lang="en">
@@ -24,12 +28,20 @@ const socialImage = withBase("/assets/naar/naar-logotype-dark.png");
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#0b0c10" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={socialImage} />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#0b0c10" />
+    <meta property="og:site_name" content={siteMeta.name} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/png" href={withBase("/assets/naar/naar-logo.png")} />
+    {noIndex && <meta name="robots" content="noindex, nofollow" />}
   </head>
   <body class="overflow-x-hidden bg-bg text-text antialiased">
     <div class="pointer-events-none fixed inset-0 -z-10 bg-hero-radial"></div>

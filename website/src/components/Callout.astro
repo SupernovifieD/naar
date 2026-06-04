@@ -1,0 +1,22 @@
+---
+interface Props {
+  title: string;
+  tone?: "info" | "warning" | "success" | "danger";
+}
+
+const { title, tone = "info" } = Astro.props as Props;
+type CalloutTone = NonNullable<Props["tone"]>;
+
+const toneClasses = {
+  info: "border-accent-gold/25 bg-accent-gold/8",
+  warning: "border-warning/25 bg-warning/10",
+  success: "border-success/25 bg-success/10",
+  danger: "border-danger/25 bg-danger/10"
+} satisfies Record<CalloutTone, string>;
+---
+<div class={`rounded-[1.5rem] border p-5 ${toneClasses[tone]}`.trim()}>
+  <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text">{title}</h3>
+  <div class="mt-3 text-sm leading-7 text-text-muted">
+    <slot />
+  </div>
+</div>

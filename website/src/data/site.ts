@@ -1,19 +1,16 @@
-import fs from "node:fs";
-
-const rootPackagePath = new URL("../../../package.json", import.meta.url);
-const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, "utf8")) as { version?: string };
+import { packageInfo } from "../lib/package";
 
 export const siteMeta = {
-  name: "Naar",
+  name: packageInfo.displayName,
   tagline: "Find, evaluate, and install AI-agent skills without turning your repo into a guessing game.",
-  description: "Naar is a local-first CLI for discovering, evaluating, and safely installing AI-agent skills, rules, and instructions from provider catalogs.",
-  installCommand: "npm i -g naar-cli",
-  npmUrl: "https://www.npmjs.com/package/naar-cli",
-  githubUrl: "https://github.com/SupernovifieD/naar",
-  issuesUrl: "https://github.com/SupernovifieD/naar/issues"
+  description: "Naar is a repo-aware CLI for discovering, reviewing, and installing AI-agent skills from provider catalogs.",
+  installCommand: `npm i -g ${packageInfo.npmPackageName}`,
+  npmUrl: `https://www.npmjs.com/package/${packageInfo.npmPackageName}`,
+  githubUrl: packageInfo.repositoryUrl,
+  issuesUrl: `${packageInfo.repositoryUrl}/issues`
 } as const;
 
-export const cliVersion = rootPackage.version ?? "unknown";
+export const cliVersion = packageInfo.version;
 
 export const navLinks = [
   { href: "/", label: "Home" },
@@ -24,9 +21,10 @@ export const navLinks = [
 ] as const;
 
 export const productLinks = [
-  { href: "/docs#search-first", label: "Search" },
-  { href: "/docs#guided-flow", label: "Go workflow" },
-  { href: "/docs#from-search-to-install", label: "Install" }
+  { href: "/docs#getting-started", label: "Getting started" },
+  { href: "/docs#search-workflow", label: "Search workflow" },
+  { href: "/docs#guided-go-workflow", label: "Go workflow" },
+  { href: "/docs#install-workflow", label: "Install" }
 ] as const;
 
 export function withBase(pathname: string): string {
