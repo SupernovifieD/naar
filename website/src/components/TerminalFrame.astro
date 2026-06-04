@@ -4,9 +4,16 @@ import CopyButton from "./CopyButton";
 interface Props {
   title?: string;
   copyText?: string;
+  asCode?: boolean;
+  bodyClass?: string;
 }
 
-const { title = "Terminal", copyText } = Astro.props as Props;
+const {
+  title = "Terminal",
+  copyText,
+  asCode = true,
+  bodyClass = ""
+} = Astro.props as Props;
 ---
 <div class="glass-panel overflow-hidden">
   <div class="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
@@ -18,5 +25,9 @@ const { title = "Terminal", copyText } = Astro.props as Props;
     </div>
     {copyText && <CopyButton client:load text={copyText} label="Copy" />}
   </div>
-  <pre class="overflow-x-auto px-5 py-5 text-sm leading-7 text-text"><code><slot /></code></pre>
+  {asCode ? (
+    <pre class={`overflow-x-auto px-5 py-5 text-sm leading-7 text-text ${bodyClass}`.trim()}><code><slot /></code></pre>
+  ) : (
+    <div class={`text-sm leading-7 text-text ${bodyClass}`.trim()}><slot /></div>
+  )}
 </div>

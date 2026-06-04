@@ -1,79 +1,214 @@
 ---
+import { ArrowRight, BadgeCheck, FolderSearch, ShieldCheck, Boxes, Download, Star, LockKeyhole } from "lucide-react";
 import SiteLayout from "../layouts/SiteLayout.astro";
 import Container from "../components/Container.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import Button from "../components/Button.astro";
 import TerminalFrame from "../components/TerminalFrame.astro";
-import { latestRelease } from "../data/changelog";
-import { withBase } from "../data/site";
+import InstallCta from "../components/InstallCta";
+import SkillSearchTerminal from "../components/SkillSearchTerminal";
+import GoWorkflowTerminal from "../components/GoWorkflowTerminal";
+import CommandRotator from "../components/CommandRotator";
+import { cliVersion, siteMeta, withBase } from "../data/site";
+import { releases } from "../data/changelog";
 
+const logoLight = withBase("/assets/naar/naar-logotype-light.png");
 const logoMark = withBase("/assets/naar/naar-logo.png");
+const latestReleases = releases.slice(0, 3).map((release) => ({
+  ...release,
+  summaryBullets: release.sections.flatMap((section) =>
+    section.bullets
+      .filter((bullet) => bullet.depth === 0)
+      .slice(0, 2)
+      .map((bullet) => bullet.text)
+  ).slice(0, 3)
+}));
+
+const commandRotatorCommands = [
+  "naar go",
+  'naar search "testing"',
+  "naar install clawhub:vitest-testing",
+  "naar list",
+  "naar history",
+  "naar targets list"
+];
+
+const whyCards = [
+  {
+    title: "Skills are scattered",
+    body: "Useful agent skills live across separate providers and formats. Search should not depend on already knowing where they live.",
+    Icon: FolderSearch
+  },
+  {
+    title: "Repo context matters",
+    body: "A React app and a Python API should not get the same suggestions. Naar scans the repo before it recommends anything.",
+    Icon: Boxes
+  },
+  {
+    title: "Trust should be visible",
+    body: "Publisher, license, freshness, and risk belong next to the result. That context should not be buried behind the install step.",
+    Icon: BadgeCheck
+  },
+  {
+    title: "Install should be explicit",
+    body: "Search stays read-only. Writes happen only after review, security checks, and an install plan you can inspect.",
+    Icon: ShieldCheck
+  }
+];
 ---
 <SiteLayout>
-  <section class="relative pt-14 sm:pt-20">
+  <section class="relative flex min-h-[calc(100vh-5.25rem)] items-center pt-10 sm:pt-16">
     <Container>
-      <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <div class="space-y-7">
-          <span class="eyebrow">Local-first skill package manager</span>
-          <div class="space-y-5">
-            <h1 class="max-w-4xl text-5xl font-semibold tracking-tight text-text sm:text-6xl lg:text-7xl">
-              Two ways in. One safe installer.
-            </h1>
-            <p class="max-w-2xl text-lg leading-8 text-text-muted sm:text-xl">
-              Naar helps developers find, evaluate, and install AI-agent skills from provider catalogs, either by letting the CLI guide the current repo or by searching directly when the goal is already clear.
-            </p>
+      <div class="mx-auto max-w-5xl text-center">
+        <div class="relative isolate overflow-visible rounded-[2rem] px-2 py-10 sm:px-6 sm:py-16">
+          <div class="pointer-events-none absolute inset-x-0 top-10 h-48 rounded-full bg-accent-red/12 blur-3xl"></div>
+          <div class="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-orange/10 blur-3xl"></div>
+          <div class="pointer-events-none absolute right-[10%] top-6 hidden sm:block">
+            <div class="relative">
+              <div class="absolute inset-0 rounded-full bg-white/10 blur-2xl"></div>
+              <img
+                src={logoMark}
+                alt=""
+                class="relative w-28 rotate-6 drop-shadow-[0_24px_44px_rgba(0,0,0,0.4)] lg:w-36"
+              />
+            </div>
           </div>
-          <div class="flex flex-col gap-3 sm:flex-row">
-            <Button href={withBase("/docs")}>
-              Read the docs
-            </Button>
-            <Button href={withBase("/security")} variant="secondary">
-              See the safety model
-            </Button>
-          </div>
-          <div class="grid gap-4 pt-3 sm:grid-cols-3">
-            <div class="glass-panel p-4">
-              <p class="text-sm font-semibold text-text">Search-first</p>
-              <p class="mt-2 text-sm leading-6 text-text-muted">Browse provider catalogs directly without scanning the repo.</p>
+
+          <div class="relative z-10 flex flex-col items-center gap-7">
+            <img src={logoLight} alt="Naar" class="h-11 w-auto sm:h-12" />
+            <div class="space-y-5">
+              <h1 class="mx-auto max-w-4xl text-5xl font-semibold tracking-tight text-text sm:text-6xl lg:text-7xl">
+                Find the right skills for your AI coding agent.
+              </h1>
+              <p class="mx-auto max-w-3xl text-lg leading-8 text-text-muted sm:text-xl">
+                Naar searches skill providers, understands your repo, and helps you review before anything gets installed.
+              </p>
             </div>
-            <div class="glass-panel p-4">
-              <p class="text-sm font-semibold text-text">Repo-guided</p>
-              <p class="mt-2 text-sm leading-6 text-text-muted">Scan the current project and rank what actually fits.</p>
+            <div class="flex flex-col items-center gap-3 sm:flex-row">
+              <InstallCta client:load command={siteMeta.installCommand} defaultText={siteMeta.installCommand} copiedText="Copied" revealOnHover={false} className="w-full sm:w-auto" />
+              <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full sm:w-auto">
+                View on GitHub
+              </Button>
             </div>
-            <div class="glass-panel p-4">
-              <p class="text-sm font-semibold text-text">Reviewed install</p>
-              <p class="mt-2 text-sm leading-6 text-text-muted">Preview changes, inspect risk, and approve writes explicitly.</p>
-            </div>
+            <p class="text-sm text-text-soft">Two doors into the same safe installer: search directly, or let <code>naar go</code> guide the repo.</p>
           </div>
         </div>
+      </div>
+    </Container>
+  </section>
 
-        <div class="glass-panel relative overflow-hidden p-6 sm:p-8">
-          <div class="pointer-events-none absolute inset-x-8 top-0 h-36 rounded-full bg-accent-red/20 blur-3xl"></div>
-          <img
-            src={logoMark}
-            alt=""
-            class="pointer-events-none absolute -right-6 -top-10 hidden w-36 rotate-6 opacity-80 drop-shadow-[0_30px_70px_rgba(0,0,0,0.45)] sm:block lg:w-44"
+  <section class="pt-12 sm:pt-16">
+    <Container>
+      <SectionHeader
+        eyebrow="Door one"
+        title="Search the catalog locally, then copy an exact install command"
+        description="The website search runs on a build-time skills index. No browser-side provider API calls, just a local catalog you can inspect and copy from."
+        align="center"
+      />
+      <div class="mx-auto mt-10 max-w-5xl">
+        <TerminalFrame title="Search terminal" asCode={false} bodyClass="p-5 sm:p-6">
+          <SkillSearchTerminal client:load dataUrl={withBase("/data/skills-index.json")} />
+        </TerminalFrame>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <SectionHeader
+        eyebrow="Why Naar exists"
+        title="A small CLI problem became a bigger trust problem"
+        description="Naar is opinionated about discovery, context, and review because the install surface is bigger than a single provider or assistant."
+        align="center"
+      />
+      <div class="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {whyCards.map(({ title, body, Icon }) => (
+          <div class="glass-panel p-6">
+            <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-accent-gold">
+              <Icon size={22} strokeWidth={1.8} />
+            </div>
+            <h3 class="mt-5 text-xl font-semibold text-text">{title}</h3>
+            <p class="mt-3 text-sm leading-7 text-text-muted">{body}</p>
+          </div>
+        ))}
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <div class="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
+        <div class="space-y-5">
+          <SectionHeader
+            eyebrow="Door two"
+            title="Let `naar go` scan, rank, and stage the install plan"
+            description="The guided flow is still the fastest way to see repo-aware recommendations, assistant detection, and a reviewed write plan in one pass."
           />
-          <div class="relative space-y-5">
-            <div class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-soft">
-              Start with search or let Naar guide you
-            </div>
-            <div class="space-y-4">
-              <TerminalFrame title="Search-first" copyText="naar search &quot;github actions&quot;">
-$ naar search "github actions"
-1. brewpage [clawhub]
-Provides reusable GitHub Actions guidance.
-Install: naar install clawhub:brewpage
-              </TerminalFrame>
-              <TerminalFrame title="Guided flow" copyText="naar go">
-$ naar go
-[1/5] Scan
-[2/5] Providers
-[3/5] Recommendations
-[4/5] Selection
-[5/5] Install
-              </TerminalFrame>
-            </div>
+          <div class="glass-panel p-6">
+            <ul class="space-y-4 text-sm leading-7 text-text-muted">
+              <li class="flex gap-3">
+                <span class="mt-1 text-accent-gold"><ArrowRight size={16} /></span>
+                <span>Scan the repo and infer stack, tools, assistants, and readiness signals.</span>
+              </li>
+              <li class="flex gap-3">
+                <span class="mt-1 text-accent-gold"><ArrowRight size={16} /></span>
+                <span>Fetch providers, rank relevant skills, and keep risky or blocked entries explicit.</span>
+              </li>
+              <li class="flex gap-3">
+                <span class="mt-1 text-accent-gold"><ArrowRight size={16} /></span>
+                <span>Review selection, inspect writes, and approve the plan before anything lands in the repo.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <TerminalFrame title="Guided workflow" asCode={false} bodyClass="p-5 sm:p-6">
+          <GoWorkflowTerminal client:load version={cliVersion} />
+        </TerminalFrame>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <SectionHeader
+        eyebrow="Install, GitHub, security"
+        title="Use Naar, inspect the source, and understand the safety model"
+        description="The CLI is open-source, install remains explicit, and the security model is documented rather than implied."
+        align="center"
+      />
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        <div class="glass-panel p-6">
+          <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-accent-orange">
+            <Download size={22} strokeWidth={1.8} />
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-text">Install globally</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Install the CLI once, then search directly or use <code>naar go</code> inside any repo.</p>
+          <div class="mt-5">
+            <InstallCta client:load command={siteMeta.installCommand} defaultText={siteMeta.installCommand} copiedText="Copied" revealOnHover={false} className="w-full justify-center" />
+          </div>
+        </div>
+        <div class="glass-panel p-6">
+          <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-accent-gold">
+            <Star size={22} strokeWidth={1.8} />
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-text">Star on GitHub</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Inspect the code, follow release work, and keep an eye on target and provider support as it grows.</p>
+          <div class="mt-5">
+            <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" class="w-full justify-center" variant="secondary">
+              Open repository
+            </Button>
+          </div>
+        </div>
+        <div class="glass-panel p-6">
+          <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-success">
+            <LockKeyhole size={22} strokeWidth={1.8} />
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-text">Review the security model</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Read how recommendation risk, fetched-bundle analysis, prompts, and explicit overrides work before install.</p>
+          <div class="mt-5">
+            <Button href={withBase("/security")} class="w-full justify-center" variant="secondary">
+              Open security guide
+            </Button>
           </div>
         </div>
       </div>
@@ -83,99 +218,56 @@ $ naar go
   <section class="pt-24">
     <Container>
       <SectionHeader
-        eyebrow="Entry points"
-        title="Choose the door that fits how you work"
-        description="Naar feels larger and clearer when the first decision is yours: browse directly, or let the CLI infer what the repo needs."
+        eyebrow="Changelog"
+        title="Follow the release timeline"
+        description="Recent releases focus on direct install clarity, terminal UX, provider retrieval breadth, and safer install workflows."
+        align="center"
       />
-      <div class="mt-12 grid gap-6 lg:grid-cols-2">
-        <div class="glass-panel p-8">
-          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent-gold">Door one</p>
-          <h3 class="mt-4 text-2xl font-semibold text-text">Search provider catalogs directly</h3>
-          <p class="mt-4 text-base leading-7 text-text-muted">
-            Use <code>naar search</code> when you already know the kind of skill you want. Browse results, compare provider metadata, and copy a precise ref into install.
-          </p>
-          <pre class="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-bg-soft/80 p-5 text-sm text-text"><code>naar search "github actions"
-naar s brewpage
-naar install clawhub:brewpage --dry-run</code></pre>
-        </div>
-        <div class="glass-panel p-8">
-          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent-red-soft">Door two</p>
-          <h3 class="mt-4 text-2xl font-semibold text-text">Let Naar guide the repo</h3>
-          <p class="mt-4 text-base leading-7 text-text-muted">
-            Use <code>naar go</code> when you want repo-aware recommendations, assistant-target detection, and a guided selection flow before install.
-          </p>
-          <pre class="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-bg-soft/80 p-5 text-sm text-text"><code>naar go
-naar recommend --limit 5
-naar scan --json</code></pre>
-        </div>
+      <div class="mx-auto mt-12 max-w-4xl space-y-5">
+        {latestReleases.map((release, index) => (
+          <a href={withBase(`/changelog/${release.slug}`)} class="group block rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 transition-colors duration-200 ease-glide hover:border-white/20 hover:bg-white/[0.05]">
+            <div class="grid gap-4 lg:grid-cols-[auto_1fr] lg:gap-6">
+              <div class="flex gap-4">
+                <div class="flex w-12 flex-col items-center">
+                  <span class="inline-flex h-4 w-4 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)]"></span>
+                  {index < latestReleases.length - 1 && <span class="mt-3 h-full w-px bg-white/10"></span>}
+                </div>
+                <div class="space-y-2">
+                  <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-lg font-semibold text-text">{release.slug}</span>
+                    <span class="text-sm text-text-soft">{release.date}</span>
+                  </div>
+                  <ul class="space-y-2 text-sm leading-7 text-text-muted">
+                    {release.summaryBullets.map((bullet) => (
+                      <li>{bullet}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </a>
+        ))}
       </div>
     </Container>
   </section>
 
   <section class="pt-24">
     <Container>
-      <SectionHeader
-        eyebrow="Why it matters"
-        title="Discovery and install stay separate on purpose"
-        description="Naar treats search as read-only and install as a reviewed write path. That separation keeps fast discovery from weakening the trust model."
-      />
-      <div class="mt-12 grid gap-6 md:grid-cols-3">
-        <div class="glass-panel p-6">
-          <h3 class="text-lg font-semibold text-text">Discovery-only search</h3>
-          <p class="mt-3 text-sm leading-7 text-text-muted">Search does not install anything. It returns provider results and install-ready refs.</p>
-        </div>
-        <div class="glass-panel p-6">
-          <h3 class="text-lg font-semibold text-text">Preview-first install</h3>
-          <p class="mt-3 text-sm leading-7 text-text-muted">Bundles are fetched, analyzed, and previewed before Naar writes managed files into the repo.</p>
-        </div>
-        <div class="glass-panel p-6">
-          <h3 class="text-lg font-semibold text-text">Local-first lifecycle</h3>
-          <p class="mt-3 text-sm leading-7 text-text-muted">Installed state, lock data, and local history help you audit what changed and remove it cleanly later.</p>
-        </div>
-      </div>
-    </Container>
-  </section>
-
-  <section class="pt-24">
-    <Container>
-      <SectionHeader
-        eyebrow="Coverage"
-        title="Built for real assistant targets and real provider catalogs"
-        description="Naar already supports stable targets for Claude, Cursor, Copilot, Codex, Gemini context, AGENTS.md, and generic agent-skill conventions, with experimental targets available when you opt in."
-      />
-      <div class="mt-12 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div class="glass-panel p-8">
-          <h3 class="text-xl font-semibold text-text">Providers today</h3>
-          <p class="mt-4 text-base leading-7 text-text-muted">
-            Anthropic and ClawHub are supported now, with GitHub-backed fallback discovery where the provider supports it. Search and guided recommendations both flow through that provider layer.
-          </p>
-        </div>
-        <div class="glass-panel p-8">
-          <h3 class="text-xl font-semibold text-text">Targets at install time</h3>
-          <p class="mt-4 text-base leading-7 text-text-muted">
-            Use <code>naar targets list</code> and <code>naar targets inspect</code> to inspect stable, experimental, deprecated, and research-only targets before writing anything.
-          </p>
-        </div>
-      </div>
-    </Container>
-  </section>
-
-  <section class="pt-24">
-    <Container>
-      <div class="glass-panel p-8 sm:p-10">
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div class="max-w-2xl space-y-3">
-            <span class="eyebrow">Current status</span>
-            <h2 class="text-3xl font-semibold text-text sm:text-4xl">Early, usable, and still getting sharper</h2>
-            <p class="text-base leading-7 text-text-muted">
-              Current work is focused on search quality, recommendation quality, provider coverage, target support, and safe installation UX.
-            </p>
+      <div class="glass-panel mx-auto max-w-4xl px-6 py-10 text-center sm:px-10 sm:py-12">
+        <div class="space-y-6">
+          <span class="eyebrow">Final CTA</span>
+          <h2 class="text-3xl font-semibold text-text sm:text-4xl">
+            Give your repo better instructions. Keep control of what gets installed.
+          </h2>
+          <div class="mx-auto max-w-2xl">
+            <CommandRotator client:load commands={commandRotatorCommands} />
           </div>
-          {latestRelease && (
-            <a href={withBase(`/changelog/${latestRelease.slug}`)} class="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-text-muted transition-colors duration-200 ease-glide hover:text-text">
-              Latest release: <span class="font-semibold text-text">{latestRelease.slug}</span>
-            </a>
-          )}
+          <div class="flex flex-col justify-center gap-3 sm:flex-row">
+            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" copiedText="Copied" className="w-full sm:w-auto" />
+            <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full sm:w-auto">
+              Star on GitHub
+            </Button>
+          </div>
         </div>
       </div>
     </Container>

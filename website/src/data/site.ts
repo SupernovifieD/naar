@@ -1,3 +1,8 @@
+import fs from "node:fs";
+
+const rootPackagePath = new URL("../../../package.json", import.meta.url);
+const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, "utf8")) as { version?: string };
+
 export const siteMeta = {
   name: "Naar",
   tagline: "Find, evaluate, and install AI-agent skills without turning your repo into a guessing game.",
@@ -7,6 +12,8 @@ export const siteMeta = {
   githubUrl: "https://github.com/SupernovifieD/naar",
   issuesUrl: "https://github.com/SupernovifieD/naar/issues"
 } as const;
+
+export const cliVersion = rootPackage.version ?? "unknown";
 
 export const navLinks = [
   { href: "/", label: "Home" },

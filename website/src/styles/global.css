@@ -79,6 +79,18 @@ a {
     outline: 2px solid rgba(219, 181, 90, 0.9);
     outline-offset: 2px;
   }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
 }
 
 @layer components {
@@ -155,4 +167,30 @@ a {
   .prose-naar pre code {
     @apply border-0 bg-transparent p-0;
   }
+}
+
+@keyframes command-rotate {
+  0% {
+    opacity: 0;
+    transform: translateY(0.65rem) rotateX(-18deg) scale(0.98);
+  }
+
+  14% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg) scale(1);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-0.55rem) rotateX(16deg) scale(0.99);
+  }
+}
+
+.animate-command-rotate {
+  animation: command-rotate 2.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
