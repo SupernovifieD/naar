@@ -1,0 +1,31 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Container from "../components/Container.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import TerminalFrame from "../components/TerminalFrame.astro";
+import DocsContent from "../content/docs.mdx";
+---
+<SiteLayout title="Docs" description="How to use Naar through search-first and repo-guided workflows.">
+  <section class="pt-16">
+    <Container>
+      <SectionHeader
+        eyebrow="Docs"
+        title="Two ways to use Naar"
+        description="Start with search when you know what you want. Start with go when you want Naar to infer what fits the current repo."
+      />
+      <div class="mt-10 grid gap-6 lg:grid-cols-2">
+        <TerminalFrame title="Search-first" copyText="naar search &quot;github actions&quot;">
+$ naar search "github actions"
+$ naar install clawhub:brewpage --dry-run
+        </TerminalFrame>
+        <TerminalFrame title="Repo-guided" copyText="naar go">
+$ naar go
+$ naar recommend --limit 5
+        </TerminalFrame>
+      </div>
+      <div class="prose-naar mt-14">
+        <DocsContent />
+      </div>
+    </Container>
+  </section>
+</SiteLayout>

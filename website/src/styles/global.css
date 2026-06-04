@@ -1,0 +1,158 @@
+@import "@fontsource-variable/manrope";
+@import "@fontsource/space-grotesk";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: 10 11 16;
+  --bg-soft: 16 17 24;
+  --surface: 21 24 33;
+  --surface-glass: 27 31 43;
+  --border: 255 255 255;
+  --text: 245 241 237;
+  --text-muted: 192 186 178;
+  --text-soft: 147 143 138;
+  --accent-red: 157 34 50;
+  --accent-red-soft: 218 92 98;
+  --accent-orange: 222 124 66;
+  --accent-gold: 219 181 90;
+  --success: 82 190 131;
+  --warning: 232 176 86;
+  --danger: 222 94 102;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(157, 34, 50, 0.22), transparent 32%),
+    radial-gradient(circle at 82% 14%, rgba(222, 124, 66, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(16, 17, 24, 1) 0%, rgba(10, 11, 16, 1) 32%, rgba(10, 11, 16, 1) 100%);
+  color: rgb(var(--text));
+  font-family: "Manrope Variable", "Manrope", "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(218, 92, 98, 0.28);
+  color: rgb(var(--text));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    font-family: "Space Grotesk", "Manrope Variable", sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    color: rgb(var(--text-muted));
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  *:focus-visible {
+    outline: 2px solid rgba(219, 181, 90, 0.9);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply rounded-3xl border border-white/10 bg-surface/70 shadow-panel shadow-black/30 backdrop-blur-xl;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 60px rgba(0, 0, 0, 0.28);
+  }
+
+  .gloss-bar {
+    @apply border border-white/10 bg-surface-glass/70 backdrop-blur-xl;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-text-soft;
+  }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: radial-gradient(circle at center, black 45%, transparent 90%);
+  }
+
+  .prose-naar {
+    @apply max-w-none text-base leading-7 text-text-muted;
+  }
+
+  .prose-naar h2,
+  .prose-naar h3 {
+    @apply mt-12 text-text;
+  }
+
+  .prose-naar a {
+    @apply text-accent-gold underline decoration-white/10 underline-offset-4 transition-colors duration-200 ease-glide hover:text-text;
+  }
+
+  .prose-naar strong {
+    @apply font-semibold text-text;
+  }
+
+  .prose-naar ul {
+    @apply my-6 space-y-3 pl-0;
+    list-style: none;
+  }
+
+  .prose-naar li {
+    @apply relative pl-6;
+  }
+
+  .prose-naar li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.75rem;
+    height: 0.35rem;
+    width: 0.35rem;
+    border-radius: 9999px;
+    background: rgb(var(--accent-red-soft));
+    box-shadow: 0 0 0 5px rgba(218, 92, 98, 0.12);
+  }
+
+  .prose-naar code {
+    @apply rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-sm text-text;
+  }
+
+  .prose-naar pre {
+    @apply overflow-x-auto rounded-2xl border border-white/10 bg-bg-soft/90 p-5 text-sm text-text shadow-panel shadow-black/25;
+  }
+
+  .prose-naar pre code {
+    @apply border-0 bg-transparent p-0;
+  }
+}

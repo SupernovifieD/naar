@@ -1,0 +1,51 @@
+---
+import Container from "./Container.astro";
+import { navLinks, productLinks, siteMeta, withBase } from "../data/site";
+
+const footerLogo = withBase("/assets/naar/naar-logotype-light.png");
+const communityLinks = [
+  { href: siteMeta.githubUrl, label: "GitHub" },
+  { href: siteMeta.npmUrl, label: "npm" },
+  { href: siteMeta.issuesUrl, label: "Issues" }
+];
+---
+<footer class="mt-28 border-t border-white/10 pb-12 pt-12">
+  <Container>
+    <div class="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+      <div class="space-y-4">
+        <img src={footerLogo} alt="Naar" class="h-8 w-auto" />
+        <p class="max-w-md text-sm leading-7 text-text-muted">
+          Find, evaluate, and safely install AI-agent skills with a local-first workflow.
+        </p>
+        <p class="text-sm text-text-soft">Naar is open-source and local-first.</p>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">Links</h3>
+        <ul class="mt-4 space-y-3 text-sm text-text-muted">
+          {navLinks.slice(1).map((link) => (
+            <li><a href={withBase(link.href)} class="transition-colors duration-200 ease-glide hover:text-text">{link.label}</a></li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">Community</h3>
+        <ul class="mt-4 space-y-3 text-sm text-text-muted">
+          {communityLinks.map((link) => (
+            <li><a href={link.href} target="_blank" rel="noreferrer" class="transition-colors duration-200 ease-glide hover:text-text">{link.label}</a></li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-text-soft">Product</h3>
+        <ul class="mt-4 space-y-3 text-sm text-text-muted">
+          {productLinks.map((link) => (
+            <li><a href={withBase(link.href)} class="transition-colors duration-200 ease-glide hover:text-text">{link.label}</a></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </Container>
+</footer>

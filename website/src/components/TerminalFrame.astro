@@ -1,0 +1,22 @@
+---
+import CopyButton from "./CopyButton";
+
+interface Props {
+  title?: string;
+  copyText?: string;
+}
+
+const { title = "Terminal", copyText } = Astro.props as Props;
+---
+<div class="glass-panel overflow-hidden">
+  <div class="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
+    <div class="flex items-center gap-2">
+      <span class="h-2.5 w-2.5 rounded-full bg-danger/80"></span>
+      <span class="h-2.5 w-2.5 rounded-full bg-warning/80"></span>
+      <span class="h-2.5 w-2.5 rounded-full bg-success/80"></span>
+      <span class="ml-3 text-xs font-medium uppercase tracking-[0.2em] text-text-soft">{title}</span>
+    </div>
+    {copyText && <CopyButton client:load text={copyText} label="Copy" />}
+  </div>
+  <pre class="overflow-x-auto px-5 py-5 text-sm leading-7 text-text"><code><slot /></code></pre>
+</div>

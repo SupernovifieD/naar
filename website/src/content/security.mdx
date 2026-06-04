@@ -1,0 +1,48 @@
+## What Naar protects against
+
+Naar is designed to reduce the chance of blindly writing third-party instructions into your repository. It is not a sandbox, antivirus engine, or formal audit.
+
+The security model is practical:
+
+- recommendation-time vetting
+- fetched-bundle content analysis before writes
+- explicit review of file changes
+- blocked and risky statuses when concerns are found
+- scripts disabled by default
+
+## Search vs install
+
+Search is read-only discovery. It does not write files and does not bypass review.
+
+Installation is where the strict checks happen:
+
+1. fetch the selected bundle
+2. analyze metadata and content
+3. build an install plan
+4. ask for explicit approval before writing
+
+## Local-first by default
+
+Naar scans repository files locally to infer stack facts and assistant readiness. It does **not** rewrite application source code during scan or recommendation.
+
+During install, Naar may write managed target files, `.naar/installed.json`, `naar.lock.json`, and a local copy of fetched skill markdown under `.naar/skills/` for provenance and lifecycle operations.
+
+## Risk model
+
+A skill can be relevant and still unsafe. It can also be low-risk and still be a weak fit for the repo.
+
+Naar keeps those concerns separate:
+
+- **match** and **fit** tell you whether a skill belongs in the project
+- **security score** and **status** tell you whether it should be installed
+
+## Before you install
+
+Use dry runs and previews when the change matters:
+
+```bash
+naar go --dry-run
+naar install clawhub:brewpage --dry-run
+```
+
+For the full model and the exact policy details, read the repository's [`SECURITY.md`](https://github.com/SupernovifieD/naar/blob/main/SECURITY.md).

@@ -1,0 +1,70 @@
+## The two entry points
+
+Naar gives you two clean ways to start:
+
+- **`naar go`** when you want repo-guided recommendations.
+- **`naar search <query>`** when you already know what you want to browse.
+
+Both paths converge on the same reviewed installer. Search stays discovery-only. Install stays explicit.
+
+<h2 id="search-first">Search-first workflow</h2>
+
+Search is for moments when you already know the kind of skill you want:
+
+- GitHub Actions helpers
+- design systems
+- deployment rules
+- agent-specific skill packs
+
+```bash
+naar search "github actions"
+naar s brewpage
+naar search "design" --limit 10
+naar search "brewpage" --provider clawhub
+naar search "brewpage" --target claude_project_skills
+naar search "brewpage" --json
+naar search "brewpage" --include-installed
+```
+
+Search does not scan your repo and does not install anything by itself.
+
+<h2 id="guided-flow">Guided flow</h2>
+
+When you want Naar to figure out what fits the current project, use:
+
+```bash
+naar go
+```
+
+The guided flow scans the repo, detects languages and tools, checks assistant targets, ranks skills, and then hands the selected results into the same install review pipeline.
+
+<h2 id="from-search-to-install">From search to install</h2>
+
+```bash
+naar search "github actions"
+naar install clawhub:brewpage --dry-run
+naar install clawhub:brewpage
+```
+
+Direct install still performs fetched-bundle review, plan preview, conflict handling, local state updates, and local history updates.
+
+## Useful commands
+
+- `naar scan` for raw repo facts
+- `naar recommend` for recommendations without install selection
+- `naar list` to inspect current Naar-managed skills
+- `naar uninstall` to remove managed skills cleanly
+- `naar history` to inspect local lifecycle history across projects
+
+## Targets and providers
+
+Naar supports stable assistant targets such as Claude, Cursor, Copilot, Codex, Gemini, AGENTS.md, and generic agent-skill conventions, plus experimental targets that are opt-in.
+
+Use:
+
+```bash
+naar targets list
+naar targets inspect codex_repo_skills
+```
+
+Current providers include Anthropic and ClawHub, with GitHub-backed fallback discovery where supported.

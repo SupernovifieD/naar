@@ -1,0 +1,27 @@
+## Is Naar only for `naar go`?
+
+No. `naar go` is the guided repo flow, but `naar search` is a first-class workflow when you want direct discovery from provider catalogs.
+
+## Does `naar search` install anything?
+
+No. Search is discovery-only. It helps you find explicit provider refs, then you install them deliberately with `naar install`.
+
+## Does Naar need a backend?
+
+No. The CLI is local-first, and this website is fully static.
+
+## Can Naar guarantee a third-party skill is harmless?
+
+No. Naar adds strong review steps and safer defaults, but it cannot guarantee that third-party instructions are harmless.
+
+## Which assistants does Naar target?
+
+The current stable set includes Claude, Cursor, Copilot, Codex, Gemini context, AGENTS.md, and generic agent-skill conventions. Experimental targets are available as opt-in.
+
+## Does Naar support automation?
+
+Yes. Many commands support `--json`, `--non-interactive`, `--apply`, and related flags, but installs still preserve explicit safety behavior.
+
+## What does Naar write into a repo?
+
+Managed assistant-target files, `.naar/installed.json`, `naar.lock.json`, and a local skill copy under `.naar/skills/` for provenance and lifecycle operations.

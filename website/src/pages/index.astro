@@ -1,0 +1,183 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Container from "../components/Container.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import Button from "../components/Button.astro";
+import TerminalFrame from "../components/TerminalFrame.astro";
+import { latestRelease } from "../data/changelog";
+import { withBase } from "../data/site";
+
+const logoMark = withBase("/assets/naar/naar-logo.png");
+---
+<SiteLayout>
+  <section class="relative pt-14 sm:pt-20">
+    <Container>
+      <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div class="space-y-7">
+          <span class="eyebrow">Local-first skill package manager</span>
+          <div class="space-y-5">
+            <h1 class="max-w-4xl text-5xl font-semibold tracking-tight text-text sm:text-6xl lg:text-7xl">
+              Two ways in. One safe installer.
+            </h1>
+            <p class="max-w-2xl text-lg leading-8 text-text-muted sm:text-xl">
+              Naar helps developers find, evaluate, and install AI-agent skills from provider catalogs, either by letting the CLI guide the current repo or by searching directly when the goal is already clear.
+            </p>
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <Button href={withBase("/docs")}>
+              Read the docs
+            </Button>
+            <Button href={withBase("/security")} variant="secondary">
+              See the safety model
+            </Button>
+          </div>
+          <div class="grid gap-4 pt-3 sm:grid-cols-3">
+            <div class="glass-panel p-4">
+              <p class="text-sm font-semibold text-text">Search-first</p>
+              <p class="mt-2 text-sm leading-6 text-text-muted">Browse provider catalogs directly without scanning the repo.</p>
+            </div>
+            <div class="glass-panel p-4">
+              <p class="text-sm font-semibold text-text">Repo-guided</p>
+              <p class="mt-2 text-sm leading-6 text-text-muted">Scan the current project and rank what actually fits.</p>
+            </div>
+            <div class="glass-panel p-4">
+              <p class="text-sm font-semibold text-text">Reviewed install</p>
+              <p class="mt-2 text-sm leading-6 text-text-muted">Preview changes, inspect risk, and approve writes explicitly.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-panel relative overflow-hidden p-6 sm:p-8">
+          <div class="pointer-events-none absolute inset-x-8 top-0 h-36 rounded-full bg-accent-red/20 blur-3xl"></div>
+          <img
+            src={logoMark}
+            alt=""
+            class="pointer-events-none absolute -right-6 -top-10 hidden w-36 rotate-6 opacity-80 drop-shadow-[0_30px_70px_rgba(0,0,0,0.45)] sm:block lg:w-44"
+          />
+          <div class="relative space-y-5">
+            <div class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-soft">
+              Start with search or let Naar guide you
+            </div>
+            <div class="space-y-4">
+              <TerminalFrame title="Search-first" copyText="naar search &quot;github actions&quot;">
+$ naar search "github actions"
+1. brewpage [clawhub]
+Provides reusable GitHub Actions guidance.
+Install: naar install clawhub:brewpage
+              </TerminalFrame>
+              <TerminalFrame title="Guided flow" copyText="naar go">
+$ naar go
+[1/5] Scan
+[2/5] Providers
+[3/5] Recommendations
+[4/5] Selection
+[5/5] Install
+              </TerminalFrame>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <SectionHeader
+        eyebrow="Entry points"
+        title="Choose the door that fits how you work"
+        description="Naar feels larger and clearer when the first decision is yours: browse directly, or let the CLI infer what the repo needs."
+      />
+      <div class="mt-12 grid gap-6 lg:grid-cols-2">
+        <div class="glass-panel p-8">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent-gold">Door one</p>
+          <h3 class="mt-4 text-2xl font-semibold text-text">Search provider catalogs directly</h3>
+          <p class="mt-4 text-base leading-7 text-text-muted">
+            Use <code>naar search</code> when you already know the kind of skill you want. Browse results, compare provider metadata, and copy a precise ref into install.
+          </p>
+          <pre class="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-bg-soft/80 p-5 text-sm text-text"><code>naar search "github actions"
+naar s brewpage
+naar install clawhub:brewpage --dry-run</code></pre>
+        </div>
+        <div class="glass-panel p-8">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent-red-soft">Door two</p>
+          <h3 class="mt-4 text-2xl font-semibold text-text">Let Naar guide the repo</h3>
+          <p class="mt-4 text-base leading-7 text-text-muted">
+            Use <code>naar go</code> when you want repo-aware recommendations, assistant-target detection, and a guided selection flow before install.
+          </p>
+          <pre class="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-bg-soft/80 p-5 text-sm text-text"><code>naar go
+naar recommend --limit 5
+naar scan --json</code></pre>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <SectionHeader
+        eyebrow="Why it matters"
+        title="Discovery and install stay separate on purpose"
+        description="Naar treats search as read-only and install as a reviewed write path. That separation keeps fast discovery from weakening the trust model."
+      />
+      <div class="mt-12 grid gap-6 md:grid-cols-3">
+        <div class="glass-panel p-6">
+          <h3 class="text-lg font-semibold text-text">Discovery-only search</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Search does not install anything. It returns provider results and install-ready refs.</p>
+        </div>
+        <div class="glass-panel p-6">
+          <h3 class="text-lg font-semibold text-text">Preview-first install</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Bundles are fetched, analyzed, and previewed before Naar writes managed files into the repo.</p>
+        </div>
+        <div class="glass-panel p-6">
+          <h3 class="text-lg font-semibold text-text">Local-first lifecycle</h3>
+          <p class="mt-3 text-sm leading-7 text-text-muted">Installed state, lock data, and local history help you audit what changed and remove it cleanly later.</p>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <SectionHeader
+        eyebrow="Coverage"
+        title="Built for real assistant targets and real provider catalogs"
+        description="Naar already supports stable targets for Claude, Cursor, Copilot, Codex, Gemini context, AGENTS.md, and generic agent-skill conventions, with experimental targets available when you opt in."
+      />
+      <div class="mt-12 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div class="glass-panel p-8">
+          <h3 class="text-xl font-semibold text-text">Providers today</h3>
+          <p class="mt-4 text-base leading-7 text-text-muted">
+            Anthropic and ClawHub are supported now, with GitHub-backed fallback discovery where the provider supports it. Search and guided recommendations both flow through that provider layer.
+          </p>
+        </div>
+        <div class="glass-panel p-8">
+          <h3 class="text-xl font-semibold text-text">Targets at install time</h3>
+          <p class="mt-4 text-base leading-7 text-text-muted">
+            Use <code>naar targets list</code> and <code>naar targets inspect</code> to inspect stable, experimental, deprecated, and research-only targets before writing anything.
+          </p>
+        </div>
+      </div>
+    </Container>
+  </section>
+
+  <section class="pt-24">
+    <Container>
+      <div class="glass-panel p-8 sm:p-10">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div class="max-w-2xl space-y-3">
+            <span class="eyebrow">Current status</span>
+            <h2 class="text-3xl font-semibold text-text sm:text-4xl">Early, usable, and still getting sharper</h2>
+            <p class="text-base leading-7 text-text-muted">
+              Current work is focused on search quality, recommendation quality, provider coverage, target support, and safe installation UX.
+            </p>
+          </div>
+          {latestRelease && (
+            <a href={withBase(`/changelog/${latestRelease.slug}`)} class="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-text-muted transition-colors duration-200 ease-glide hover:text-text">
+              Latest release: <span class="font-semibold text-text">{latestRelease.slug}</span>
+            </a>
+          )}
+        </div>
+      </div>
+    </Container>
+  </section>
+</SiteLayout>

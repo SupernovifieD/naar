@@ -1,0 +1,20 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Container from "../components/Container.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import FaqContent from "../content/faq.mdx";
+---
+<SiteLayout title="FAQ" description="Common questions about Naar's search-first and repo-guided workflows.">
+  <section class="pt-16">
+    <Container>
+      <SectionHeader
+        eyebrow="FAQ"
+        title="Common questions, straight answers"
+        description="Naar is small enough to learn quickly, but broad enough that the entry points, trust model, and install behavior deserve explicit answers."
+      />
+      <div class="prose-naar mt-14 rounded-[2rem] border border-white/10 bg-surface/60 p-8 shadow-panel shadow-black/20 sm:p-10">
+        <FaqContent />
+      </div>
+    </Container>
+  </section>
+</SiteLayout>

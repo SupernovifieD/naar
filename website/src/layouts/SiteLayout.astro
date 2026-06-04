@@ -1,0 +1,43 @@
+---
+import Navbar from "../components/Navbar.astro";
+import Footer from "../components/Footer.astro";
+import "../styles/global.css";
+import { siteMeta, withBase } from "../data/site";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = siteMeta.description
+} = Astro.props as Props;
+
+const pageTitle = title ? `${title} · ${siteMeta.name}` : `${siteMeta.name} · ${siteMeta.tagline}`;
+const socialImage = withBase("/assets/naar/naar-logotype-dark.png");
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0b0c10" />
+  </head>
+  <body class="overflow-x-hidden bg-bg text-text antialiased">
+    <div class="pointer-events-none fixed inset-0 -z-10 bg-hero-radial"></div>
+    <div class="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[32rem] hero-grid opacity-40"></div>
+    <Navbar />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>
