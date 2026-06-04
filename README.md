@@ -1,4 +1,4 @@
-# Naar — Skill Package Manager
+# Naar — Skills Package Manager
 
 <p align="center">
   <picture>
@@ -9,16 +9,49 @@
 </p>
 
 <p align="center">
-  <strong>Repo-aware skill discovery and installation for AI coding assistants</strong>
+  <strong>Find, evaluate, and install AI-agent skills without turning your repo into a guessing game.</strong>
 </p>
 
-Naar is a CLI and package manager for AI-agent skills. It scans your repository, understands your stack and assistant setup, recommends relevant skills from providers, explains security risk, previews file changes, and installs only what you approve.
+Naar is a CLI and package-manager-style tool for AI-agent skills, rules, and instructions. It connects project context, provider catalogs, assistant targets, and safety checks so you can either let Naar guide you to a fit for the current repo or search directly when you already know what you want.
+
+Both paths lead into the same safe installer: fetched bundles are reviewed, changes are previewed, and nothing is written until you explicitly approve it.
 
 ## Why Naar Exists
 
 Developers now work across multiple AI coding assistants, each with its own skill, rule, or instruction format. Finding the right skill for a specific repository is already messy; deciding whether to trust it and where to install it adds another layer of friction.
 
 Naar is a repo-aware bridge between your project, your AI assistants, and skill marketplaces. It turns "what should I install for this repo?" into a guided flow with matching, safety checks, and explicit installation control.
+
+## Two Doors Into Naar
+
+Installing Naar is very straight-forward. In your terminal:
+
+```bash
+npm i -g naar-cli
+```
+
+Then you can use Naar in your project easily — or ask your AI agent to do the job for you!
+
+### 1. Search first
+
+Use search when you already know the kind of skill you want and want to browse provider catalogs directly.
+
+```bash
+naar search "github actions"
+naar s "design"
+```
+
+Search is discovery-only. It does not scan your repo and it does not install anything by itself. It helps you find an explicit skill reference, then hand that reference to `naar install`.
+
+### 2. Let Naar guide you
+
+Use the guided flow when you want Naar to inspect the current repo, infer what fits, and walk you through selection and installation.
+
+```bash
+naar go
+```
+
+`naar go` scans the repo, detects stack and assistant targets, ranks relevant skills, estimates pre-fetch risk, and leads into the same reviewed install flow.
 
 ## Quick Start
 
@@ -28,40 +61,85 @@ Prerequisite: Node.js `>=20`.
 npm i -g naar-cli
 ```
 
-Then in your project:
+Start with the repo-guided path:
 
 ```bash
-naar --help
 naar go
+```
+
+Or start with direct discovery:
+
+```bash
+naar search "github actions"
+naar s "next"
 ```
 
 Run without a global install:
 
 ```bash
 npx -y naar-cli@latest go
+npx -y naar-cli@latest search "github actions"
 ```
-
-`naar go` is the recommended first run. It scans the current repository, ranks skill recommendations, lets you choose what to install, and previews changes before writing.
 
 ## How Naar Works
 
-1. Scans your repository for languages, frameworks, tools, topology, and assistant config.
-2. Detects compatible assistant targets such as Claude, Cursor, Copilot, Codex, and generic agent skill folders.
-3. Fetches skill candidates from configured providers.
-4. Scores recommendations against your repo needs and shows pre-fetch risk estimates.
-5. Fetches selected bundles and performs final content security checks.
-6. Shows an install plan before writing files.
-7. Installs only after explicit approval.
+1. Start with either `naar search <query>` or `naar go`.
+2. `naar go` scans your repository for languages, frameworks, tools, topology, and assistant config.
+3. Naar detects compatible assistant targets such as Claude, Cursor, Copilot, Codex, Gemini, AGENTS.md, and generic agent skill folders.
+4. Naar fetches skill candidates from configured providers.
+5. Search returns direct catalog matches; `go` scores recommendations against repo needs and shows pre-fetch risk estimates.
+6. `naar install <provider>:<skill>` fetches selected bundles and performs final content security checks.
+7. Naar shows an install plan before writing files.
+8. Installs happen only after explicit approval.
+
+## Search-First Workflow
+
+Use search when:
+
+- you already know the type of skill you want
+- you want to browse provider catalogs directly
+- you do not want repo scanning or recommendation yet
+- you want to find an explicit skill ref and then install it safely
+
+```bash
+naar search "github actions"
+naar s ui ux
+naar search "design" --limit 10
+naar search "brewpage" --provider clawhub
+naar search "brewpage" --target claude_project_skills
+naar search "brewpage" --json
+naar search "brewpage" --all
+```
+
+Search does not install anything by itself. It prints install-ready refs and commands, but installation stays explicit.
+
+## Guided Repo Workflow
+
+```bash
+naar go
+```
+
+Use the guided flow when you want Naar to figure out what fits the current repo. It scans the project, detects assistant targets, recommends relevant skills, estimates pre-fetch risk, and previews changes before writing anything.
+
+## From Search To Install
+
+```bash
+naar search "github actions"
+naar install clawhub:brewpage --dry-run
+naar install clawhub:brewpage
+```
+
+`naar install` is the shared safe installer behind both entry points. Whether you arrived through search or through `go`, install still performs bundle fetch, security analysis, review, plan preview, conflict handling, and state/history updates.
 
 ## Commands
 
 | Command | What it does | Use it when | Example |
 | --- | --- | --- | --- |
 | `naar go` | Runs the guided scan, recommend, select, and install flow. | You want the complete experience. | `naar go` |
+| `naar search <query>` / `naar s <query>` | Searches provider catalogs directly without repo scanning. | You already know roughly what skill you want. | `naar search "github actions"` |
+| `naar install <refs...>` | Installs explicit provider skill refs with preview and confirmation. | You already know what to install or want a dry run. | `naar install clawhub:ui-ux --dry-run` |
 | `naar scan` | Prints structured repository facts. | You want to inspect what Naar detects. | `naar scan --json` |
 | `naar recommend` | Ranks matching skills from providers. | You want recommendations without installing yet. | `naar recommend --compact` |
-| `naar search <query>` | Searches provider catalogs directly without repo scanning. | You already know roughly what skill you want. | `naar search "github actions"` |
-| `naar install <refs...>` | Installs explicit provider skill refs with preview and confirmation. | You already know what to install or want a dry run. | `naar install clawhub:ui-ux --dry-run` |
 | `naar list` | Lists skills Naar has installed in the repository. | You want to audit installed skills and locations. | `naar list` |
 | `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
 | `naar config` | Views or updates Naar config for the repo. | You want default providers, targets, or score settings. | `naar config --json` |
