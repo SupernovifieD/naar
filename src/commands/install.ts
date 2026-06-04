@@ -8,6 +8,7 @@ import { resolveSkillRefs } from "../installer/resolveRefs.js";
 import { listInstallTargets } from "../targets/index.js";
 import { printJson } from "../utils/json.js";
 import { warningLine } from "../utils/output.js";
+import { withSpinner } from "../utils/terminal.js";
 import { resolveRepoRoot } from "./shared.js";
 
 const INSTALL_TARGETS = listInstallTargets().filter((target) => target.canWrite && target.status === "stable");
@@ -57,7 +58,15 @@ export async function runInstall(flags: CliFlags, refs: string[] = []): Promise<
     return;
   }
 
-  const resolvedSkills = await resolveSkillRefs(parsedRefs.map(toSkillRef), targets);
+  const resolvedSkills = await withSpinner(
+    "Resolving skill references",
+    async () => resolveSkillRefs(parsedRefs.map(toSkillRef), targets),
+    {
+      enabled: !flags.json,
+      successText: "Skill references resolved",
+      failText: "Failed to resolve skill references"
+    }
+  );
   await installResolvedSkills({
     repoRoot,
     flags,
@@ -102,7 +111,7 @@ async function resolveInstallTargets(flags: CliFlags, defaultTargets: InstallTar
     const selectedTargets = await runPromptWithQuitShortcut((context) =>
       checkbox<InstallTarget>(
         {
-          message: "Select coding assistant rules/skills to install (press q to quit)",
+          message: "Select targets",
           theme: CHECKBOX_THEME_WITH_QUIT_HINT,
           choices: INSTALL_TARGETS.map((target, index) => ({
             name: `${pc.bold(target.displayName)} (${pc.dim(target.pathHint)})`,

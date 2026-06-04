@@ -35,6 +35,8 @@ export function coerceFlags(raw: Record<string, unknown>): CliFlags {
     broadTargetSelection: hasBroadTargetSelection(raw.target as string[] | undefined),
     json: Boolean(raw.json),
     compact: Boolean(raw.compact),
+    limit: typeof raw.limit === "number" ? raw.limit : undefined,
+    all: Boolean(raw.all),
     apply: Boolean(raw.apply),
     dryRun: Boolean(raw.dryRun),
     yes: Boolean(raw.yes),

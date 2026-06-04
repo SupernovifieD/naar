@@ -137,30 +137,29 @@ describe("recommendation card helpers", () => {
     expect(wrapped).toEqual(["alpha beta", "gamma", "delta"]);
   });
 
-  it("renders card with meta line and eligible status", () => {
+  it("renders concise default card with eligible status", () => {
     const output = stripAnsi(renderRecommendationCard(makeRecommendation(), 1, { indent: "  ", columns: 80 }));
-    expect(output).toContain("1) Frontend Design Pro [anthropic]");
-    expect(output).toContain("Publisher: anthropic");
-    expect(output).toContain("Match score: 88%");
-    expect(output).toContain("Pre-fetch risk estimate: 5%");
-    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
-    expect(output).toContain("Fit: Strong fit for CLI/package workflow");
-    expect(output).toContain("Page: https://example.com/skills/frontend-design");
-    expect(output).toContain("Meta:");
-    expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
-    expect(output).toContain("Trust: official");
-    expect(output).toContain("License: MIT");
-    expect(output).toContain("Updated: 2026-05-30");
+    expect(output).toContain("1. frontend-design [anthropic]");
+    expect(output).toContain("Match 88%");
+    expect(output).toContain("Risk 5%");
+    expect(output).toContain("Status PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("API description");
+    expect(output).toContain("Why: Matched stack: Next.js; Assistant compatibility: claude");
+    expect(output).toContain("Install: naar install anthropic:frontend-design");
+    expect(output).not.toContain("Targets:");
+    expect(output).not.toContain("Meta:");
+    expect(output).not.toContain("Page:");
+    expect(output).not.toContain("Publisher:");
   });
 
-  it("omits meta when metadata fields are not available", () => {
+  it("renders verbose meta with fallback missing-license text", () => {
     const recommendation = makeRecommendation();
     recommendation.candidate.metadata.publisher = undefined;
     recommendation.candidate.metadata.trustLevel = undefined;
     recommendation.candidate.metadata.license = undefined;
     recommendation.candidate.metadata.lastUpdatedIso = undefined;
 
-    const output = stripAnsi(renderRecommendationCard(recommendation, 1, { columns: 80 }));
+    const output = stripAnsi(renderRecommendationCard(recommendation, 1, { columns: 80, verbose: true }));
     expect(output).toContain("Meta:");
     expect(output).toContain("License: No license declared");
   });
@@ -171,7 +170,7 @@ describe("recommendation card helpers", () => {
       blockReasons: ["Risk 80% exceeds threshold"]
     }), 1, { columns: 80 }));
 
-    expect(output).toContain("Status: PRELIMINARILY BLOCKED");
+    expect(output).toContain("Status PRELIMINARILY BLOCKED");
     expect(output).toContain("Blocked:");
     expect(output).toContain("Risk 80% exceeds threshold");
   });
@@ -182,13 +181,12 @@ describe("recommendation card helpers", () => {
       compact: true
     }));
 
-    expect(output).toContain("1) Frontend Design Pro [anthropic]");
-    expect(output).toContain("Match score: 88%");
-    expect(output).toContain("Pre-fetch risk estimate: 5%");
-    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
-    expect(output).toContain("Why:");
-    expect(output).toContain("  Matched stack: Next.js");
-    expect(output).not.toContain("Description:");
+    expect(output).toContain("1. frontend-design [anthropic]");
+    expect(output).toContain("Match 88%");
+    expect(output).toContain("Risk 5%");
+    expect(output).toContain("Status PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("Why: Matched stack: Next.js");
+    expect(output).not.toContain("API description");
     expect(output).not.toContain("Page:");
     expect(output).not.toContain("Targets:");
     expect(output).not.toContain("Meta:");
@@ -204,7 +202,7 @@ describe("recommendation card helpers", () => {
           url: "/tmp/local-skill/SKILL.md"
         }
       }
-    }), 1, { columns: 80 }));
+    }), 1, { columns: 80, verbose: true }));
 
     expect(output).not.toContain("Page:");
   });
@@ -289,8 +287,8 @@ describe("recommendation card helpers", () => {
   it("builds focused install choice description", () => {
     const text = formatRecommendationChoiceDescription(makeRecommendation());
     expect(text).toContain("- Preliminary status: PRELIMINARILY ELIGIBLE");
+    expect(text).toContain("- Fit: Strong fit for CLI/package workflow");
     expect(text).toContain("- Why: Matched stack: Next.js; Assistant compatibility: claude");
-    expect(text).toContain("- Page: https://example.com/skills/frontend-design");
     expect(text).toContain("- Targets: claude, cursor, copilot");
     expect(text).toContain("- Publisher: anthropic");
     expect(text).toContain("- Trust: official");
@@ -304,7 +302,7 @@ describe("recommendation card helpers", () => {
       blockReasons: ["missing_license [medium]: License is not declared."]
     }), 1, { columns: 80 }));
 
-    expect(output).toContain("Status: PRELIMINARILY RISKY");
+    expect(output).toContain("Status PRELIMINARILY RISKY");
     expect(output).toContain("Risky:");
     expect(output).toContain("missing_license [medium]");
   });
@@ -315,7 +313,7 @@ describe("recommendation card helpers", () => {
     });
     recommendation.candidate.risk.score = 81;
     const output = stripAnsi(renderRecommendationCard(recommendation, 1, { columns: 80 }));
-    expect(output).toContain("Match score: 64%");
-    expect(output).toContain("Pre-fetch risk estimate: 19%");
+    expect(output).toContain("Match 64%");
+    expect(output).toContain("Risk 19%");
   });
 });

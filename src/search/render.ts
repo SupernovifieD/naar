@@ -1,6 +1,18 @@
 import pc from "picocolors";
 import type { AssistantId, SkillCandidate, SkillProviderResult } from "../types/index.js";
 import { resolveSkillDescription, wrapForTerminal } from "../utils/output.js";
+import {
+  command,
+  formatDateOnly,
+  info,
+  joinSegments,
+  label,
+  muted,
+  skill as skillText,
+  truncateText,
+  value,
+  warning
+} from "../utils/terminal.js";
 import type { SearchRankedCandidate } from "./types.js";
 
 export interface SearchProviderSummary {
@@ -37,40 +49,27 @@ export function renderSearchResults(options: SearchRenderOptions): string {
   const query = options.query;
   const columns = resolveColumns(options.columns);
 
-  if (options.verbose) {
-    appendProviderDiagnostics(lines, options.providerSummaries ?? [], options.warnings ?? []);
-  }
-
-  lines.push(`${pc.bold(`Search results for "${query}"`)}`);
+  lines.push(pc.bold(`Search results for "${query}"`));
   if (!options.all && typeof options.limit === "number" && options.totalResults > options.results.length) {
-    lines.push(pc.dim(`Showing ${options.results.length} of ${options.totalResults} matches. Use --all to show every meaningful result.`));
+    lines.push(muted(`Showing ${options.results.length} of ${options.totalResults}. Use --limit <n> or --all for more.`));
   }
   lines.push("");
 
   if (options.results.length === 0) {
-    lines.push(`${pc.yellow("⚠")} ${pc.yellow(`No skills found for "${query}".`)}`);
-    lines.push(`Try a broader term or search a specific provider with ${pc.cyan("--provider <id>")}.`);
-    if (!options.verbose && (options.warnings ?? []).length > 0) {
-      lines.push("");
-      lines.push(`${pc.bold("Provider notes")}:`);
-      for (const warning of options.warnings ?? []) {
-        lines.push(`- ${pc.yellow(warning)}`);
-      }
-    }
+    lines.push(`${pc.yellow("⚠")} ${warning(`No skills found for "${query}".`)}`);
+    lines.push(`Try a broader term or search a specific provider with ${command("--provider <id>")}.`);
+    appendProviderDiagnostics(lines, options.providerSummaries ?? [], options.warnings ?? [], options.verbose === true);
     return `${lines.join("\n")}\n`;
   }
 
   for (const [index, result] of options.results.entries()) {
-    if (options.compact) {
-      appendCompactResult(lines, result, columns);
-    } else {
-      appendFullResult(lines, result, columns, options.verbose === true);
-    }
-
+    appendResult(lines, result, columns, options.verbose === true, index + 1, options.compact === true);
     if (index < options.results.length - 1) {
       lines.push("");
     }
   }
+
+  appendProviderDiagnostics(lines, options.providerSummaries ?? [], options.warnings ?? [], options.verbose === true);
 
   return `${lines.join("\n")}\n`;
 }
@@ -102,109 +101,88 @@ export function formatInstallInfo(candidate: SkillCandidate): SearchInstallInfo 
   };
 }
 
-function appendFullResult(
+function appendResult(
   lines: string[],
   result: SearchRankedCandidate,
   columns: number,
-  verbose: boolean
+  verbose: boolean,
+  rank: number,
+  compact: boolean
 ): void {
   const candidate = result.candidate;
-  lines.push(`${pc.bold(candidate.canonicalSkillId)}  ${pc.dim(`[${pc.cyan(candidate.source.providerId)}]`)}`);
+  lines.push(`${skillText(`${rank}. ${candidate.providerSkillId}`)} ${info(`[${candidate.source.providerId}]`)}`);
 
-  const description = resolveSkillDescription(candidate);
+  const description = resolveSkillDescription(candidate) ?? candidate.summary;
   if (description) {
-    for (const line of wrapForTerminal(description, Math.max(MIN_DESCRIPTION_WIDTH, columns))) {
+    const wrapped = wrapForTerminal(
+      compact ? truncateText(description, Math.max(36, columns - 8)) : description,
+      Math.max(MIN_DESCRIPTION_WIDTH, columns - 2)
+    ).slice(0, compact ? 1 : 2);
+    for (const line of wrapped) {
       lines.push(line);
     }
   }
 
   lines.push(formatMetadataLine(candidate));
-  const targets = formatTargets(candidate.compatibility.assistants);
-  if (targets) {
-    lines.push(`${pc.blue("Targets")}: ${pc.cyan(targets)}`);
-  }
-
-  const pageUrl = resolveSkillPageUrl(candidate);
-  if (pageUrl) {
-    lines.push(`${pc.blue("Page")}: ${pc.cyan(pageUrl)}`);
-  }
-
-  const install = formatInstallInfo(candidate);
-  lines.push(`${pc.blue("Install")}: ${pc.cyan(install.command)}`);
+  lines.push(`${label("Install")}: ${command(formatInstallInfo(candidate).command)}`);
 
   if (verbose) {
-    lines.push(`${pc.blue("Search match")}: ${pc.cyan(`${result.score}%`)}`);
-    lines.push(`${pc.blue("Provider skill ID")}: ${pc.white(candidate.providerSkillId)}`);
-    lines.push(`${pc.blue("Canonical skill ID")}: ${pc.white(candidate.canonicalSkillId)}`);
-    lines.push(`${pc.blue("Pre-fetch risk estimate")}: ${pc.white(`${toRiskPercent(candidate.risk.score)}%`)}`);
+    lines.push(`${label("Search match")}: ${info(`${result.score}%`)}`);
+    lines.push(`${label("Canonical ID")}: ${value(candidate.canonicalSkillId)}`);
+    lines.push(`${label("Provider skill ID")}: ${value(candidate.providerSkillId)}`);
+    lines.push(`${label("Pre-fetch risk")}: ${value(`${toRiskPercent(candidate.risk.score)}%`)}`);
+    const targets = formatTargets(candidate.compatibility.assistants);
+    if (targets) {
+      lines.push(`${label("Targets")}: ${info(targets)}`);
+    }
+    const pageUrl = resolveSkillPageUrl(candidate);
+    if (pageUrl) {
+      lines.push(`${label("Page")}: ${command(pageUrl)}`);
+    }
     if (candidate.metadata.trustLevel) {
-      lines.push(`${pc.blue("Trust")}: ${pc.white(candidate.metadata.trustLevel)}`);
+      lines.push(`${label("Trust")}: ${value(candidate.metadata.trustLevel)}`);
     }
     if (result.reasons.length > 0) {
-      lines.push(`${pc.blue("Reasons")}:`);
+      lines.push(`${label("Reasons")}:`);
       for (const reason of result.reasons) {
-        lines.push(`  - ${pc.white(reason)}`);
+        lines.push(`  - ${value(reason)}`);
       }
     }
   }
 }
 
-function appendCompactResult(
-  lines: string[],
-  result: SearchRankedCandidate,
-  columns: number
-): void {
-  const candidate = result.candidate;
-  const description = resolveSkillDescription(candidate) ?? candidate.summary;
-  const availableDescriptionWidth = Math.max(24, columns - candidate.canonicalSkillId.length - candidate.source.providerId.length - 8);
-  const summary = truncate(description, availableDescriptionWidth);
-  lines.push(`${pc.bold(candidate.canonicalSkillId)} ${pc.dim(`[${pc.cyan(candidate.source.providerId)}]`)} - ${summary}`);
-
-  const metadata = [
-    candidate.metadata.publisher ?? candidate.source.publisher ?? candidate.source.providerId,
-    colorLicense(candidate),
-    formatUpdated(candidate.metadata.lastUpdatedIso),
-    resolveSkillPageUrl(candidate)
-  ].filter((value): value is string => Boolean(value));
-  lines.push(`  ${pc.dim(metadata.join(" · "))}`);
-  lines.push(`  ${pc.blue("install")}: ${pc.cyan(formatInstallInfo(candidate).command)}`);
-}
-
 function appendProviderDiagnostics(
   lines: string[],
   providers: SearchProviderSummary[],
-  warnings: string[]
+  warnings: string[],
+  verbose: boolean
 ): void {
-  if (providers.length > 0) {
-    lines.push(`${pc.bold("Providers")}:`);
+  if (verbose && providers.length > 0) {
+    lines.push("");
+    lines.push(pc.bold("Providers"));
     for (const provider of providers) {
-      const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
-      lines.push(`- ${pc.bold(provider.providerId)}${mode} candidates=${pc.cyan(String(provider.candidateCount))}`);
+      const mode = provider.mode ? ` ${muted("·")} mode ${info(provider.mode)}` : "";
+      lines.push(`* ${skillText(provider.providerId)}${mode}${muted(" · ")}${value(`${provider.candidateCount} candidates`)}`);
     }
   }
 
   if (warnings.length > 0) {
-    if (providers.length > 0) {
+    if (providers.length > 0 || lines.length > 0) {
       lines.push("");
     }
-    lines.push(`${pc.bold("Provider notes")}:`);
+    lines.push(pc.bold("Provider notes"));
     for (const warning of warnings) {
-      lines.push(`- ${pc.yellow(warning)}`);
+      lines.push(`* ${pc.yellow(warning)}`);
     }
-  }
-
-  if (providers.length > 0 || warnings.length > 0) {
-    lines.push("");
   }
 }
 
 function formatMetadataLine(candidate: SkillCandidate): string {
-  const fields = [
-    `${pc.blue("Publisher")}: ${pc.white(candidate.metadata.publisher ?? candidate.source.publisher ?? candidate.source.providerId)}`,
-    `${pc.blue("License")}: ${colorLicense(candidate)}`,
-    `${pc.blue("Updated")}: ${pc.white(formatUpdated(candidate.metadata.lastUpdatedIso) ?? "unknown")}`
-  ];
-  return fields.join(pc.dim("   "));
+  return joinSegments([
+    `${label("Publisher")} ${value(candidate.metadata.publisher ?? candidate.source.publisher ?? candidate.source.providerId)}`,
+    `${label("License")} ${colorLicense(candidate)}`,
+    `${label("Updated")} ${value(formatUpdated(candidate.metadata.lastUpdatedIso) ?? "unknown")}`
+  ]);
 }
 
 function colorLicense(candidate: SkillCandidate): string {
@@ -216,9 +194,7 @@ function colorLicense(candidate: SkillCandidate): string {
 
 function formatUpdated(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toISOString().slice(0, 10);
+  return formatDateOnly(value);
 }
 
 function formatTargets(assistants: AssistantId[]): string {
@@ -254,9 +230,7 @@ function toRiskPercent(safetyScore: number): number {
 }
 
 function truncate(value: string, maxLength: number): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+  return truncateText(value, maxLength);
 }
 
 function shellQuote(value: string): string {

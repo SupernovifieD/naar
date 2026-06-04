@@ -27,6 +27,21 @@ import {
   warningHeader,
   warningLine
 } from "../utils/output.js";
+import {
+  command,
+  danger,
+  heading,
+  info,
+  joinSegments,
+  keyValue,
+  label,
+  muted,
+  pathText,
+  skill as skillText,
+  success,
+  warning,
+  withSpinner
+} from "../utils/terminal.js";
 import { analyzeSkill, evaluateInstallDecision, mergeSecuritySignals } from "../security/analyzeSkill.js";
 import { analyzeSkillContent } from "../security/analyzeSkillContent.js";
 import { getTargetById } from "../targets/index.js";
@@ -103,11 +118,11 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
     return;
   }
 
-  const spinner = flags.json ? null : ora("Preparing install plan").start();
   const resolvedSkills = resolvedWithWriteableTargets;
 
-  const evaluatedAfterFetch: PostFetchSecurityEntry[] = resolvedSkills
-    .map((resolved) => {
+  const evaluatedAfterFetch: PostFetchSecurityEntry[] = await withSpinner(
+    "Reviewing security",
+    async () => resolvedSkills.map((resolved) => {
       const metadataRisk = analyzeSkill(resolved.bundle.skill);
       const contentSignals = analyzeSkillContent(resolved.bundle.files);
       const risk = mergeSecuritySignals(metadataRisk, contentSignals);
@@ -126,7 +141,13 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
         decision,
         risk
       };
-    });
+    }),
+    {
+      enabled: !flags.json,
+      successText: "Security reviewed",
+      failText: "Security review failed"
+    }
+  );
 
   const concerningAfterFetch = evaluatedAfterFetch
     .filter((entry) => entry.status !== "eligible");
@@ -134,7 +155,6 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
     .some((entry) => entry.status === "blocked" || entry.status === "hard-blocked");
 
   if (concerningAfterFetch.length > 0) {
-    spinner?.stop();
     if (flags.json) {
       const canProceedNonInteractive = flags.apply && flags.allowRisky && flags.yes;
       if (!canProceedNonInteractive) {
@@ -204,12 +224,19 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
     }
   }
 
-  const plan = await createInstallPlan({
-    repoRoot,
-    resolvedSkills,
-    force: flags.force
-  });
-  spinner?.succeed("Install plan generated");
+  const plan = await withSpinner(
+    "Preparing install plan",
+    async () => createInstallPlan({
+      repoRoot,
+      resolvedSkills,
+      force: flags.force
+    }),
+    {
+      enabled: !flags.json,
+      successText: "Install plan ready",
+      failText: "Failed to prepare install plan"
+    }
+  );
 
   if (flags.json) {
     printJson({
@@ -228,7 +255,7 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
   }
 
   if (options.printHeader && flags.json === false) {
-    process.stdout.write(`${pc.bold("[5/5]")} Installation plan preview\n`);
+    process.stdout.write(`${pc.bold("[5/5]")} Install\n`);
   }
 
   const includePlanTitle = options.printHeader && flags.json === false ? false : true;
@@ -280,16 +307,34 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
     return;
   }
 
-  await applyInstallPlan(repoRoot, plan);
-  await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
-  const historyWarning = await updateInstallHistoryBestEffort(
-    flags,
-    repoRoot,
-    repoFacts,
-    resolvedSkills
+  await withSpinner(
+    "Applying changes",
+    async () => {
+      await applyInstallPlan(repoRoot, plan);
+      await persistInstallationState(repoRoot, resolvedSkills, plan.actions);
+    },
+    {
+      enabled: !flags.json,
+      successText: "Changes applied",
+      failText: "Failed to apply changes"
+    }
+  );
+  const historyWarning = await withSpinner(
+    "Updating history",
+    async () => updateInstallHistoryBestEffort(
+      flags,
+      repoRoot,
+      repoFacts,
+      resolvedSkills
+    ),
+    {
+      enabled: !flags.json,
+      successText: "History updated",
+      failText: "History update failed"
+    }
   );
 
-  process.stdout.write(`\n${pc.green("✔ Installation complete.")}\n`);
+  process.stdout.write(`\n${success(`✔ Installed ${resolvedSkills.length} skill${resolvedSkills.length === 1 ? "" : "s"}`)}\n\n`);
   if (historyWarning) {
     if (flags.json) {
       printJson({ historyWarning });
@@ -297,11 +342,11 @@ export async function installResolvedSkills(options: InstallResolvedSkillsOption
       process.stdout.write(`${warningLine(historyWarning)}\n`);
     }
   }
-  renderInstallLocations(repoRoot, plan.actions);
+  renderInstallCompletion(repoRoot, resolvedSkills.map((resolved) => resolved.bundle.skill), plan.actions, flags.verbose === true);
   if (concerningAfterFetch.length > 0) {
     renderInstalledRiskSummary(concerningAfterFetch, plan.actions);
   }
-  process.stdout.write(`${pc.cyan("Next")}: run ${pc.bold("naar list")} to review installed skills.\n`);
+  process.stdout.write(`Next: run ${command("naar list")}\n`);
 
   // Keep config synced with explicit runtime flags when used.
   if (flags.target.length > 0 || flags.provider.length > 0 || flags.minSecurityScore !== config.minSecurityScore) {
@@ -422,18 +467,25 @@ function renderPlanPreview(
   includeTitle = true
 ): void {
   if (includeTitle) {
-    process.stdout.write(`\n${pc.bold("Installation plan preview")}:\n`);
+    process.stdout.write(`\n${heading("Installation plan")}\n\n`);
   } else {
     process.stdout.write("\n");
   }
 
-  for (const action of plan.actions) {
-    const prefix = action.type === "append" ? pc.yellow("~") : pc.green("+");
+  const visibleActions = plan.actions.slice(0, 10);
+  for (const action of visibleActions) {
+    const prefix = action.type === "append" ? warning("~") : success("+");
     process.stdout.write(`  ${prefix} ${action.path}\n`);
   }
+  if (plan.actions.length > visibleActions.length) {
+    process.stdout.write(`  …and ${plan.actions.length - visibleActions.length} more. Use ${command("--verbose")} to show all.\n`);
+  }
   process.stdout.write(
-    `\n${pc.bold("Summary")}: write=${pc.green(String(plan.summary.filesToWrite))}, `
-    + `update=${pc.yellow(String(plan.summary.filesToUpdate))}, blocked=${pc.red(String(plan.summary.filesBlocked))}\n`
+    `\n${keyValue("Summary", joinSegments([
+      `${plan.summary.filesToWrite} write`,
+      `${plan.summary.filesToUpdate} update`,
+      `${plan.summary.filesBlocked} blocked`
+    ]))}\n`
   );
 }
 
@@ -523,15 +575,6 @@ function dedupeInstallTargets(targets: InstallTarget[]): InstallTarget[] {
   return [...new Set(targets)];
 }
 
-function renderInstallLocations(repoRoot: string, actions: InstallAction[]): void {
-  const locations = collectInstallLocations(repoRoot, actions);
-  process.stdout.write(`${pc.bold("Install locations")}:\n`);
-  for (const location of locations) {
-    process.stdout.write(`- ${pc.dim(location)}\n`);
-  }
-  process.stdout.write("\n");
-}
-
 function collectInstallLocations(repoRoot: string, actions: InstallAction[]): string[] {
   const locations = new Set<string>();
 
@@ -549,6 +592,29 @@ function collectInstallLocations(repoRoot: string, actions: InstallAction[]): st
   locations.add(path.resolve(repoRoot, "naar.lock.json"));
 
   return [...locations].sort((left, right) => left.localeCompare(right));
+}
+
+function renderInstallCompletion(
+  repoRoot: string,
+  skills: SkillCandidate[],
+  actions: InstallAction[],
+  verbose: boolean
+): void {
+  process.stdout.write(`${heading("Installed")}\n\n`);
+  for (const item of skills) {
+    process.stdout.write(`* ${skillText(item.canonicalSkillId)} ${info(`[${item.source.providerId}]`)}\n`);
+  }
+  process.stdout.write(`\n${keyValue("Files changed", joinSegments([
+    `${actions.filter((action) => action.type !== "append").length} write`,
+    `${actions.filter((action) => action.type === "append").length} update`
+  ]))}\n`);
+  if (verbose) {
+    const locations = collectInstallLocations(repoRoot, actions);
+    process.stdout.write(`\n${heading("Locations")}\n`);
+    for (const location of locations) {
+      process.stdout.write(`* ${pathText(location)}\n`);
+    }
+  }
 }
 
 function buildSecurityReviewPayload(concerningAfterFetch: PostFetchSecurityEntry[]): {
@@ -602,40 +668,24 @@ function renderSecurityReview(
   }
 
   process.stdout.write(`${warningHeader("Security review required")}\n`);
-  process.stdout.write("Naar found security concerns in the selected skill bundles.\n");
-  process.stdout.write("No files have been written yet.\n\n");
-  process.stdout.write(`${pc.bold("Selected risky skills")}:\n\n`);
+  process.stdout.write("Selected skills need confirmation before Naar writes files.\n");
+  process.stdout.write("No files have been written.\n\n");
 
   for (const [index, entry] of concerningAfterFetch.entries()) {
     process.stdout.write(
-      `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)}\n`
-      + `  ${pc.blue("Status")}: ${formatFinalStatusForDisplay(entry.status)}\n`
-      + `  ${pc.blue("Security Score")}: ${colorSecurityScore(entry.risk.score)}`
-      + `   ${pc.blue("Risk")}: ${colorRisk(entry.risk.score, { percent: true })}`
-      + `   ${pc.blue("Risk Level")}: ${colorSecurityLevel(entry.risk.level)}\n`
+      `${skillText(`${index + 1}. ${entry.skillName}`)} ${info(`[${entry.providerId}]`)}\n`
+      + `  ${joinSegments([
+        `${label("Status")} ${formatFinalStatusForDisplay(entry.status)}`,
+        `${label("Score")} ${colorSecurityScore(entry.risk.score)}`,
+        `${label("Risk")} ${colorRisk(entry.risk.score, { percent: true })}`
+      ])}\n`
     );
 
-    const reasons = sanitizeSecurityReasons(entry.decision.reasons).slice(0, 5);
+    const reasons = sanitizeSecurityReasons(entry.decision.reasons).slice(0, 3);
     if (reasons.length > 0) {
-      process.stdout.write(`  ${pc.blue("Reasons")}:\n`);
-      for (const reason of reasons) {
-        process.stdout.write(`  - ${colorSecurityReason(reason)}\n`);
-      }
-    }
-
-    const signalLines = entry.risk.signals.slice(0, 5);
-    let evidencePrinted = 0;
-    for (const signal of signalLines) {
-      process.stdout.write(
-        `  ${pc.blue("Signal")}: ${pc.cyan(toDisplayLabel(signal.id))} `
-        + `[${colorSignalSeverity(signal.severity)}] `
-        + `${pc.white(capitalizeSentence(signal.detail))}\n`
-      );
-      const evidences = signal.evidence ?? [];
-      for (const evidence of evidences) {
-        if (evidencePrinted >= 3) break;
-        process.stdout.write(`  ${pc.blue("Evidence")}: ${pc.white(formatSecurityEvidence(evidence))}\n`);
-        evidencePrinted += 1;
+      process.stdout.write(`  ${label("Reason")}: ${colorSecurityReason(reasons[0])}\n`);
+      for (const reason of reasons.slice(1)) {
+        process.stdout.write(`  ${label("More")}: ${colorSecurityReason(reason)}\n`);
       }
     }
 
@@ -644,41 +694,25 @@ function renderSecurityReview(
     }
   }
 
-  process.stdout.write("\n");
-  process.stdout.write("Installing these skills may expose your project, secrets, local environment, or AI assistant workflow to unsafe instructions.\n");
   if (options.hasBlockedOrHardBlocked) {
-    process.stdout.write(`${warningLine("Blocked or hard-blocked skills require dangerous override confirmation.")}\n`);
+    process.stdout.write(`\n${warning("Blocked skills require explicit override confirmation.")}\n`);
   }
-  process.stdout.write("You can continue with explicit confirmation or cancel installation.\n");
 }
 
 function renderInstalledRiskSummary(
   concerningAfterFetch: PostFetchSecurityEntry[],
   actions: InstallAction[]
 ): void {
-  process.stdout.write(`\n${warningHeader("Risky skills were installed")}\n`);
-  process.stdout.write("Please inspect installed files before using your AI assistant in this repository.\n\n");
-  process.stdout.write(`${pc.bold("Installed risky skills")}:\n`);
   for (const entry of concerningAfterFetch) {
     const installedFiles = listInstalledFilesForSkill(actions, entry.skill.canonicalSkillId);
     process.stdout.write(
-      `- ${pc.bold(entry.skillName)} ${pc.cyan(`[${entry.providerId}]`)}\n`
-      + `  ${pc.blue("Status at install")}: ${formatFinalStatusForDisplay(entry.status)}\n`
-      + `  ${pc.blue("Security Score")}: ${colorSecurityScore(entry.risk.score)}`
-      + `   ${pc.blue("Risk")}: ${colorRisk(entry.risk.score, { percent: true })}\n`
+      `${warning("⚠ Risky skill installed")}: ${skillText(entry.skillName)} ${info(`[${entry.providerId}]`)}. `
+      + `Review installed files before using your AI assistant.\n`
     );
     if (installedFiles.length > 0) {
-      process.stdout.write(`  ${pc.blue("Installed files")}:\n`);
-      for (const filePath of installedFiles) {
-        process.stdout.write(`  - ${pc.white(filePath)}\n`);
-      }
+      process.stdout.write(`  ${keyValue("Files", installedFiles.slice(0, 5).join(", "))}\n`);
     }
   }
-  process.stdout.write("\n");
-  process.stdout.write(`${pc.bold("Recommended next steps")}:\n`);
-  process.stdout.write("- Review installed skill files.\n");
-  process.stdout.write("- Check for shell commands, network calls, package installation instructions, API-key usage, and secret handling.\n");
-  process.stdout.write("- Remove any skill you do not fully trust.\n");
 }
 
 function listInstalledFilesForSkill(actions: InstallAction[], canonicalSkillId: string): string[] {

@@ -1,5 +1,22 @@
 import pc from "picocolors";
 import type { AssistantId, RecommendationStatus, RepoFinding, SkillCandidate, SkillRecommendation } from "../types/index.js";
+import {
+  command,
+  divider,
+  formatDateOnly,
+  info,
+  joinSegments,
+  keyValue,
+  label,
+  muted,
+  scoreBadge,
+  skill as skillText,
+  statusBadge,
+  subtle,
+  value,
+  warning as warningText,
+  wrap
+} from "./terminal.js";
 
 interface ColorValueOptions {
   percent?: boolean;
@@ -25,6 +42,9 @@ const ASSISTANT_ORDER: AssistantId[] = ["claude", "cursor", "copilot", "codex", 
 
 export function colorScore(score: number, options: ColorValueOptions = {}): string {
   const label = formatValue(score, options.percent === true);
+  if (options.percent === true) {
+    return scoreBadge(score);
+  }
   if (score >= 80) return pc.green(label);
   if (score >= 60) return pc.yellow(label);
   return pc.red(label);
@@ -33,6 +53,9 @@ export function colorScore(score: number, options: ColorValueOptions = {}): stri
 export function colorRisk(score: number, options: ColorValueOptions = {}): string {
   const riskPercent = toRiskPercent(score);
   const label = formatValue(riskPercent, options.percent === true);
+  if (options.percent === true) {
+    return riskPercent <= 20 ? pc.green(label) : (riskPercent <= 40 ? pc.yellow(label) : pc.red(label));
+  }
   if (riskPercent <= 20) return pc.green(label);
   if (riskPercent <= 40) return pc.yellow(label);
   return pc.red(label);
@@ -66,7 +89,7 @@ export function colorFindingSeverity(severity: RepoFinding["severity"]): string 
 }
 
 export function warningLine(message: string): string {
-  return `${pc.yellow("⚠")} ${pc.yellow(message)}`;
+  return `${pc.yellow("⚠")} ${warningText(message)}`;
 }
 
 export function warningHeader(title = "Warnings"): string {
@@ -90,45 +113,7 @@ export function resolveRecommendationCardWidth(columns: number | undefined = pro
 }
 
 export function wrapForTerminal(text: string, width: number): string[] {
-  const normalizedWidth = Math.max(8, Math.floor(width));
-  const normalizedText = text.replace(/\s+/g, " ").trim();
-  if (!normalizedText) return [];
-
-  const words = normalizedText.split(" ");
-  const lines: string[] = [];
-  let current = "";
-
-  for (const word of words) {
-    if (word.length > normalizedWidth) {
-      if (current) {
-        lines.push(current);
-        current = "";
-      }
-      for (let i = 0; i < word.length; i += normalizedWidth) {
-        lines.push(word.slice(i, i + normalizedWidth));
-      }
-      continue;
-    }
-
-    if (!current) {
-      current = word;
-      continue;
-    }
-
-    if (current.length + 1 + word.length <= normalizedWidth) {
-      current += ` ${word}`;
-      continue;
-    }
-
-    lines.push(current);
-    current = word;
-  }
-
-  if (current) {
-    lines.push(current);
-  }
-
-  return lines;
+  return wrap(text, width);
 }
 
 export function renderRecommendationCards(
@@ -138,7 +123,7 @@ export function renderRecommendationCards(
   const sections = recommendations.map((recommendation, index) =>
     renderRecommendationCard(recommendation, index + 1, options)
   );
-  return sections.join("\n");
+  return sections.join("\n\n");
 }
 
 export function renderRecommendationCard(
@@ -153,64 +138,38 @@ export function renderRecommendationCard(
     ? 1
     : (options.reasonLimit ?? DEFAULT_REASON_LIMIT);
   const cardWidth = resolveRecommendationCardWidth(options.columns);
-  const divider = `${indent}${pc.dim("-".repeat(cardWidth))}`;
 
   const lines: string[] = [];
-  lines.push(divider);
   lines.push(
-    `${indent}${pc.bold(`${rank}) ${recommendation.candidate.name}`)} ${pc.cyan(`[${recommendation.candidate.source.providerId}]`)}`
+    `${indent}${skillText(`${rank}. ${recommendation.candidate.canonicalSkillId}`)} ${info(`[${recommendation.candidate.source.providerId}]`)}`
   );
   const status = resolveRecommendationStatus(recommendation);
-  const scoreLabel = options.scoreLabel ?? "Match score";
-  const publisher = recommendation.candidate.metadata.publisher
-    ?? recommendation.candidate.source.publisher
-    ?? recommendation.candidate.source.providerId;
   lines.push(
-    `${indent}${pc.blue("Publisher")}: ${pc.white(publisher)}`
-    + `   ${pc.blue(scoreLabel)}: ${colorScore(recommendation.score, { percent: true })}`
-    + `   ${pc.blue("Pre-fetch risk estimate")}: ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`
-    + `   ${pc.blue("Status")}: ${colorPreliminaryRecommendationStatus(status)}`
+    `${indent}${joinSegments([
+      `${label("Match")} ${colorScore(recommendation.score, { percent: true })}`,
+      `${label("Risk")} ${colorRisk(recommendation.candidate.risk.score, { percent: true })}`,
+      `${label("Status")} ${colorPreliminaryRecommendationStatus(status)}`
+    ])}`
   );
 
-  if (!compact) {
-    if (recommendation.fitSummary?.headline) {
-      appendWrappedField(lines, {
-        cardWidth,
-        indent,
-        label: "Fit",
-        value: recommendation.fitSummary.headline
-      });
+  const description = resolveSkillDescription(recommendation.candidate);
+  if (description && !compact) {
+    const summaryLines = wrapForTerminal(description, Math.max(24, cardWidth - indent.length - 2)).slice(0, 2);
+    for (const summaryLine of summaryLines) {
+      lines.push(`${indent}${value(summaryLine)}`);
     }
-
-    const description = resolveSkillDescription(recommendation.candidate);
-    if (description) {
-      appendWrappedField(lines, {
-        cardWidth,
-        indent,
-        label: "Description",
-        value: description
-      });
-    }
-
-    const pageUrl = resolveSkillPageUrl(recommendation.candidate);
-    if (pageUrl) {
-      appendUrlField(lines, {
-        indent,
-        label: "Page",
-        value: pageUrl
-      });
-    }
-
-    lines.push(`${indent}${pc.blue("Install")}: ${pc.cyan(formatSkillInstallCommand(recommendation.candidate))}`);
   }
 
   const reasons = (recommendation.reasons ?? []).slice(0, reasonLimit).map((reason) => reason.trim()).filter(Boolean);
-  appendWrappedReasonsField(lines, {
+  const whyText = reasons.length > 0 ? reasons.join("; ") : "n/a";
+  appendWrappedField(lines, {
     cardWidth,
     indent,
     label: "Why",
-    reasons
+    value: whyText
   });
+
+  lines.push(`${indent}${label("Install")}: ${command(formatSkillInstallCommand(recommendation.candidate))}`);
 
   if (!compact && (recommendation.fitSummary?.cautions.length ?? 0) > 0) {
     appendWrappedReasonsField(lines, {
@@ -240,7 +199,7 @@ export function renderRecommendationCard(
     });
   }
 
-  if (!compact) {
+  if (!compact && verbose) {
     appendWrappedField(lines, {
       cardWidth,
       indent,
@@ -255,6 +214,15 @@ export function renderRecommendationCard(
         indent,
         label: "Meta",
         fields: metadataFields
+      });
+    }
+
+    const pageUrl = resolveSkillPageUrl(recommendation.candidate);
+    if (pageUrl) {
+      appendUrlField(lines, {
+        indent,
+        label: "Page",
+        value: pageUrl
       });
     }
   }
@@ -444,8 +412,7 @@ export function renderRecommendationCard(
     });
   }
 
-  lines.push(divider);
-  return `${lines.join("\n")}\n`;
+  return `${lines.join("\n")}`;
 }
 
 export function formatRecommendationChoiceDescription(recommendation: SkillRecommendation): string {
@@ -455,13 +422,12 @@ export function formatRecommendationChoiceDescription(recommendation: SkillRecom
   const status = formatPreliminaryRecommendationStatus(resolveRecommendationStatus(recommendation));
   const publisher = recommendation.candidate.metadata.publisher ?? "n/a";
   const trust = recommendation.candidate.metadata.trustLevel ?? "unknown";
-  const pageUrl = resolveSkillPageUrl(recommendation.candidate);
   const security = (recommendation.blockReasons ?? []).slice(0, 1).join("; ");
   return [
     `- Preliminary status: ${status}`,
+    ...(recommendation.fitSummary?.headline ? [`- Fit: ${recommendation.fitSummary.headline}`] : []),
     `- Why: ${why}`,
     ...(security ? [`- Security: ${security}`] : []),
-    ...(pageUrl ? [`- Page: ${pageUrl}`] : []),
     `- Targets: ${targets}`,
     `- Publisher: ${publisher}`,
     `- Trust: ${trust}`
@@ -482,9 +448,9 @@ function appendWrappedField(
     return;
   }
 
-  lines.push(`${options.indent}${pc.blue(displayLabel)}: ${pc.white(wrapped[0])}`);
+  lines.push(`${options.indent}${label(displayLabel)}: ${value(wrapped[0])}`);
   for (const segment of wrapped.slice(1)) {
-    lines.push(`${continuationPrefix}${pc.white(segment)}`);
+    lines.push(`${continuationPrefix}${value(segment)}`);
   }
 }
 
@@ -493,7 +459,7 @@ function appendUrlField(
   options: { indent: string; label: string; value: string }
 ): void {
   const displayLabel = toDisplayLabel(options.label);
-  lines.push(`${options.indent}${pc.blue(displayLabel)}: ${pc.cyan(options.value)}`);
+  lines.push(`${options.indent}${label(displayLabel)}: ${command(options.value)}`);
 }
 
 function formatSkillInstallCommand(candidate: SkillCandidate): string {
@@ -514,7 +480,7 @@ function appendWrappedReasonsField(
   const reasonPrefix = `${options.indent}  `;
   const availableWidth = Math.max(12, options.cardWidth - reasonPrefix.length);
 
-  lines.push(`${options.indent}${pc.blue(displayLabel)}:`);
+  lines.push(`${options.indent}${label(displayLabel)}:`);
 
   for (const reason of options.reasons) {
     const wrapped = wrapForTerminal(reason, availableWidth);
@@ -525,12 +491,12 @@ function appendWrappedReasonsField(
     lines.push(`${reasonPrefix}${formatReason(wrapped[0])}`);
 
     for (const segment of wrapped.slice(1)) {
-      lines.push(`${reasonPrefix}${pc.white(segment)}`);
+      lines.push(`${reasonPrefix}${value(segment)}`);
     }
   }
 
   if (options.reasons.length === 0) {
-    lines.push(`${reasonPrefix}${pc.white("n/a")}`);
+    lines.push(`${reasonPrefix}${value("n/a")}`);
   }
 }
 
@@ -543,7 +509,7 @@ function appendMetaFields(
   }
 
   const displayLabel = toDisplayLabel(options.label);
-  lines.push(`${options.indent}${pc.blue(displayLabel)}:`);
+  lines.push(`${options.indent}${label(displayLabel)}:`);
 
   for (const field of options.fields) {
     const displayKey = toDisplayLabel(field.key);
@@ -556,7 +522,7 @@ function appendMetaFields(
       continue;
     }
 
-    lines.push(`${options.indent}  ${pc.blue(displayKey)}: ${colorMetaValue(wrapped[0], field.tone)}`);
+    lines.push(`${options.indent}  ${label(displayKey)}: ${colorMetaValue(wrapped[0], field.tone)}`);
     for (const segment of wrapped.slice(1)) {
       lines.push(`${continuationPrefix}${colorMetaValue(segment, field.tone)}`);
     }
@@ -635,7 +601,7 @@ function colorMetaValue(value: string, tone: MetaFieldTone | undefined): string 
 function formatUpdated(value: string): string {
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) {
-    return date.toISOString().slice(0, 10);
+    return formatDateOnly(value);
   }
   return value;
 }

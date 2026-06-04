@@ -40,6 +40,8 @@ export function createCliProgram(): Command {
   applySharedOptions(program
     .command("go")
     .description("Scan, recommend, and install with guided flow")
+    .option("--limit <n>", "Maximum number of recommendations to display", parseSearchLimit)
+    .option("--all", "Show all recommendation cards")
     .action(async (_args, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
       await runGo(flags);
@@ -56,6 +58,8 @@ export function createCliProgram(): Command {
   applySharedOptions(program
     .command("recommend")
     .description("Recommend skills from configured providers")
+    .option("--limit <n>", "Maximum number of recommendations to display", parseSearchLimit)
+    .option("--all", "Show all recommendation cards")
     .action(async (_args, cmd) => {
       const flags = coerceFlags(cmd.optsWithGlobals());
       await runRecommend(flags);

@@ -1,10 +1,10 @@
-import ora from "ora";
 import { loadConfig } from "../config/store.js";
 import { loadInstalledState, toProviderScopedId } from "../installer/state.js";
 import { buildProviders, queryProviders } from "../providers/orchestrator.js";
 import type { CliFlags, InstallTarget, SkillCandidate } from "../types/index.js";
 import { printJson } from "../utils/json.js";
 import { rankSearchCandidates } from "../search/rank.js";
+import { withSpinner } from "../utils/terminal.js";
 import {
   providerResultsToSearchSummaries,
   renderSearchResults,
@@ -12,7 +12,7 @@ import {
 } from "../search/render.js";
 import { resolveRepoRoot } from "./shared.js";
 
-const DEFAULT_SEARCH_DISPLAY_LIMIT = 20;
+const DEFAULT_SEARCH_DISPLAY_LIMIT = 5;
 const PROVIDER_SEARCH_LIMIT = 200;
 
 export interface SearchCommandOptions {
@@ -33,20 +33,20 @@ export async function runSearch(flags: CliFlags, query: string, options: SearchC
   const selectedTargets: InstallTarget[] = flags.target.length > 0 ? flags.target : config.defaultTargets;
   const providers = buildProviders(providerIds);
 
-  const spinner = flags.json ? null : ora(`Searching providers for "${normalizedQuery}"`).start();
-  let providerResults: Awaited<ReturnType<typeof queryProviders>>;
-  try {
-    providerResults = await queryProviders(providers, {
+  const providerResults = await withSpinner(
+    `Searching for "${normalizedQuery}"`,
+    async () => queryProviders(providers, {
       mode: "search",
       term: normalizedQuery,
       targets: selectedTargets,
       limit: PROVIDER_SEARCH_LIMIT
-    });
-    spinner?.succeed("Search complete");
-  } catch (error) {
-    spinner?.fail("Search failed");
-    throw error;
-  }
+    }),
+    {
+      enabled: !flags.json,
+      successText: "Search complete",
+      failText: "Search failed"
+    }
+  );
 
   const installedIds = options.includeInstalled === true
     ? new Set<string>()

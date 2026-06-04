@@ -11,6 +11,7 @@ import {
   formatRecommendationChoiceDescription,
   warningLine
 } from "../utils/output.js";
+import { withSpinner } from "../utils/terminal.js";
 import { isCandidateCompatibleWithTarget, listInstallTargets } from "../targets/index.js";
 import { resolveRepoRoot } from "./shared.js";
 import type { RepoFacts } from "../types/index.js";
@@ -95,7 +96,7 @@ export async function runInstallFlowFromRecommendations(
     return;
   }
 
-  const resolvedSkills = await resolveRecommendationBundles(selectedRecommendations, targets);
+  const resolvedSkills = await resolveRecommendationBundles(selectedRecommendations, targets, !flags.json);
   await installResolvedSkills({
     repoRoot,
     flags,
@@ -122,7 +123,7 @@ async function chooseRecommendations(
   const selectedIds = await runPromptWithQuitShortcut((context) =>
     checkbox<string>(
       {
-        message: "Select skills to install (press q to quit)",
+        message: "Select skills to install",
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: recommendations.map((recommendation, index) => {
           const disabled = resolveRecommendationDisabledReason(recommendation, flags.allowRisky);
@@ -177,7 +178,7 @@ async function chooseInstallTargets(
   const selectedTargets = await runPromptWithQuitShortcut((context) =>
     checkbox<InstallTarget>(
       {
-        message: "Select coding assistant rules/skills to install (press q to quit)",
+        message: "Select targets",
         theme: CHECKBOX_THEME_WITH_QUIT_HINT,
         choices: INSTALL_TARGETS.map((target) => {
           const compatibilityCount = compatibilityCountByTarget.get(target.id) ?? 0;
@@ -198,30 +199,41 @@ async function chooseInstallTargets(
 
 async function resolveRecommendationBundles(
   selected: SkillRecommendation[],
-  selectedTargets: InstallTarget[]
+  selectedTargets: InstallTarget[],
+  spinnerEnabled: boolean
 ): Promise<ResolvedSkill[]> {
-  const providers = buildProviders([...new Set(selected.map((recommendation) => recommendation.candidate.source.providerId))]);
-  const byId = new Map(providers.map((provider) => [provider.id, provider]));
-  const resolved: ResolvedSkill[] = [];
+  return withSpinner(
+    "Fetching selected skills",
+    async () => {
+      const providers = buildProviders([...new Set(selected.map((recommendation) => recommendation.candidate.source.providerId))]);
+      const byId = new Map(providers.map((provider) => [provider.id, provider]));
+      const resolved: ResolvedSkill[] = [];
 
-  for (const recommendation of selected) {
-    const candidate = recommendation.candidate;
-    const provider = byId.get(candidate.source.providerId);
-    if (!provider) {
-      throw new Error(`Provider not configured for candidate: ${candidate.source.providerId}`);
+      for (const recommendation of selected) {
+        const candidate = recommendation.candidate;
+        const provider = byId.get(candidate.source.providerId);
+        if (!provider) {
+          throw new Error(`Provider not configured for candidate: ${candidate.source.providerId}`);
+        }
+
+        const ref: SkillRef = {
+          providerId: provider.id,
+          skillId: candidate.providerSkillId,
+          version: candidate.source.version
+        };
+        const bundle = await provider.fetchFiles(ref);
+        const targets = selectedTargets.filter((target) => isCandidateCompatibleWithTarget(candidate, target));
+        resolved.push({ bundle, targets });
+      }
+
+      return resolved;
+    },
+    {
+      enabled: spinnerEnabled,
+      successText: "Selected skills fetched",
+      failText: "Failed to fetch selected skills"
     }
-
-    const ref: SkillRef = {
-      providerId: provider.id,
-      skillId: candidate.providerSkillId,
-      version: candidate.source.version
-    };
-    const bundle = await provider.fetchFiles(ref);
-    const targets = selectedTargets.filter((target) => isCandidateCompatibleWithTarget(candidate, target));
-    resolved.push({ bundle, targets });
-  }
-
-  return resolved;
+  );
 }
 
 function resolveRecommendationStatus(recommendation: SkillRecommendation): NonNullable<SkillRecommendation["status"]> {

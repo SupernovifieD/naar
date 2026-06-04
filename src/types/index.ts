@@ -595,6 +595,8 @@ export interface CliFlags {
   broadTargetSelection?: boolean;
   json: boolean;
   compact: boolean;
+  limit?: number;
+  all?: boolean;
   apply: boolean;
   dryRun: boolean;
   yes: boolean;

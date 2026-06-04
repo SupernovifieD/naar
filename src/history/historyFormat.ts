@@ -7,61 +7,43 @@ import {
   listSkillSummaries,
   projectUninstalledSkillIds
 } from "./historyService.js";
+import { command, formatDateOnly, formatLocalDateTime, heading, info, joinSegments, keyValue, muted, pathText, skill as skillText, warning } from "../utils/terminal.js";
 
 export function renderHistorySummary(history: NaarHistory, options: { disabled?: boolean; warning?: string; verbose?: boolean } = {}): void {
-  process.stdout.write(`${pc.bold("Naar history")}
-
-`);
+  process.stdout.write(`${heading("Naar history")}\n\n`);
   if (options.disabled) {
-    process.stdout.write(`${pc.yellow("History is disabled for this invocation.")} Existing local history is not deleted.
-
-`);
+    process.stdout.write(`${warning("History is disabled for this invocation.")} Existing local history is not deleted.\n\n`);
   }
   if (options.warning) {
-    process.stdout.write(`${pc.yellow(options.warning)}
-
-`);
+    process.stdout.write(`${warning(options.warning)}\n\n`);
   }
 
   const projects = listProjects(history);
   const skills = listSkillSummaries(history);
   const installEventCount = countHistoryEvents(history, "install");
   const uninstallEventCount = countHistoryEvents(history, "uninstall");
-  process.stdout.write(`${pc.blue("Remembered projects")}: ${pc.cyan(String(projects.length))}
-`);
-  process.stdout.write(`${pc.blue("Currently installed skills")}: ${pc.cyan(String(currentSkillCount(projects)))}
-`);
-  process.stdout.write(`${pc.blue("Skills ever used")}: ${pc.cyan(String(skills.length))}
-`);
-  process.stdout.write(`${pc.blue("Install events")}: ${pc.cyan(String(installEventCount))}
-`);
-  process.stdout.write(`${pc.blue("Uninstall events")}: ${pc.cyan(String(uninstallEventCount))}
-`);
-  process.stdout.write(`${pc.blue("Last updated")}: ${formatDateTime(history.updatedAt)}
-`);
+  process.stdout.write(`${keyValue("Remembered projects", String(projects.length))}\n`);
+  process.stdout.write(`${keyValue("Current skills", String(currentSkillCount(projects)))}\n`);
+  process.stdout.write(`${keyValue("Skills ever used", String(skills.length))}\n`);
+  process.stdout.write(`${keyValue("Install events", String(installEventCount))}\n`);
+  process.stdout.write(`${keyValue("Uninstall events", String(uninstallEventCount))}\n`);
+  process.stdout.write(`${keyValue("Last updated", formatLocalDateTime(history.updatedAt))}\n`);
 
   const recentProjects = projects.slice(0, 5);
   if (recentProjects.length > 0) {
-    process.stdout.write(`
-${pc.bold("Recent projects")}
-`);
+    process.stdout.write(`\n${heading("Recent projects")}\n\n`);
     for (const project of recentProjects) {
-      process.stdout.write(`- ${pc.cyan(project.name)}     ${project.installedSkills.length} current     ${projectUninstalledSkillIds(project).length} uninstalled     last activity ${formatDate(project.lastSeenAt)}
-`);
+      process.stdout.write(`* ${skillText(project.name)} ${muted("·")} ${project.installedSkills.length} current ${muted("·")} ${projectUninstalledSkillIds(project).length} uninstalled ${muted("·")} last activity ${formatDate(project.lastSeenAt)}\n`);
       if (options.verbose) {
-        process.stdout.write(`  ${pc.blue("Path")}: ${project.path}
-`);
-        process.stdout.write(`  ${pc.blue("Project ID")}: ${project.projectId}
-`);
+        process.stdout.write(`  ${keyValue("Path", pathText(project.path))}\n`);
+        process.stdout.write(`  ${keyValue("Project ID", project.projectId)}\n`);
       }
     }
   }
 
   const activity = listRecentActivity(history, 5);
   if (activity.length > 0) {
-    process.stdout.write(`
-${pc.bold("Recent activity")}
-`);
+    process.stdout.write(`\n${heading("Recent activity")}\n\n`);
     for (const item of activity) {
       renderActivityLine(item.project, item.event, item.skill, options.verbose);
     }
@@ -70,137 +52,114 @@ ${pc.bold("Recent activity")}
 
 export function renderHistoryProjectList(projects: HistoryProject[], options: { warning?: string; verbose?: boolean } = {}): void {
   if (options.warning) {
-    process.stdout.write(`${pc.yellow(options.warning)}
-
-`);
+    process.stdout.write(`${warning(options.warning)}\n\n`);
   }
-  process.stdout.write(`${pc.bold("Project")} | ${pc.bold("Path")} | ${pc.bold("Current skills")} | ${pc.bold("Uninstalled skills")} | ${pc.bold("Last activity")}
-`);
+  process.stdout.write(`${heading("Remembered projects")}\n\n`);
   for (const project of projects) {
-    process.stdout.write(`${project.name} | ${project.path} | ${project.installedSkills.length} | ${projectUninstalledSkillIds(project).length} | ${formatDate(project.lastSeenAt)}
-`);
+    process.stdout.write(`${skillText(project.name)}\n`);
+    process.stdout.write(`  ${joinSegments([
+      `${project.installedSkills.length} current`,
+      `${projectUninstalledSkillIds(project).length} uninstalled`,
+      `last activity ${formatDate(project.lastSeenAt)}`
+    ])}\n`);
     if (options.verbose) {
-      process.stdout.write(`  ${pc.blue("First seen")}: ${project.firstSeenAt}
-`);
-      process.stdout.write(`  ${pc.blue("Last install")}: ${project.lastInstallAt ?? "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Last uninstall")}: ${project.lastUninstallAt ?? "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Project ID")}: ${project.projectId}
-`);
+      process.stdout.write(`  ${keyValue("Path", pathText(project.path))}\n`);
+      process.stdout.write(`  ${keyValue("First seen", formatLocalDateTime(project.firstSeenAt))}\n`);
+      process.stdout.write(`  ${keyValue("Last install", formatLocalDateTime(project.lastInstallAt))}\n`);
+      process.stdout.write(`  ${keyValue("Last uninstall", formatLocalDateTime(project.lastUninstallAt))}\n`);
+      process.stdout.write(`  ${keyValue("Project ID", project.projectId)}\n`);
     }
+    process.stdout.write("\n");
   }
 }
 
 export function renderHistorySkills(skills: HistorySkillSummary[], options: { warning?: string; verbose?: boolean } = {}): void {
   if (options.warning) {
-    process.stdout.write(`${pc.yellow(options.warning)}
-
-`);
+    process.stdout.write(`${warning(options.warning)}\n\n`);
   }
-  process.stdout.write(`${pc.bold("Skill")} | ${pc.bold("Current projects")} | ${pc.bold("Ever used in")} | ${pc.bold("Installs")} | ${pc.bold("Uninstalls")} | ${pc.bold("Last activity")}
-`);
+  process.stdout.write(`${heading("Remembered skills")}\n\n`);
   for (const skill of skills) {
-    process.stdout.write(`${skill.name ?? skill.canonicalId} | ${skill.currentlyInstalledInProjects.length} | ${skill.everInstalledInProjects.length} | ${skill.installCount} | ${skill.uninstallCount} | ${formatDate(skill.lastSeenAt)}
-`);
+    process.stdout.write(`${skillText(skill.name ?? skill.canonicalId)}\n`);
+    process.stdout.write(`  ${joinSegments([
+      `${skill.currentlyInstalledInProjects.length} current projects`,
+      `${skill.everInstalledInProjects.length} ever used`,
+      `${skill.installCount} installs`,
+      `${skill.uninstallCount} uninstalls`,
+      `last activity ${formatDate(skill.lastSeenAt)}`
+    ])}\n`);
     if (options.verbose) {
-      process.stdout.write(`  ${pc.blue("Canonical ID")}: ${skill.canonicalId}
-`);
-      process.stdout.write(`  ${pc.blue("Providers")}: ${skill.providerIds.join(", ") || "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Provider skill IDs")}: ${skill.skillIds.join(", ") || "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Targets")}: ${skill.targets.join(", ") || "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Last installed")}: ${skill.lastInstalledAt ?? "none"}
-`);
-      process.stdout.write(`  ${pc.blue("Last uninstalled")}: ${skill.lastUninstalledAt ?? "none"}
-`);
+      process.stdout.write(`  ${keyValue("Canonical ID", skill.canonicalId)}\n`);
+      process.stdout.write(`  ${keyValue("Providers", skill.providerIds.join(", ") || "none")}\n`);
+      process.stdout.write(`  ${keyValue("Provider skill IDs", skill.skillIds.join(", ") || "none")}\n`);
+      process.stdout.write(`  ${keyValue("Targets", skill.targets.join(", ") || "none")}\n`);
+      process.stdout.write(`  ${keyValue("Last installed", formatLocalDateTime(skill.lastInstalledAt))}\n`);
+      process.stdout.write(`  ${keyValue("Last uninstalled", formatLocalDateTime(skill.lastUninstalledAt))}\n`);
     }
+    process.stdout.write("\n");
   }
 }
 
 export function renderHistoryProject(project: HistoryProject, options: { warning?: string; verbose?: boolean } = {}): void {
   if (options.warning) {
-    process.stdout.write(`${pc.yellow(options.warning)}
-
-`);
+    process.stdout.write(`${warning(options.warning)}\n\n`);
   }
-  process.stdout.write(`${pc.bold(project.name)}
-`);
-  process.stdout.write(`${pc.blue("Path")}: ${project.path}
-`);
-  process.stdout.write(`${pc.blue("First seen")}: ${formatDateTime(project.firstSeenAt)}
-`);
-  process.stdout.write(`${pc.blue("Last activity")}: ${formatDateTime(project.lastSeenAt)}
-`);
+  process.stdout.write(`${heading(project.name)}\n`);
+  process.stdout.write(`${keyValue("Path", pathText(project.path))}\n`);
+  process.stdout.write(`${keyValue("First seen", formatLocalDateTime(project.firstSeenAt))}\n`);
+  process.stdout.write(`${keyValue("Last activity", formatLocalDateTime(project.lastSeenAt))}\n`);
   if (project.lastInstallAt) {
-    process.stdout.write(`${pc.blue("Last install")}: ${formatDateTime(project.lastInstallAt)}
-`);
+    process.stdout.write(`${keyValue("Last install", formatLocalDateTime(project.lastInstallAt))}\n`);
   }
   if (project.lastUninstallAt) {
-    process.stdout.write(`${pc.blue("Last uninstall")}: ${formatDateTime(project.lastUninstallAt)}
-`);
+    process.stdout.write(`${keyValue("Last uninstall", formatLocalDateTime(project.lastUninstallAt))}\n`);
   }
 
   if (project.detected) {
-    process.stdout.write(`
-${pc.bold("Detected")}:
-`);
+    process.stdout.write(`\n${heading("Detected")}\n`);
     renderOptionalList("Languages", project.detected.languages);
     renderOptionalList("Frameworks", project.detected.frameworks);
     renderOptionalList("Package managers", project.detected.packageManagers);
     renderOptionalList("Assistants", project.detected.assistants);
   }
 
-  process.stdout.write(`\n${pc.bold("Current installed skills")}:\n`);
+  process.stdout.write(`\n${heading("Current installed skills")}\n`);
   if (project.installedSkills.length === 0) {
-    process.stdout.write("- none\n");
+    process.stdout.write("* none\n");
   }
   for (const skill of project.installedSkills) {
-    process.stdout.write(`- ${pc.cyan(skill.name ?? skill.canonicalId)} (${skill.providerId})
-`);
-    process.stdout.write(`  ${pc.blue("Canonical ID")}: ${skill.canonicalId}
-`);
-    process.stdout.write(`  ${pc.blue("Targets")}: ${skill.targets.join(", ") || "none"}
-`);
+    process.stdout.write(`* ${skillText(skill.name ?? skill.canonicalId)} ${info(`[${skill.providerId}]`)}\n`);
+    process.stdout.write(`  ${joinSegments([
+      `Targets ${skill.targets.join(", ") || "none"}`,
+      typeof skill.securityScore === "number" ? `Security ${skill.securityScore}/100` : undefined
+    ])}\n`);
     if (typeof skill.securityScore === "number") {
-      process.stdout.write(`  ${pc.blue("Security score")}: ${skill.securityScore}/100
-`);
+      void 0;
     }
     if (options.verbose) {
-      process.stdout.write(`  ${pc.blue("Provider skill ID")}: ${skill.skillId}
-`);
-      process.stdout.write(`  ${pc.blue("Version")}: ${skill.version ?? "unknown"}
-`);
-      process.stdout.write(`  ${pc.blue("Ref")}: ${skill.ref ?? "unknown"}
-`);
-      process.stdout.write(`  ${pc.blue("Install count")}: ${skill.installCount}
-`);
-      process.stdout.write(`  ${pc.blue("Installed at")}: ${skill.installedAt}
-`);
-      process.stdout.write(`  ${pc.blue("Last seen")}: ${skill.lastSeenAt}
-`);
+      process.stdout.write(`  ${keyValue("Canonical ID", skill.canonicalId)}\n`);
+      process.stdout.write(`  ${keyValue("Provider skill ID", skill.skillId)}\n`);
+      process.stdout.write(`  ${keyValue("Version", skill.version ?? "unknown")}\n`);
+      process.stdout.write(`  ${keyValue("Ref", skill.ref ?? "unknown")}\n`);
+      process.stdout.write(`  ${keyValue("Install count", String(skill.installCount))}\n`);
+      process.stdout.write(`  ${keyValue("Installed at", formatLocalDateTime(skill.installedAt))}\n`);
+      process.stdout.write(`  ${keyValue("Last seen", formatLocalDateTime(skill.lastSeenAt))}\n`);
     }
   }
 
   const uninstalled = projectUninstalledSkillIds(project);
-  process.stdout.write(`\n${pc.bold("Previously uninstalled skills")}:\n`);
+  process.stdout.write(`\n${heading("Previously uninstalled skills")}\n`);
   if (uninstalled.length === 0) {
-    process.stdout.write("- none\n");
+    process.stdout.write("* none\n");
   }
   for (const canonicalId of uninstalled) {
-    process.stdout.write(`- ${pc.cyan(canonicalId)}
-`);
+    process.stdout.write(`* ${info(canonicalId)}\n`);
   }
 
   const events = [...project.events]
     .sort((left, right) => right.at.localeCompare(left.at))
     .slice(0, options.verbose ? project.events.length : 10);
   if (events.length > 0) {
-    process.stdout.write(`
-${pc.bold("Recent activity")}:
-`);
+    process.stdout.write(`\n${heading("Recent activity")}\n`);
     for (const event of events) {
       for (const skill of event.skills) {
         renderActivityLine(project, event, skill, options.verbose);
@@ -230,31 +189,20 @@ export function historySummaryJson(history: NaarHistory, disabled = false): obje
 
 function renderActivityLine(project: HistoryProject, event: HistoryEvent, skill: HistoryEventSkill, verbose = false): void {
   const verb = event.type === "install" ? "Installed" : "Uninstalled";
-  process.stdout.write(`- ${formatDate(event.at)}     ${verb} ${pc.cyan(skill.name ?? skill.canonicalId)} in ${project.name}
-`);
+  process.stdout.write(`* ${formatDate(event.at)} ${muted("·")} ${verb} ${info(skill.name ?? skill.canonicalId)} in ${project.name}\n`);
   if (verbose) {
-    process.stdout.write(`  ${pc.blue("Event ID")}: ${event.eventId}
-`);
-    process.stdout.write(`  ${pc.blue("Source")}: ${event.source}
-`);
-    process.stdout.write(`  ${pc.blue("Provider")}: ${skill.providerId}
-`);
-    process.stdout.write(`  ${pc.blue("Provider skill ID")}: ${skill.skillId}
-`);
-    process.stdout.write(`  ${pc.blue("Canonical ID")}: ${skill.canonicalId}
-`);
-    process.stdout.write(`  ${pc.blue("Version")}: ${skill.version ?? "unknown"}
-`);
-    process.stdout.write(`  ${pc.blue("Ref")}: ${skill.ref ?? "unknown"}
-`);
-    process.stdout.write(`  ${pc.blue("Targets")}: ${skill.targets.join(", ") || "none"}
-`);
+    process.stdout.write(`  ${keyValue("Event ID", event.eventId)}\n`);
+    process.stdout.write(`  ${keyValue("Source", event.source)}\n`);
+    process.stdout.write(`  ${keyValue("Provider", skill.providerId)}\n`);
+    process.stdout.write(`  ${keyValue("Provider skill ID", skill.skillId)}\n`);
+    process.stdout.write(`  ${keyValue("Canonical ID", skill.canonicalId)}\n`);
+    process.stdout.write(`  ${keyValue("Version", skill.version ?? "unknown")}\n`);
+    process.stdout.write(`  ${keyValue("Ref", skill.ref ?? "unknown")}\n`);
+    process.stdout.write(`  ${keyValue("Targets", skill.targets.join(", ") || "none")}\n`);
     if (typeof skill.securityScore === "number") {
-      process.stdout.write(`  ${pc.blue("Security score")}: ${skill.securityScore}/100
-`);
+      process.stdout.write(`  ${keyValue("Security score", `${skill.securityScore}/100`)}\n`);
     }
-    process.stdout.write(`  ${pc.blue("Timestamp")}: ${event.at}
-`);
+    process.stdout.write(`  ${keyValue("Timestamp", event.at)}\n`);
   }
 }
 
@@ -264,8 +212,7 @@ function currentSkillCount(projects: HistoryProject[]): number {
 
 function renderOptionalList(label: string, values: string[] | undefined): void {
   if (values && values.length > 0) {
-    process.stdout.write(`  ${pc.blue(label)}: ${values.join(", ")}
-`);
+    process.stdout.write(`  ${keyValue(label, values.join(", "))}\n`);
   }
 }
 
@@ -274,17 +221,5 @@ function formatDate(value: string): string {
 }
 
 function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const time = new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(date);
-  const localDate = new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  }).format(date);
-  return `${time} - ${localDate}`;
+  return formatLocalDateTime(value);
 }

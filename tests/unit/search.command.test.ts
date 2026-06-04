@@ -82,10 +82,10 @@ describe("runSearch", () => {
     });
 
     expect(output).toContain("Search results for \"brewpage\"");
-    expect(output).toContain("brewpage  [anthropic]");
-    expect(output).toContain("Publisher: anthropic");
-    expect(output).toContain("License: MIT");
-    expect(output).toContain("Page: https://example.com/anthropic/brewpage");
+    expect(output).toContain("1. brewpage [anthropic]");
+    expect(output).toContain("Searchable skill description");
+    expect(output).toContain("Publisher anthropic");
+    expect(output).toContain("License MIT");
     expect(output).toContain("Install: naar install anthropic:brewpage");
     expect(queryProvidersMock).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({
       mode: "search",
@@ -93,7 +93,7 @@ describe("runSearch", () => {
       targets: defaultTargets,
       limit: 200
     }));
-    expect(oraMock).toHaveBeenCalledWith("Searching providers for \"brewpage\"");
+    expect(oraMock).toHaveBeenCalledWith("Searching for \"brewpage\"");
     expect(oraStartMock).toHaveBeenCalledTimes(1);
     expect(oraSucceedMock).toHaveBeenCalledWith("Search complete");
     expect(scanRepoMock).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("runSearch", () => {
     };
 
     expect(parsed.query).toBe("brewpage");
-    expect(parsed.limit).toBe(20);
+    expect(parsed.limit).toBe(5);
     expect(parsed.totalResults).toBe(1);
     expect(parsed.results).toHaveLength(1);
     expect(parsed.results[0].exact).toBe(true);
@@ -151,7 +151,7 @@ describe("runSearch", () => {
     const includedOutput = await captureStdout(async () => {
       await runSearch(baseFlags, "brewpage", { includeInstalled: true });
     });
-    expect(includedOutput).toContain("brewpage  [anthropic]");
+    expect(includedOutput).toContain("1. brewpage [anthropic]");
   });
 
   it("honors limit and all output controls", async () => {
@@ -168,7 +168,7 @@ describe("runSearch", () => {
     const limitedOutput = await captureStdout(async () => {
       await runSearch(baseFlags, "design", { limit: 5 });
     });
-    expect(limitedOutput).toContain("Showing 5 of 25 matches");
+    expect(limitedOutput).toContain("Showing 5 of 25. Use --limit <n> or --all for more.");
     expect((limitedOutput.match(/Install: naar install/g) ?? []).length).toBe(5);
 
     const allJsonOutput = await captureStdout(async () => {
@@ -186,9 +186,10 @@ describe("runSearch", () => {
       await runSearch({ ...baseFlags, compact: true }, "brewpage");
     });
 
-    expect(output).toContain("brewpage [anthropic] - Searchable skill description");
-    expect(output).toContain("anthropic · MIT");
-    expect(output).toContain("install: naar install anthropic:brewpage");
+    expect(output).toContain("1. brewpage [anthropic]");
+    expect(output).toContain("Searchable skill description");
+    expect(output).toContain("Publisher anthropic · License MIT");
+    expect(output).toContain("Install: naar install anthropic:brewpage");
     expect(output).not.toContain("Targets:");
   });
 });

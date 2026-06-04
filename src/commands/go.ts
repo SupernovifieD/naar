@@ -10,11 +10,13 @@ import { renderRecommendationQueryPlan } from "../recommend/queryPlan.js";
 import {
   colorAssistantStatus,
   colorScore,
-  formatList,
   renderRecommendationCards,
   warningHeader,
   warningLine
 } from "../utils/output.js";
+import { heading, joinSegments, keyValue, muted, pathText, section, statusBadge } from "../utils/terminal.js";
+
+const DEFAULT_RECOMMENDATION_DISPLAY_LIMIT = 5;
 
 export async function runGo(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -54,7 +56,7 @@ function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: Pi
   let activeSpinner: ReturnType<typeof ora> | null = null;
 
   process.stdout.write(`${pc.bold("Naar")} v${CLI_VERSION}\n`);
-  process.stdout.write(`Repo: ${pc.dim(repoRoot)}\n\n`);
+  process.stdout.write(`Repo: ${pathText(repoRoot)}\n\n`);
 
   return (event: PipelinePhaseEvent): void => {
     if (event.phase.endsWith(":start")) {
@@ -63,59 +65,44 @@ function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: Pi
 
     switch (event.phase) {
       case "scan:start": {
-        process.stdout.write(`${pc.bold("[1/5]")} Scanning repository...\n`);
-        activeSpinner = ora("Detecting stack and project topology").start();
+        process.stdout.write(`${pc.bold("[1/5]")} Scan\n`);
+        activeSpinner = ora("Scanning repository").start();
         return;
       }
       case "scan:done": {
-        activeSpinner?.succeed("Scan complete");
+        activeSpinner?.succeed("Repository scanned");
         activeSpinner = null;
         if (!event.repoFacts) return;
         renderScanSummary(event.repoFacts);
         return;
       }
       case "providers:start": {
-        process.stdout.write(`${pc.bold("[2/5]")} Fetching skill candidates...\n`);
-        if (event.providerIds && event.providerIds.length > 0) {
-          process.stdout.write(`  Providers: ${event.providerIds.map((id) => pc.cyan(id)).join(pc.dim(", "))}\n`);
-        }
-        activeSpinner = ora("Fetching from providers").start();
+        process.stdout.write(`\n${pc.bold("[2/5]")} Providers\n`);
+        activeSpinner = ora("Fetching providers").start();
         return;
       }
       case "providers:done": {
-        activeSpinner?.succeed("Provider fetch complete");
+        activeSpinner?.succeed("Providers fetched");
         activeSpinner = null;
         const providerSummaries = event.providerSummaries ?? [];
-        const hasWarnings = providerSummaries.some((summary) => (summary.warnings ?? []).length > 0);
-        if (hasWarnings) {
-          process.stdout.write(`  Mode: ${pc.yellow("degraded (partial provider failures)")}\n`);
-        }
         if (providerSummaries.length > 0) {
-          process.stdout.write("\n");
           for (const provider of providerSummaries) {
-            const mode = provider.mode ? ` mode=${pc.cyan(provider.mode)}` : "";
-            const queryCount = typeof provider.queryCount === "number" && provider.queryCount > 0
-              ? ` queries=${pc.cyan(String(provider.queryCount))}`
-              : "";
-            process.stdout.write(
-              `    - ${pc.bold(provider.providerId)}${mode}${queryCount} candidates=${pc.cyan(String(provider.candidateCount))}\n`
-            );
+            process.stdout.write(`* ${provider.providerId}${muted(" · ")}${provider.candidateCount} candidates\n`);
           }
         }
-        process.stdout.write("\n");
         return;
       }
       case "rank:start": {
-        process.stdout.write(`${pc.bold("[3/5]")} Ranking recommendations...\n`);
-        activeSpinner = ora("Scoring and filtering candidates").start();
+        process.stdout.write(`\n${pc.bold("[3/5]")} Recommendations\n`);
+        activeSpinner = ora("Ranking skills").start();
         return;
       }
       case "rank:done": {
-        activeSpinner?.succeed("Ranking complete");
+        activeSpinner?.succeed("Ranked skills");
         activeSpinner = null;
         if (!event.result) return;
         renderRankingSummary(event.result, flags);
-        process.stdout.write(`\n${pc.bold("[4/5]")} Select skills to install\n\n`);
+        process.stdout.write(`\n${pc.bold("[4/5]")} Selection\n\n`);
         return;
       }
       default:
@@ -127,27 +114,22 @@ function createGoProgressRenderer(repoRoot: string, flags: CliFlags): (event: Pi
 function renderScanSummary(
   repoFacts: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"]
 ): void {
-  process.stdout.write(`  Languages: ${formatList(repoFacts.languages)}\n`);
-  process.stdout.write(
-    `  Package manager: ${formatList(repoFacts.packageManagers.map((packageManager) => packageManager.id), "unknown")}\n`
-  );
+  const stackParts = [
+    repoFacts.languages.join(", "),
+    repoFacts.packageManagers.map((packageManager) => packageManager.id).join(", "),
+    repoFacts.primaryFacts?.testTools?.map((tool) => tool.id).join(", "),
+    repoFacts.primaryFacts?.ci?.map((tool) => tool.id).join(", ")
+  ].map((part) => part?.trim()).filter(Boolean) as string[];
+  const foundAssistants = repoFacts.aiAssistants.filter((assistant) => assistant.status === "found");
 
-  const byCategory = groupFrameworks(repoFacts.frameworks);
-  const ciTools = repoFacts.primaryFacts?.ci?.map((tool) => tool.id)
-    ?? (repoFacts.frameworks.some((framework) => framework.id === "github-actions") ? ["github-actions"] : []);
-  process.stdout.write(`  Frontend: ${formatList(byCategory.frontend)}\n`);
-  process.stdout.write(`  Backend: ${formatList(byCategory.backend)}\n`);
-  process.stdout.write(`  Tests: ${formatList(byCategory.testing)}\n`);
-  process.stdout.write(`  Styling: ${formatList(byCategory.styling)}\n`);
-  process.stdout.write(`  CI/CD: ${formatList(ciTools)}\n`);
-
-  process.stdout.write("  AI config:\n");
-  for (const assistant of repoFacts.aiAssistants) {
-    process.stdout.write(`    - ${pc.cyan(assistant.id)}: ${colorAssistantStatus(assistant.status)}\n`);
-  }
-  process.stdout.write(
-    `  Readiness score: ${colorScore(repoFacts.readiness.score, { percent: true })} (${pc.bold(repoFacts.readiness.grade)})\n\n`
-  );
+  process.stdout.write(`${keyValue("Stack", stackParts.join(muted(" · ")) || muted("unknown"))}\n`);
+  process.stdout.write(`${keyValue(
+    "Assistants",
+    foundAssistants.length > 0
+      ? foundAssistants.map((assistant) => `${assistant.id} ${statusBadge("found")}`).join(muted(" · "))
+      : muted("none found")
+  )}\n`);
+  process.stdout.write(`${keyValue("Readiness", `${colorScore(repoFacts.readiness.score, { percent: true })} ${statusBadge(repoFacts.readiness.grade)}`)}\n`);
 }
 
 function renderRankingSummary(
@@ -161,11 +143,14 @@ function renderRankingSummary(
   }
 
   if (recommendations.length === 0) {
-    process.stdout.write(`  ${warningLine("No recommendations available for this run.")}\n`);
+    process.stdout.write(`${warningLine("No recommendations available for this run.")}\n`);
   }
 
-  process.stdout.write(renderRecommendationCards(recommendations, {
-    indent: "  ",
+  const visibleRecommendations = flags.all || flags.verbose
+    ? recommendations
+    : recommendations.slice(0, Math.max(1, flags.limit ?? DEFAULT_RECOMMENDATION_DISPLAY_LIMIT));
+  process.stdout.write(`Showing top ${visibleRecommendations.length} of ${recommendations.length}\n\n`);
+  process.stdout.write(renderRecommendationCards(visibleRecommendations, {
     reasonLimit: 3,
     compact: flags.compact,
     verbose: flags.verbose
@@ -185,28 +170,9 @@ function renderRankingSummary(
   if (warnings.length > 0) {
     process.stdout.write(`\n${warningHeader("Warnings")}\n`);
     for (const warning of warnings) {
-      process.stdout.write(`  ${warningLine(warning)}\n`);
+      process.stdout.write(`${warningLine(warning)}\n`);
     }
   }
-}
-
-function groupFrameworks(
-  frameworks: Awaited<ReturnType<typeof buildRecommendations>>["repoFacts"]["frameworks"]
-): Record<string, string[]> {
-  const grouped: Record<string, string[]> = {
-    frontend: [],
-    backend: [],
-    testing: [],
-    styling: [],
-    build: [],
-    infra: []
-  };
-
-  for (const framework of frameworks) {
-    grouped[framework.category].push(framework.id);
-  }
-
-  return grouped;
 }
 
 function resolveRecommendationStatus(recommendation: { status?: string; blocked: boolean }): string {

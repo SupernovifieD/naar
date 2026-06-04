@@ -270,21 +270,28 @@ describe("history commands", () => {
     await runHistorySummary({ historyFilePath, history: false });
     expect(stripAnsi(captured)).toContain("History is disabled");
     expect(stripAnsi(captured)).toContain("Remembered projects: 1");
-    expect(stripAnsi(captured)).toContain("Currently installed skills: 1");
+    expect(stripAnsi(captured)).toContain("Current skills: 1");
     expect(stripAnsi(captured)).toContain("Skills ever used: 1");
     expect(stripAnsi(captured)).toContain("Install events: 1");
-    expect(stripAnsi(captured)).toMatch(/Last updated: .+ - .+/);
+    expect(stripAnsi(captured)).toContain("Last updated:");
     expect(stripAnsi(captured)).not.toContain(NOW.toISOString());
+    expect(stripAnsi(captured)).toContain("Recent projects");
+    expect(stripAnsi(captured)).toContain("Recent activity");
 
     captureStdout();
-    await runHistoryList({ historyFilePath });
-    expect(stripAnsi(captured)).toContain("Project | Path | Current skills | Uninstalled skills | Last activity");
+    await runHistoryList({ historyFilePath, verbose: true });
+    expect(stripAnsi(captured)).toContain("Remembered projects");
+    expect(stripAnsi(captured)).toContain("repo");
+    expect(stripAnsi(captured)).toContain("1 current");
+    expect(stripAnsi(captured)).toContain("Path:");
     expect(stripAnsi(captured)).toContain(repoPath);
 
     captureStdout();
     await runHistorySkills({ historyFilePath });
-    expect(stripAnsi(captured)).toContain("Skill | Current projects | Ever used in | Installs | Uninstalls | Last activity");
+    expect(stripAnsi(captured)).toContain("Remembered skills");
     expect(stripAnsi(captured)).toContain("secure-skill");
+    expect(stripAnsi(captured)).toContain("1 current projects");
+    expect(stripAnsi(captured)).toContain("1 installs");
 
     captureStdout();
     await runHistoryShow(repoPath, { historyFilePath, verbose: true });

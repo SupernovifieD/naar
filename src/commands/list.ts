@@ -1,8 +1,8 @@
 import type { CliFlags } from "../types/index.js";
-import pc from "picocolors";
 import { resolveRepoRoot } from "./shared.js";
 import { loadInstalledState } from "../installer/state.js";
 import { printJson } from "../utils/json.js";
+import { command, formatDateOnly, heading, info, joinSegments, keyValue, muted, pathText, skill as skillText, warning } from "../utils/terminal.js";
 
 export async function runList(flags: CliFlags): Promise<void> {
   const repoRoot = resolveRepoRoot(flags.repo);
@@ -14,37 +14,44 @@ export async function runList(flags: CliFlags): Promise<void> {
   }
 
   if (state.skills.length === 0) {
-    process.stdout.write(`${pc.yellow("⚠ No skills installed by Naar.")}\n`);
+    process.stdout.write(`${warning("No skills installed by Naar.")}\n`);
+    process.stdout.write(`Next: run ${command("naar go")}\n`);
     return;
   }
 
-  process.stdout.write(`${pc.bold("Installed skills")} (${pc.cyan(String(state.skills.length))}):\n`);
-  for (const [index, skill] of state.skills.entries()) {
-    const installDate = formatInstallDate(skill.installedAtIso);
-    const locations = formatLocations(skill.managedFiles);
+  process.stdout.write(`${heading(`Installed skills: ${state.skills.length}`)}\n\n`);
+  for (const [index, installedSkill] of state.skills.entries()) {
+    const installDate = formatInstallDate(installedSkill.installedAtIso);
     process.stdout.write(
-      `${pc.bold(`${index + 1}) ${skill.canonicalSkillId}`)} (${pc.cyan(skill.providerId)})\n`
+      `${skillText(`${index + 1}. ${installedSkill.canonicalSkillId}`)} ${info(`[${installedSkill.providerId}]`)}\n`
     );
-    process.stdout.write(`  ${pc.blue("Version")}: ${pc.white(skill.installedVersion)}\n`);
-    process.stdout.write(`  ${pc.blue("Targets")}: ${skill.targets.map((target) => pc.cyan(target)).join(", ")}\n`);
-    process.stdout.write(`  ${pc.blue("Location")}: ${pc.white(locations)}\n`);
-    process.stdout.write(`  ${pc.blue("Install date")}: ${pc.white(installDate)}\n`);
-    if (index < state.skills.length - 1) {
-      process.stdout.write("\n\n");
+    process.stdout.write(`   ${joinSegments([
+      `Version ${installedSkill.installedVersion}`,
+      `Targets ${installedSkill.targets.join(", ")}`,
+      `Installed ${installDate}`
+    ])}\n`);
+    if (flags.verbose) {
+      process.stdout.write(`   ${keyValue("Provider scoped ID", installedSkill.providerScopedId ?? `${installedSkill.providerId}:${installedSkill.providerSkillId}`)}\n`);
+      process.stdout.write(`   ${keyValue("Provider skill ID", installedSkill.providerSkillId)}\n`);
+      process.stdout.write(`   ${keyValue("Pinned ref", installedSkill.pinnedRef)}\n`);
+      process.stdout.write(`   ${keyValue("Security score at install", `${installedSkill.securityScoreAtInstall}/100`)}\n`);
+      process.stdout.write(`   ${keyValue("Managed files", formatLocations(installedSkill.managedFiles, flags.verbose))}\n`);
     }
+    if (index < state.skills.length - 1) {
+      process.stdout.write("\n");
+    }
+  }
+
+  if (!flags.verbose) {
+    process.stdout.write(`\nNext: run ${command("naar list --verbose")} to see managed files.\n`);
   }
 }
 
 function formatInstallDate(installedAtIso: string | undefined): string {
-  if (!installedAtIso) return "unknown";
-  const date = new Date(installedAtIso);
-  if (Number.isNaN(date.getTime())) {
-    return installedAtIso;
-  }
-  return date.toISOString().slice(0, 10);
+  return formatDateOnly(installedAtIso);
 }
 
-function formatLocations(managedFiles: string[] | undefined): string {
+function formatLocations(managedFiles: string[] | undefined, verbose: boolean): string {
   if (!managedFiles || managedFiles.length === 0) {
     return "unknown";
   }
@@ -53,5 +60,12 @@ function formatLocations(managedFiles: string[] | undefined): string {
     managedFiles.map((path) => path.split("#")[0])
   )].sort((left, right) => left.localeCompare(right));
 
-  return locations.join(", ");
+  return locations
+    .map((location) => {
+      if (!verbose) {
+        return location;
+      }
+      return pathText(location);
+    })
+    .join(muted(", "));
 }

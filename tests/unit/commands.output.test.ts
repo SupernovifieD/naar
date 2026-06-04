@@ -195,25 +195,23 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    const cardStart = output.indexOf("1) Frontend Design [anthropic]");
+    const cardStart = output.indexOf("1. frontend-design [anthropic]");
     expect(cardStart).toBeGreaterThanOrEqual(0);
-    expect(output.indexOf("Publisher:", cardStart)).toBeGreaterThan(cardStart);
-    expect(output.indexOf("Match score:", cardStart)).toBeGreaterThan(output.indexOf("Publisher:", cardStart));
-    expect(output.indexOf("Description:", cardStart)).toBeGreaterThan(output.indexOf("Match score:", cardStart));
-    expect(output.indexOf("Why:", cardStart)).toBeGreaterThan(output.indexOf("Description:", cardStart));
-    expect(output.indexOf("Targets:", cardStart)).toBeGreaterThan(output.indexOf("Why:", cardStart));
-    expect(output).toContain("Match score:");
-    expect(output).toContain("Pre-fetch risk estimate:");
-    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
-    expect(output).toContain("Fit: Strong fit for CLI/package workflow");
+    expect(output.indexOf("Match 91%", cardStart)).toBeGreaterThan(cardStart);
+    expect(output.indexOf("API skill description from provider", cardStart)).toBeGreaterThan(output.indexOf("Match 91%", cardStart));
+    expect(output.indexOf("Why:", cardStart)).toBeGreaterThan(output.indexOf("API skill description from provider", cardStart));
+    expect(output.indexOf("Install:", cardStart)).toBeGreaterThan(output.indexOf("Why:", cardStart));
+    expect(output).toContain("Recommendations");
+    expect(output).toContain("Match 91%");
+    expect(output).toContain("Risk 0%");
+    expect(output).toContain("Status PRELIMINARILY ELIGIBLE");
     expect(output).not.toContain("Score: 91%");
     expect(output).not.toContain("Status: ELIGIBLE");
-    expect(output).toContain("Description: API skill description from provider");
-    expect(output).toContain("Why:");
-    expect(output).toContain("Targets:");
-    expect(output).toContain("Meta:");
-    expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
-    expect(output).toContain("License: MIT");
+    expect(output).toContain("Install: naar install anthropic:frontend-design");
+    expect(output).not.toContain("Targets:");
+    expect(output).not.toContain("Meta:");
+    expect(output).not.toContain("Publisher:");
+    expect(output).not.toContain("License: MIT");
   });
 
   it("shows at most three reasons in card why block", async () => {
@@ -234,7 +232,8 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Why:");
     expect(output).toContain("Matched stack: React");
     expect(output).toContain("Matched language: TypeScript");
-    expect(output).toContain("Addresses missing capability: Testing guidance");
+    expect(output).toContain("Addresses missing");
+    expect(output).toContain("capability: Testing guidance");
     expect(output).not.toContain("Compatible with detected assistants: claude");
   });
 
@@ -246,7 +245,7 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("Description: Fallback summary text");
+    expect(output).toContain("Fallback summary text");
   });
 
   it("prints no description line when both description and summary are empty", async () => {
@@ -257,8 +256,9 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("1) Frontend Design [anthropic]");
+    expect(output).toContain("1. frontend-design [anthropic]");
     expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Strong fit for CLI/package workflow");
   });
 
   it("renders the same card layout in go ranking section", async () => {
@@ -281,10 +281,11 @@ describe("recommend/go output descriptions", () => {
 
     expect(output).toMatch(/Naar v\d+\.\d+\.\d+/);
     expect(output).not.toContain("Naar vunknown");
-    expect(output).toContain("[3/5] Ranking recommendations...");
-    expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
-    expect(output).toContain("Description: Go output description");
+    expect(output).toContain("[3/5] Recommendations");
+    expect(output).toContain("Showing top 1 of 1");
+    expect(output).toContain("1. frontend-design [anthropic]");
+    expect(output).toContain("Status PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("Go output description");
   });
 
   it("shows blocked status and blocked reason in recommend output", async () => {
@@ -299,7 +300,7 @@ describe("recommend/go output descriptions", () => {
       await runRecommend(baseFlags);
     });
 
-    expect(output).toContain("Status: PRELIMINARILY BLOCKED");
+    expect(output).toContain("Status PRELIMINARILY BLOCKED");
     expect(output).toContain("Blocked:");
     expect(output).toContain("Risk 90% exceeds required threshold");
   });
@@ -312,13 +313,13 @@ describe("recommend/go output descriptions", () => {
       await runRecommend({ ...baseFlags, compact: true });
     });
 
-    expect(output).toContain("1) Frontend Design [anthropic]");
-    expect(output).toContain("Match score:");
-    expect(output).toContain("Pre-fetch risk estimate:");
-    expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("1. frontend-design [anthropic]");
+    expect(output).toContain("Match 91%");
+    expect(output).toContain("Risk 0%");
+    expect(output).toContain("Status PRELIMINARILY ELIGIBLE");
     expect(output).not.toContain("Score: 91%");
     expect(output).toContain("Why:");
-    expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Compact description from API");
     expect(output).not.toContain("Targets:");
     expect(output).not.toContain("Meta:");
   });
@@ -341,10 +342,10 @@ describe("recommend/go output descriptions", () => {
       await runGo({ ...baseFlags, compact: true });
     });
 
-    expect(output).toContain("[3/5] Ranking recommendations...");
-    expect(output).toContain("1) Frontend Design [anthropic]");
+    expect(output).toContain("[3/5] Recommendations");
+    expect(output).toContain("1. frontend-design [anthropic]");
     expect(output).toContain("Why:");
-    expect(output).not.toContain("Description:");
+    expect(output).not.toContain("Go compact description");
     expect(output).not.toContain("Targets:");
     expect(output).not.toContain("Meta:");
   });

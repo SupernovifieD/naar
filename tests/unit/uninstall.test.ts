@@ -120,7 +120,8 @@ describe("runUninstall history lifecycle", () => {
     await runUninstall(baseFlags, ["skill-one"]);
 
     expect(saveInstalledStateMock).toHaveBeenCalledTimes(1);
-    expect(stripAnsi(captured)).toContain("Uninstall complete");
+    expect(stripAnsi(captured)).toContain("✔ Uninstalled 1 skill");
+    expect(stripAnsi(captured)).toContain("Removed 1 managed entry.");
     expect(stripAnsi(captured)).toContain("Uninstall succeeded, but Naar could not update local history.");
   });
 });
