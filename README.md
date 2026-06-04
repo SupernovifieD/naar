@@ -88,6 +88,8 @@ Get recommendations:
 naar recommend
 ```
 
+Naar explains each recommendation with a fit summary, matched repo signals, and cautions when a skill looks too domain-specific or framework-specific for your repo.
+
 Search provider catalogs directly:
 
 ```bash

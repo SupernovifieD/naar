@@ -2,6 +2,7 @@ import path from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { RepoFacts, RepoNeed, SkillRecommendation } from "../types/index.js";
 import type { RecommendationQueryPlan } from "../recommend/queryPlan.js";
+import { buildLegacyFitSummary } from "../recommend/explain.js";
 import { ensureNaarRuntimeGitignore } from "../utils/gitignore.js";
 import { SCAN_SCHEMA_VERSION } from "../scanner/scanRepo.js";
 
@@ -76,6 +77,8 @@ export async function loadRecommendationCache(repoRoot: string): Promise<Recomme
         safety: recommendation.candidate?.risk?.score ?? 0,
         final: recommendation.score ?? 0
       },
+      blockers: recommendation.blockers ?? [],
+      fitSummary: recommendation.fitSummary ?? buildLegacyFitSummary(recommendation),
       matchedNeeds: recommendation.matchedNeeds ?? [],
       matchedNeedDetails: recommendation.matchedNeedDetails ?? [],
       matchedFacts: recommendation.matchedFacts ?? [],

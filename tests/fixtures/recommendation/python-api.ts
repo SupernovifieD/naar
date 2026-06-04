@@ -38,6 +38,8 @@ export const PYTHON_API_FIXTURE: RecommendationEvalFixture = {
     shouldNotRecommendCategories: ["design", "crypto", "finance", "art", "spreadsheet"],
     maxBadDomainInTopK: { k: 5, max: 0 },
     maxBlockedInTopK: { k: 5, max: 1 },
+    maxHardBlockersInTopK: { k: 5, max: 0 },
+    maxPoorFitInTopK: { k: 5, max: 1 },
     // TODO(recommendation-quality): raise backend precision once Python/API-specific relevance beats generic CI/package skills.
     minPrecisionAtK: { k: 5, min: 0.2 },
     minRecallAtK: { k: 10, min: 0.25 }

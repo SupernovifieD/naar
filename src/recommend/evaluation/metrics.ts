@@ -10,8 +10,11 @@ export interface RecommendationMetrics {
   precisionAtK: Record<string, number>;
   recallAtK: Record<string, number>;
   badDomainCountAtK: Record<string, number>;
+  badFitDomainCountAtK?: Record<string, number>;
   blockedCountAtK: Record<string, number>;
   riskyCountAtK: Record<string, number>;
+  hardBlockerCountAtK?: Record<string, number>;
+  poorFitCountAtK?: Record<string, number>;
   averageDimensionsAtK?: Record<string, RecommendationDimensionScores>;
 }
 
@@ -71,6 +74,33 @@ export function riskyCountAtK(recommendations: SkillRecommendation[], k: number)
   return recommendations.slice(0, Math.max(0, k)).filter((recommendation) =>
     recommendation.status === "risky"
   ).length;
+}
+
+export function hardBlockerCountAtK(recommendations: SkillRecommendation[], k: number): number {
+  return recommendations.slice(0, Math.max(0, k)).filter((recommendation) =>
+    (recommendation.blockers ?? []).some((blocker) => blocker.severity === "hard")
+  ).length;
+}
+
+export function poorFitCountAtK(recommendations: SkillRecommendation[], k: number): number {
+  return recommendations.slice(0, Math.max(0, k)).filter((recommendation) =>
+    recommendation.fitSummary?.level === "poor"
+  ).length;
+}
+
+export function badFitDomainCountAtK(
+  recommendations: SkillRecommendation[],
+  badCategories: RecommendationEvalCategory[],
+  k: number
+): number {
+  const badSet = new Set(badCategories.map(normalizeValue));
+  return recommendations.slice(0, Math.max(0, k)).filter((recommendation) => {
+    const categories = (recommendation.skillCategories ?? []).map(normalizeValue);
+    const domains = (recommendation.domainSignals ?? []).map(normalizeValue);
+    const hasBadCategory = [...categories, ...domains].some((value) => badSet.has(value));
+    const hasDomainMismatch = (recommendation.blockers ?? []).some((blocker) => blocker.kind === "domain_mismatch");
+    return hasBadCategory || hasDomainMismatch;
+  }).length;
 }
 
 export function topKContainsAny(

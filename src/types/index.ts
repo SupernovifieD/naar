@@ -366,6 +366,43 @@ export interface RecommendationDimensionScores {
   final: number;
 }
 
+export type RecommendationBlockerSeverity = "soft" | "hard";
+
+export type RecommendationBlockerKind =
+  | "domain_mismatch"
+  | "framework_mismatch"
+  | "secondary_scope_only"
+  | "generic_productivity_mismatch"
+  | "prompting_mismatch"
+  | "mcp_mismatch"
+  | "skill_authoring_mismatch"
+  | "claude_api_mismatch"
+  | "assistant_setup_mismatch"
+  | "weak_only_match"
+  | "no_strong_need_match"
+  | "negative_need_match"
+  | "language_only_match";
+
+export interface RecommendationBlocker {
+  kind: RecommendationBlockerKind;
+  severity: RecommendationBlockerSeverity;
+  message: string;
+  penalty: number;
+  scoreCap: number;
+  evidence?: string[];
+}
+
+export type RecommendationFitLevel = "strong" | "moderate" | "weak" | "poor";
+
+export interface RecommendationFitSummary {
+  level: RecommendationFitLevel;
+  headline: string;
+  primaryMatches: string[];
+  supportingMatches: string[];
+  cautions: string[];
+  blockers: string[];
+}
+
 export interface RepoNeed {
   id: string;
   weight: number;
@@ -406,6 +443,8 @@ export interface SkillRecommendation {
   relevanceRaw?: number;
   qualityRaw?: number;
   dimensionScores?: RecommendationDimensionScores;
+  blockers?: RecommendationBlocker[];
+  fitSummary?: RecommendationFitSummary;
   status?: RecommendationStatus;
   overrideable?: boolean;
   hardBlocked?: boolean;

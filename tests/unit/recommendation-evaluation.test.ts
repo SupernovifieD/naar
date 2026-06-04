@@ -8,18 +8,23 @@ describe("recommendation evaluation", () => {
     const results = RECOMMENDATION_EVAL_FIXTURES.map((fixture) =>
       evaluateRecommendationFixture(fixture)
     );
+    const report = renderRecommendationEvaluationReport(results);
 
     const failures = results.flatMap((result) => result.failures);
 
     if (failures.length > 0) {
-      console.error(renderRecommendationEvaluationReport(results));
+      console.error(report);
     }
 
     expect(failures.map((failure) => failure.message)).toEqual([]);
+    expect(report).toContain("hard-blockers@5:");
+    expect(report).toContain("poor-fit@5:");
     for (const result of results) {
       for (const recommendation of result.recommendations) {
         expect(recommendation.dimensionScores).toBeDefined();
         expect(recommendation.dimensionScores?.final).toBe(recommendation.score);
+        expect(Array.isArray(recommendation.blockers)).toBe(true);
+        expect(recommendation.fitSummary).toBeDefined();
       }
 
       const topRecommendation = result.recommendations[0];

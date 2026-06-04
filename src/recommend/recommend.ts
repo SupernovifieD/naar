@@ -1,5 +1,6 @@
 import type {
   AssistantId,
+  RecommendationBlocker,
   MatchedNeedDetail,
   MatchedFact,
   RecommendationStatus,
@@ -21,9 +22,10 @@ import {
 } from "./needs.js";
 import {
   classifySkillCategories,
-  detectDomainSignals,
-  evaluateSpecializedGates
+  detectDomainSignals
 } from "./specializedGates.js";
+import { evaluateRecommendationBlockers } from "./blockers.js";
+import { buildRecommendationFitSummary } from "./explain.js";
 import {
   applyRecommendationCaps,
   clampRecommendationScore,
@@ -76,6 +78,7 @@ export interface RecommendOptions extends SecurityPolicy {
   allCompatible?: boolean;
   maxResults?: number;
   precomputedRepoNeeds?: RepoNeed[];
+  referenceDateIso?: string;
 }
 
 export interface RecommendResult {
@@ -151,6 +154,7 @@ export function recommendSkills(
   const repoNeeds = options.precomputedRepoNeeds ?? deriveRepoNeeds(repoFacts);
   const repoNeedIds = new Set(repoNeeds.map((need) => need.id));
   const eligibleAssistants = dedupeAssistants(options.eligibleAssistants ?? ALL_ASSISTANTS);
+  const referenceDateIso = options.referenceDateIso ?? new Date().toISOString();
   const recommendations: SkillRecommendation[] = [];
 
   for (const candidate of candidates) {
@@ -169,14 +173,12 @@ export function recommendSkills(
     const matchedFacts: MatchedFact[] = [];
     const matchedNeeds: string[] = [];
     const matchedNeedDetails: MatchedNeedDetail[] = [];
+    const blockers: RecommendationBlocker[] = [];
     const capsApplied: RecommendationCapApplied[] = [];
     const scoreBreakdown: RecommendationScoreComponent[] = [];
     const skillCategories = normalized.categories;
     const domainSignals = normalized.domainSignals;
     let score = 0;
-    let sawStrongNeedMatch = false;
-    let sawWeakNeedMatch = false;
-    let sawNeedNegativeMatch = false;
     const includedByAllCompatible = assistantMatches.length === 0 && options.allCompatible === true;
 
     if (includedByAllCompatible) {
@@ -227,7 +229,6 @@ export function recommendSkills(
       }
 
       if (match.strength === "exact" || match.strength === "strong") {
-        sawStrongNeedMatch = true;
         matchedNeeds.push(repoNeed.id);
         reasons.push(`Matched repo need: ${repoNeed.id} (${match.strength})`);
         matchedFacts.push({
@@ -237,11 +238,9 @@ export function recommendSkills(
         });
       }
       if (match.strength === "weak") {
-        sawWeakNeedMatch = true;
         penalties.push(`Weak repo-need evidence only: ${repoNeed.id}`);
       }
       if (match.strength === "negative") {
-        sawNeedNegativeMatch = true;
         penalties.push(`Need anti-trigger: ${repoNeed.id}`);
       }
 
@@ -285,8 +284,6 @@ export function recommendSkills(
     }
 
     const frameworkMatches = [...normalized.frameworks].filter((framework) => context.primaryFrameworks.has(framework));
-    const secondaryOnlyFrameworkMatches = [...normalized.frameworks].filter((framework) => !context.primaryFrameworks.has(framework) && context.secondaryFrameworks.has(framework));
-
     let frameworkPoints = 0;
     for (const frameworkId of frameworkMatches) {
       const limitRemaining = 28 - frameworkPoints;
@@ -301,20 +298,6 @@ export function recommendSkills(
       reasons.push(`Matched primary framework: ${frameworkId}`);
       const baseFact = context.primaryFrameworks.get(frameworkId);
       if (baseFact) matchedFacts.push(baseFact);
-    }
-
-    if (secondaryOnlyFrameworkMatches.length > 0) {
-      score = applyScoreComponent(score, scoreBreakdown, {
-        kind: "secondary_only_framework_penalty",
-        points: -18,
-        detail: `Secondary-only framework matches: ${secondaryOnlyFrameworkMatches.slice(0, 3).join(", ")}`
-      });
-      penalties.push(`Skill targets ${secondaryOnlyFrameworkMatches.slice(0, 3).join(", ")}, but those frameworks are only in fixture/secondary scope`);
-      capsApplied.push({
-        kind: "secondary_only_framework_cap",
-        cap: 40,
-        reason: "Framework relevance is secondary/fixture-only"
-      });
     }
 
     const toolMatches = matchPrimaryTools(context, normalized.tokens);
@@ -350,41 +333,47 @@ export function recommendSkills(
     }
 
     const hasDeepMatch = matchedNeeds.length > 0 || projectTypeMatches.length > 0 || frameworkMatches.length > 0 || toolMatches.length > 0;
-    if (languageMatches.length > 0 && !hasDeepMatch) {
+
+    const recommendationBlockers = evaluateRecommendationBlockers({
+      candidateText: normalized.primaryText,
+      candidateTokens: normalized.primaryTokens,
+      candidateNameText: normalized.nameText,
+      candidateNameTokens: normalized.nameTokens,
+      candidateTagText: normalized.tagText,
+      candidateTagTokens: normalized.tagTokens,
+      skillCategories,
+      domainSignals,
+      repoNeedIds,
+      repoTokens: context.repoTokens,
+      repoDomains: context.repoDomains,
+      primaryFrameworks: new Set(context.primaryFrameworks.keys()),
+      secondaryFrameworks: context.secondaryFrameworks,
+      matchedNeeds,
+      matchedNeedDetails,
+      hasDeepMatch,
+      languageMatches,
+      hasProviderSourcePath: context.hasProviderSourcePath,
+      hasSkillAuthoringPath: context.hasSkillAuthoringPath
+    });
+
+    for (const blocker of recommendationBlockers) {
+      blockers.push(blocker);
       score = applyScoreComponent(score, scoreBreakdown, {
-        kind: "language_only_penalty",
-        points: -24,
-        detail: "Language-only match without project-type/tool/framework/need support"
+        kind: "recommendation_blocker",
+        points: blocker.penalty,
+        detail: blocker.message,
+        reason: blocker.kind
       });
-      penalties.push("Language-only match; no deeper project need match");
+      penalties.push(blocker.message);
+      capsApplied.push({
+        kind: blocker.kind,
+        cap: blocker.scoreCap,
+        reason: blocker.message
+      });
     }
 
     const missingMismatchPenalty = evaluateMissingCapabilityMismatch(context, normalized, matchedNeedDetails, penalties, scoreBreakdown);
     score += missingMismatchPenalty;
-
-    const domainPenalty = applyDomainPenalty(context, normalized, penalties, scoreBreakdown);
-    score += domainPenalty;
-    if (domainPenalty < 0) {
-      capsApplied.push({
-        kind: "domain_mismatch_cap",
-        cap: 15,
-        reason: "Domain mismatch penalty applied"
-      });
-    }
-
-    if (normalized.isGeneralProductivity && !hasDeepMatch) {
-      score = applyScoreComponent(score, scoreBreakdown, {
-        kind: "generic_productivity_penalty",
-        points: -15,
-        detail: "General productivity skill has no repo-specific evidence"
-      });
-      penalties.push("General productivity skill with no repo-specific evidence");
-      capsApplied.push({
-        kind: "general_productivity_cap",
-        cap: 35,
-        reason: "General productivity skill with no repo-specific evidence"
-      });
-    }
 
     if (candidate.metadata.trustLevel === "official") {
       score = applyScoreComponent(score, scoreBreakdown, {
@@ -427,69 +416,6 @@ export function recommendSkills(
       });
     }
 
-    const specializedGateResults = evaluateSpecializedGates({
-      candidateText: normalized.primaryText,
-      candidateTokens: normalized.primaryTokens,
-      candidateNameText: normalized.nameText,
-      candidateNameTokens: normalized.nameTokens,
-      candidateTagText: normalized.tagText,
-      candidateTagTokens: normalized.tagTokens,
-      skillCategories,
-      domainSignals,
-      repoNeedIds,
-      repoTokens: context.repoTokens,
-      repoDomains: context.repoDomains,
-      primaryFrameworks: new Set(context.primaryFrameworks.keys()),
-      secondaryFrameworks: context.secondaryFrameworks,
-      hasProviderSourcePath: context.hasProviderSourcePath,
-      hasSkillAuthoringPath: context.hasSkillAuthoringPath
-    });
-
-    for (const gate of specializedGateResults) {
-      score = applyScoreComponent(score, scoreBreakdown, {
-        kind: gate.kind,
-        points: gate.penalty,
-        detail: gate.message,
-        reason: gate.message
-      });
-      penalties.push(gate.message);
-      if (gate.scoreCap < 100) {
-        capsApplied.push({
-          kind: "specialized_gate_cap",
-          cap: gate.scoreCap,
-          reason: gate.message
-        });
-      }
-    }
-
-    if (sawWeakNeedMatch && !sawStrongNeedMatch) {
-      capsApplied.push({
-        kind: "weak_only_cap",
-        cap: 45,
-        reason: "Only weak repo-need matches were found"
-      });
-    }
-    if (!sawStrongNeedMatch) {
-      capsApplied.push({
-        kind: "no_strong_need_cap",
-        cap: 40,
-        reason: "No strong repo-need match was found"
-      });
-    }
-    if (languageMatches.length > 0 && !hasDeepMatch) {
-      capsApplied.push({
-        kind: "language_only_cap",
-        cap: 35,
-        reason: "Language-only relevance"
-      });
-    }
-    if (sawNeedNegativeMatch && !sawStrongNeedMatch) {
-      capsApplied.push({
-        kind: "negative_need_cap",
-        cap: 35,
-        reason: "Need anti-triggers were matched without strong need evidence"
-      });
-    }
 
     const { rawScore, relevanceRaw, qualityRaw } = computeScorePartitions(scoreBreakdown);
     const normalizedRelevance = normalizePositiveScore(relevanceRaw, 90);
@@ -528,7 +454,9 @@ export function recommendSkills(
       skillCategories,
       domainSignals,
       includedByAllCompatible,
-      noScripts: options.noScripts
+      noScripts: options.noScripts,
+      blockers,
+      referenceDateIso
     });
 
     scoreBreakdown.push({
@@ -603,11 +531,23 @@ export function recommendSkills(
     const normalizedReasons = dedupeStrings(reasons).slice(0, 8);
     const normalizedPenalties = dedupeStrings(penalties);
     const normalizedEligibility = dedupeStrings(eligibilityReasons);
+    const normalizedBlockers = dedupeBlockers(blockers);
     const finalRoundedScore = clampRecommendationScore(finalScore);
     const dimensionScores = {
       ...preCapDimensions,
       final: finalRoundedScore
     };
+    const fitSummary = buildRecommendationFitSummary({
+      recommendationScore: finalRoundedScore,
+      dimensionScores,
+      reasons: normalizedReasons,
+      penalties: normalizedPenalties,
+      matchedNeeds: dedupeStrings(matchedNeeds),
+      matchedNeedDetails,
+      matchedFacts: dedupeFacts(matchedFacts),
+      blockers: normalizedBlockers,
+      capsApplied: dedupeCaps(capsApplied)
+    });
 
     const recommendation: SkillRecommendation = {
       candidate,
@@ -616,6 +556,8 @@ export function recommendSkills(
       relevanceRaw: roundDimension(relevanceRaw),
       qualityRaw: roundDimension(qualityRaw),
       dimensionScores,
+      blockers: normalizedBlockers,
+      fitSummary,
       status,
       overrideable: securityDecision.overrideable,
       hardBlocked: securityDecision.hardBlocked,
@@ -793,26 +735,6 @@ function evaluateMissingCapabilityMismatch(
   return delta;
 }
 
-function applyDomainPenalty(
-  context: RecommendationContext,
-  candidate: NormalizedCandidate,
-  penalties: string[],
-  scoreBreakdown: RecommendationScoreComponent[]
-): number {
-  if (candidate.domains.size === 0) return 0;
-
-  const overlapping = [...candidate.domains].filter((domain) => context.repoDomains.has(domain));
-  if (overlapping.length > 0) return 0;
-
-  const label = [...candidate.domains].slice(0, 3).join("/");
-  penalties.push(`Domain-specific skill: ${label}, but repo has no matching domain evidence`);
-  return applyScoreComponent(0, scoreBreakdown, {
-    kind: "domain_mismatch_penalty",
-    points: -40,
-    detail: `Domain mismatch: ${label}`
-  });
-}
-
 function applyScoreComponent(
   score: number,
   scoreBreakdown: RecommendationScoreComponent[],
@@ -857,6 +779,18 @@ function dedupeCaps(values: RecommendationCapApplied[]): RecommendationCapApplie
   const output: RecommendationCapApplied[] = [];
   for (const value of values) {
     const key = `${value.kind}:${value.cap}:${value.reason}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(value);
+  }
+  return output;
+}
+
+function dedupeBlockers(values: RecommendationBlocker[]): RecommendationBlocker[] {
+  const seen = new Set<string>();
+  const output: RecommendationBlocker[] = [];
+  for (const value of values) {
+    const key = `${value.kind}:${value.severity}:${value.message}:${value.scoreCap}`;
     if (seen.has(key)) continue;
     seen.add(key);
     output.push(value);

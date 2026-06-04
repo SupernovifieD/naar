@@ -50,6 +50,15 @@ function makeRecommendation(overrides: Partial<SkillRecommendation> = {}): Skill
     },
     score: 88,
     reasons: ["Matched stack: Next.js", "Assistant compatibility: claude"],
+    blockers: [],
+    fitSummary: {
+      level: "strong",
+      headline: "Strong fit for CLI/package workflow",
+      primaryMatches: ["repo need: node_cli_development"],
+      supportingMatches: ["language: TypeScript"],
+      cautions: [],
+      blockers: []
+    },
     dimensionScores: {
       relevance: 82,
       specificity: 68,
@@ -135,6 +144,7 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("Match score: 88%");
     expect(output).toContain("Pre-fetch risk estimate: 5%");
     expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("Fit: Strong fit for CLI/package workflow");
     expect(output).toContain("Page: https://example.com/skills/frontend-design");
     expect(output).toContain("Meta:");
     expect(output.match(/Publisher: anthropic/g)?.length ?? 0).toBe(1);
@@ -213,6 +223,15 @@ describe("recommendation card helpers", () => {
 
   it("renders verbose recommendation explainability sections", () => {
     const output = stripAnsi(renderRecommendationCard(makeRecommendation({
+      blockers: [{ kind: "weak_only_match", severity: "soft", message: "Only weak repo-need matches were found", penalty: -12, scoreCap: 45 }],
+      fitSummary: {
+        level: "weak",
+        headline: "Weak fit: mostly language-level evidence",
+        primaryMatches: ["repo need: node_cli_development"],
+        supportingMatches: ["language: TypeScript"],
+        cautions: ["Only weak repo-need matches were found"],
+        blockers: []
+      },
       matchedNeeds: ["node_cli_development", "vitest_testing"],
       matchedNeedDetails: [
         {
@@ -241,6 +260,8 @@ describe("recommendation card helpers", () => {
 
     expect(output).toContain("Skill Categories:");
     expect(output).toContain("Domain Signals:");
+    expect(output).toContain("Fit Summary:");
+    expect(output).toContain("Headline: Weak fit: mostly language-level evidence");
     expect(output).toContain("Match Score Model:");
     expect(output).toContain("relevanceRaw=");
     expect(output).toContain("Score:");
@@ -260,6 +281,8 @@ describe("recommendation card helpers", () => {
     expect(output).toContain("+30 repo_need_match [strong]: node_cli_development");
     expect(output).toContain("Caps Applied:");
     expect(output).toContain("weak_only_cap: cap=45");
+    expect(output).toContain("Blockers:");
+    expect(output).toContain("weak_only_match [soft] cap=45 penalty=-12");
     expect(output).toContain("Cap Summary:");
   });
 

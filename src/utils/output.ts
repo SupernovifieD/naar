@@ -173,6 +173,15 @@ export function renderRecommendationCard(
   );
 
   if (!compact) {
+    if (recommendation.fitSummary?.headline) {
+      appendWrappedField(lines, {
+        cardWidth,
+        indent,
+        label: "Fit",
+        value: recommendation.fitSummary.headline
+      });
+    }
+
     const description = resolveSkillDescription(recommendation.candidate);
     if (description) {
       appendWrappedField(lines, {
@@ -202,6 +211,24 @@ export function renderRecommendationCard(
     label: "Why",
     reasons
   });
+
+  if (!compact && (recommendation.fitSummary?.cautions.length ?? 0) > 0) {
+    appendWrappedReasonsField(lines, {
+      cardWidth,
+      indent,
+      label: "Cautions",
+      reasons: recommendation.fitSummary?.cautions.slice(0, 3) ?? []
+    });
+  }
+
+  if (!compact && (recommendation.fitSummary?.blockers.length ?? 0) > 0) {
+    appendWrappedReasonsField(lines, {
+      cardWidth,
+      indent,
+      label: "Limited By",
+      reasons: recommendation.fitSummary?.blockers.slice(0, 2) ?? []
+    });
+  }
 
   const eligibilityReasons = (recommendation.eligibilityReasons ?? []).map((reason) => reason.trim()).filter(Boolean);
   if (eligibilityReasons.length > 0 && (!compact || verbose)) {
@@ -233,6 +260,22 @@ export function renderRecommendationCard(
   }
 
   if (verbose) {
+    if (recommendation.fitSummary) {
+      appendMetaFields(lines, {
+        cardWidth,
+        indent,
+        label: "Fit Summary",
+        fields: [
+          { key: "level", value: recommendation.fitSummary.level },
+          { key: "headline", value: recommendation.fitSummary.headline },
+          { key: "primary", value: recommendation.fitSummary.primaryMatches.join("; ") || "n/a" },
+          { key: "supporting", value: recommendation.fitSummary.supportingMatches.join("; ") || "n/a" },
+          { key: "cautions", value: recommendation.fitSummary.cautions.join("; ") || "none" },
+          { key: "blockers", value: recommendation.fitSummary.blockers.join("; ") || "none" }
+        ]
+      });
+    }
+
     if (recommendation.dimensionScores) {
       appendMetaFields(lines, {
         cardWidth,
@@ -356,6 +399,18 @@ export function renderRecommendationCard(
         indent,
         label: "Caps Applied",
         reasons: capsApplied
+      });
+    }
+
+    const blockers = (recommendation.blockers ?? []).slice(0, 8).map((blocker) =>
+      `${blocker.kind} [${blocker.severity}] cap=${blocker.scoreCap} penalty=${blocker.penalty}`
+    );
+    if (blockers.length > 0) {
+      appendWrappedReasonsField(lines, {
+        cardWidth,
+        indent,
+        label: "Blockers",
+        reasons: blockers
       });
     }
   }

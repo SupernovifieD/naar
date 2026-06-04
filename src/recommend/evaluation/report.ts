@@ -8,12 +8,16 @@ export function renderRecommendationEvaluationReport(results: RecommendationEval
     const recallK = firstMetricKey(result.metrics.recallAtK, 10);
     const badDomainK = firstMetricKey(result.metrics.badDomainCountAtK, 5);
     const blockedK = firstMetricKey(result.metrics.blockedCountAtK, 5);
+    const hardBlockerK = firstMetricKey(result.metrics.hardBlockerCountAtK ?? {}, 5);
+    const poorFitK = firstMetricKey(result.metrics.poorFitCountAtK ?? {}, 5);
 
     lines.push(result.fixtureId);
     lines.push(`  precision@${precisionK}: ${formatMetric(result.metrics.precisionAtK[precisionK] ?? 0)}`);
     lines.push(`  recall@${recallK}: ${formatMetric(result.metrics.recallAtK[recallK] ?? 0)}`);
     lines.push(`  bad-domain@${badDomainK}: ${result.metrics.badDomainCountAtK[badDomainK] ?? 0}`);
     lines.push(`  blocked@${blockedK}: ${result.metrics.blockedCountAtK[blockedK] ?? 0}`);
+    lines.push(`  hard-blockers@${hardBlockerK}: ${result.metrics.hardBlockerCountAtK?.[hardBlockerK] ?? 0}`);
+    lines.push(`  poor-fit@${poorFitK}: ${result.metrics.poorFitCountAtK?.[poorFitK] ?? 0}`);
     const averageDimensions = result.metrics.averageDimensionsAtK ?? {};
     const averageDimensionK = firstMetricKey(averageDimensions, 5);
     const dimensionValues = averageDimensions[averageDimensionK];

@@ -32,6 +32,8 @@ export const DOCS_SITE_FIXTURE: RecommendationEvalFixture = {
     shouldNotRecommendCategories: ["crypto", "finance", "spreadsheet", "mcp"],
     maxBadDomainInTopK: { k: 5, max: 0 },
     maxBlockedInTopK: { k: 5, max: 1 },
+    maxHardBlockersInTopK: { k: 5, max: 0 },
+    maxPoorFitInTopK: { k: 5, max: 1 },
     // TODO(recommendation-quality): raise docs precision after docs-specific relevance consistently beats generic setup/type-safety skills.
     minPrecisionAtK: { k: 5, min: 0.2 },
     minRecallAtK: { k: 10, min: 0.2 }

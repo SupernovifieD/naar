@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   AssistantId,
+  RecommendationBlocker,
   RecommendationCapApplied,
   RecommendationScoreComponent,
   SkillCandidate
@@ -58,6 +59,7 @@ function makeInput(options: {
   hasDeepMatch?: boolean;
   candidate?: SkillCandidate;
   includedByAllCompatible?: boolean;
+  blockers?: RecommendationBlocker[];
 } = {}) {
   return {
     scoreBreakdown: options.scoreBreakdown ?? [],
@@ -75,7 +77,9 @@ function makeInput(options: {
     skillCategories: [],
     domainSignals: [],
     includedByAllCompatible: options.includedByAllCompatible ?? false,
-    noScripts: true
+    noScripts: true,
+    blockers: options.blockers ?? [],
+    referenceDateIso: "2026-06-03T00:00:00.000Z"
   };
 }
 
@@ -98,9 +102,9 @@ describe("computeDimensionScores", () => {
   it("keeps language-only matches low in relevance and specificity", () => {
     const dimensions = computeDimensionScores(makeInput({
       scoreBreakdown: [
-        { kind: "language_match", points: 7, detail: "TypeScript" },
-        { kind: "language_only_penalty", points: -24, detail: "Language-only" }
+        { kind: "language_match", points: 7, detail: "TypeScript" }
       ],
+      blockers: [{ kind: "language_only_match", severity: "soft", message: "Language-only match without deeper repo evidence", penalty: -24, scoreCap: 35 }],
       hasDeepMatch: false
     }));
 
@@ -169,13 +173,13 @@ describe("computeDimensionScores", () => {
         { kind: "tool_match", points: 12, detail: "vitest" },
         { kind: "framework_match", points: 14, detail: "react" }
       ],
-      capsApplied: [{ kind: "domain_mismatch_cap", cap: 15, reason: "Domain mismatch" }],
+      capsApplied: [{ kind: "domain_mismatch", cap: 15, reason: "Domain mismatch" }],
       hasDeepMatch: true
     }));
 
-    const capped = applyRecommendationCaps(dimensions.final, [{ kind: "domain_mismatch_cap", cap: 15, reason: "Domain mismatch" }]);
+    const capped = applyRecommendationCaps(dimensions.final, [{ kind: "domain_mismatch", cap: 15, reason: "Domain mismatch" }]);
     expect(capped.score).toBe(15);
-    expect(capped.appliedCap?.kind).toBe("domain_mismatch_cap");
+    expect(capped.appliedCap?.kind).toBe("domain_mismatch");
   });
 
   it("uses the exact weighted dimensional formula", () => {

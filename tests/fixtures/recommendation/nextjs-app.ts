@@ -49,6 +49,8 @@ export const NEXTJS_APP_FIXTURE: RecommendationEvalFixture = {
     shouldNotRecommendCategories: ["crypto", "finance", "art", "spreadsheet", "mcp"],
     maxBadDomainInTopK: { k: 5, max: 0 },
     maxBlockedInTopK: { k: 5, max: 1 },
+    maxHardBlockersInTopK: { k: 5, max: 0 },
+    maxPoorFitInTopK: { k: 5, max: 1 },
     minPrecisionAtK: { k: 5, min: 0.4 },
     minRecallAtK: { k: 10, min: 0.3 }
   }

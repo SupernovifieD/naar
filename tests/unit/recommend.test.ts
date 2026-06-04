@@ -261,8 +261,10 @@ describe("recommendSkills", () => {
     });
 
     expect(result.recommendations).toHaveLength(1);
-    expect(result.recommendations[0].penalties).toContain("Language-only match; no deeper project need match");
-    expect(result.recommendations[0].scoreBreakdown.some((item) => item.kind === "language_only_penalty")).toBe(true);
+    expect(result.recommendations[0].blockers?.some((blocker) => blocker.kind === "language_only_match")).toBe(true);
+    expect(result.recommendations[0].scoreBreakdown.some((item) =>
+      item.kind === "recommendation_blocker" && item.reason === "language_only_match"
+    )).toBe(true);
   });
 
   it("treats assistant compatibility as eligibility and explicit-target tie-break only", () => {
@@ -374,7 +376,11 @@ describe("recommendSkills", () => {
     });
 
     const defiRec = result.recommendations.find((recommendation) => recommendation.candidate.canonicalSkillId === "defi-skill");
-    expect(defiRec?.penalties.some((penalty) => penalty.startsWith("Domain-specific skill:"))).toBe(true);
+    expect(defiRec?.blockers?.some((blocker) => blocker.kind === "domain_mismatch")).toBe(true);
+    expect(defiRec?.capsApplied?.some((cap) => cap.kind === "domain_mismatch")).toBe(true);
+    expect(defiRec?.fitSummary?.level).toBe("poor");
+    expect(defiRec?.status).toBe("eligible");
+    expect(defiRec?.blocked).toBe(false);
     expect(defiRec?.score).toBeLessThan(result.recommendations[0].score);
   });
 
@@ -397,10 +403,10 @@ describe("recommendSkills", () => {
     });
 
     expect(result.recommendations).toHaveLength(1);
-    expect(result.recommendations[0].penalties).toContain(
-      "Skill targets react, but those frameworks are only in fixture/secondary scope"
-    );
-    expect(result.recommendations[0].scoreBreakdown.some((item) => item.kind === "secondary_only_framework_penalty")).toBe(true);
+    expect(result.recommendations[0].blockers?.some((blocker) => blocker.kind === "secondary_scope_only")).toBe(true);
+    expect(result.recommendations[0].scoreBreakdown.some((item) =>
+      item.kind === "recommendation_blocker" && item.reason === "secondary_scope_only"
+    )).toBe(true);
   });
 
   it("does not top-rank MCP skills without MCP evidence", () => {
@@ -474,7 +480,7 @@ describe("recommendSkills", () => {
     const recommendation = result.recommendations[0];
     const testingNeeds = new Set(["vitest_testing", "test_generation", "test_debugging"]);
     expect(recommendation.matchedNeeds.some((needId) => testingNeeds.has(needId))).toBe(false);
-    expect(recommendation.capsApplied?.some((cap) => cap.kind === "specialized_gate_cap")).toBe(true);
+    expect(recommendation.blockers?.some((blocker) => blocker.kind === "skill_authoring_mismatch")).toBe(true);
     expect(recommendation.score).toBeLessThanOrEqual(45);
   });
 
@@ -494,7 +500,7 @@ describe("recommendSkills", () => {
       noScripts: true,
       eligibleAssistants: ["claude"]
     }).recommendations[0];
-    expect(noEvidence.penalties).toContain("MCP-specific skill, but repo has no MCP evidence");
+    expect(noEvidence.blockers?.some((blocker) => blocker.kind === "mcp_mismatch")).toBe(true);
     expect(noEvidence.score).toBeLessThanOrEqual(35);
 
     const mcpRepoRoot = await makeTempRepo({
@@ -506,7 +512,7 @@ describe("recommendSkills", () => {
       noScripts: true,
       eligibleAssistants: ["claude"]
     }).recommendations[0];
-    expect(withEvidence.penalties).not.toContain("MCP-specific skill, but repo has no MCP evidence");
+    expect(withEvidence.blockers?.some((blocker) => blocker.kind === "mcp_mismatch")).toBe(false);
   });
 
   it("keeps claude-api skill moderate without Anthropic SDK/import evidence", () => {
@@ -718,6 +724,8 @@ describe("recommendSkills", () => {
     expect(typeof recommendation.qualityRaw).toBe("number");
     expect(recommendation.dimensionScores).toBeDefined();
     expect(recommendation.dimensionScores?.final).toBe(recommendation.score);
+    expect(Array.isArray(recommendation.blockers)).toBe(true);
+    expect(recommendation.fitSummary).toBeDefined();
     expect(recommendation.rawScore).not.toBe(recommendation.score);
   });
 
@@ -821,6 +829,7 @@ describe("recommendSkills", () => {
     expect(Array.isArray(recommendation.penalties)).toBe(true);
     expect(Array.isArray(recommendation.eligibilityReasons)).toBe(true);
     expect(Array.isArray(recommendation.capsApplied ?? [])).toBe(true);
+    expect(Array.isArray(recommendation.blockers ?? [])).toBe(true);
     expect(Array.isArray(recommendation.skillCategories ?? [])).toBe(true);
     expect(Array.isArray(recommendation.domainSignals ?? [])).toBe(true);
     expect(recommendation.scoreBreakdown.length).toBeGreaterThan(0);
@@ -829,5 +838,6 @@ describe("recommendSkills", () => {
     expect(typeof recommendation.qualityRaw).toBe("number");
     expect(recommendation.dimensionScores).toBeDefined();
     expect(recommendation.dimensionScores?.final).toBe(recommendation.score);
+    expect(recommendation.fitSummary).toBeDefined();
   });
 });

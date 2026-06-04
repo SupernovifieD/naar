@@ -33,6 +33,8 @@ export interface RecommendationExpectations {
   shouldNotRecommendSkillRefs?: string[];
   maxBadDomainInTopK?: { k: number; max: number };
   maxBlockedInTopK?: { k: number; max: number };
+  maxHardBlockersInTopK?: { k: number; max: number };
+  maxPoorFitInTopK?: { k: number; max: number };
   minPrecisionAtK?: { k: number; min: number };
   minRecallAtK?: { k: number; min: number };
 }
@@ -45,6 +47,8 @@ export interface RecommendationEvalFixture {
   expectations: RecommendationExpectations;
 }
 
+const DEFAULT_SCAN_TIME = "2026-06-03T00:00:00.000Z";
+
 export const DEFAULT_RECOMMEND_EVAL_OPTIONS: RecommendOptions = {
   minSecurityScore: 80,
   noScripts: true,
@@ -52,10 +56,9 @@ export const DEFAULT_RECOMMEND_EVAL_OPTIONS: RecommendOptions = {
   eligibleAssistants: ["claude", "cursor", "codex", "copilot", "generic"],
   eligibilitySource: "fallback-all",
   allCompatible: false,
-  maxResults: 10
+  maxResults: 10,
+  referenceDateIso: DEFAULT_SCAN_TIME
 };
-
-const DEFAULT_SCAN_TIME = "2026-06-03T00:00:00.000Z";
 
 export function makeEvidence(
   path = "package.json",

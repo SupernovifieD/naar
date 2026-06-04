@@ -80,5 +80,14 @@ describe("loadRecommendationCache", () => {
       safety: 91,
       final: 77
     });
+    expect(loaded?.recommendations[0].blockers).toEqual([]);
+    expect(loaded?.recommendations[0].fitSummary).toEqual({
+      level: "strong",
+      headline: "Legacy cached recommendation",
+      primaryMatches: ["Matched stack"],
+      supportingMatches: [],
+      cautions: [],
+      blockers: []
+    });
   });
 });

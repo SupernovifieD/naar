@@ -98,6 +98,15 @@ function makeRecommendation(description?: string, summary = "Summary fallback"):
       risk: { score: 100, level: "low", signals: [], requiresOverride: false }
     },
     score: 91,
+    blockers: [],
+    fitSummary: {
+      level: "strong",
+      headline: "Strong fit for CLI/package workflow",
+      primaryMatches: ["repo need: node_cli_development"],
+      supportingMatches: ["language: TypeScript"],
+      cautions: [],
+      blockers: []
+    },
     dimensionScores: {
       relevance: 84,
       specificity: 69,
@@ -196,6 +205,7 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Match score:");
     expect(output).toContain("Pre-fetch risk estimate:");
     expect(output).toContain("Status: PRELIMINARILY ELIGIBLE");
+    expect(output).toContain("Fit: Strong fit for CLI/package workflow");
     expect(output).not.toContain("Score: 91%");
     expect(output).not.toContain("Status: ELIGIBLE");
     expect(output).toContain("Description: API skill description from provider");
@@ -343,6 +353,15 @@ describe("recommend/go output descriptions", () => {
     const recommendation = makeRecommendation("Verbose description");
     recommendation.eligibilityReasons = ["Eligible for target: claude"];
     recommendation.penalties = ["Language-only match; no deeper project need match"];
+    recommendation.blockers = [{ kind: "weak_only_match", severity: "soft", message: "Only weak repo-need matches were found", penalty: -12, scoreCap: 45 }];
+    recommendation.fitSummary = {
+      level: "weak",
+      headline: "Weak fit: mostly language-level evidence",
+      primaryMatches: ["repo need: node_cli_development"],
+      supportingMatches: ["language: TypeScript"],
+      cautions: ["Only weak repo-need matches were found"],
+      blockers: []
+    };
     recommendation.matchedNeeds = ["node_cli_development"];
     recommendation.matchedNeedDetails = [
       {
@@ -382,5 +401,7 @@ describe("recommend/go output descriptions", () => {
     expect(output).toContain("Final:");
     expect(output).toContain("Match Score Model:");
     expect(output).toContain("Cap Summary:");
+    expect(output).toContain("Fit Summary:");
+    expect(output).toContain("Blockers:");
   });
 });

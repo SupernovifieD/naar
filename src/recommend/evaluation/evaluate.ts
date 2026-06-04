@@ -4,11 +4,14 @@ import type { RecommendationEvalFixture } from "./fixtures.js";
 import { DEFAULT_RECOMMEND_EVAL_OPTIONS } from "./fixtures.js";
 import {
   averageDimensionAtK,
+  badFitDomainCountAtK,
   badDomainCountAtK,
   blockedCountAtK,
   collectBadDomainRefsAtK,
   createRelevantSet,
+  hardBlockerCountAtK,
   precisionAtK,
+  poorFitCountAtK,
   recallAtK,
   recommendationRef,
   riskyCountAtK,
@@ -64,6 +67,8 @@ function computeMetrics(
   const blockedK = fixture.expectations.maxBlockedInTopK?.k ?? 5;
   const riskyK = Math.max(5, blockedK);
   const dimensionK = 5;
+  const hardBlockerK = fixture.expectations.maxHardBlockersInTopK?.k ?? 5;
+  const poorFitK = fixture.expectations.maxPoorFitInTopK?.k ?? 5;
 
   return {
     precisionAtK: {
@@ -75,11 +80,20 @@ function computeMetrics(
     badDomainCountAtK: {
       [badDomainK]: badDomainCountAtK(recommendations, fixture.expectations.shouldNotRecommendCategories, badDomainK)
     },
+    badFitDomainCountAtK: {
+      [badDomainK]: badFitDomainCountAtK(recommendations, fixture.expectations.shouldNotRecommendCategories, badDomainK)
+    },
     blockedCountAtK: {
       [blockedK]: blockedCountAtK(recommendations, blockedK)
     },
     riskyCountAtK: {
       [riskyK]: riskyCountAtK(recommendations, riskyK)
+    },
+    hardBlockerCountAtK: {
+      [hardBlockerK]: hardBlockerCountAtK(recommendations, hardBlockerK)
+    },
+    poorFitCountAtK: {
+      [poorFitK]: poorFitCountAtK(recommendations, poorFitK)
     },
     averageDimensionsAtK: {
       [dimensionK]: {
@@ -148,6 +162,36 @@ function evaluateExpectations(
       failures.push({
         fixtureId: fixture.id,
         message: `${fixture.id}: blocked results in top ${k} expected <= ${max}, got ${actual}: ${blockedRefs.join(", ")}`
+      });
+    }
+  }
+
+  if (fixture.expectations.maxHardBlockersInTopK) {
+    const { k, max } = fixture.expectations.maxHardBlockersInTopK;
+    const actual = metrics.hardBlockerCountAtK?.[k] ?? hardBlockerCountAtK(recommendations, k);
+    if (actual > max) {
+      const hardBlockerRefs = recommendations
+        .slice(0, k)
+        .filter((recommendation) => (recommendation.blockers ?? []).some((blocker) => blocker.severity === "hard"))
+        .map((recommendation) => recommendationRef(recommendation));
+      failures.push({
+        fixtureId: fixture.id,
+        message: `${fixture.id}: hard blockers in top ${k} expected <= ${max}, got ${actual}: ${hardBlockerRefs.join(", ")}`
+      });
+    }
+  }
+
+  if (fixture.expectations.maxPoorFitInTopK) {
+    const { k, max } = fixture.expectations.maxPoorFitInTopK;
+    const actual = metrics.poorFitCountAtK?.[k] ?? poorFitCountAtK(recommendations, k);
+    if (actual > max) {
+      const poorFitRefs = recommendations
+        .slice(0, k)
+        .filter((recommendation) => recommendation.fitSummary?.level === "poor")
+        .map((recommendation) => recommendationRef(recommendation));
+      failures.push({
+        fixtureId: fixture.id,
+        message: `${fixture.id}: poor-fit results in top ${k} expected <= ${max}, got ${actual}: ${poorFitRefs.join(", ")}`
       });
     }
   }

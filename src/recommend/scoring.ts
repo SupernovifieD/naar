@@ -2,6 +2,7 @@ import type {
   AssistantId,
   MatchedFact,
   MatchedNeedDetail,
+  RecommendationBlocker,
   RecommendationCapApplied,
   RecommendationDimensionScores,
   RecommendationScoreComponent,
@@ -26,6 +27,8 @@ export interface ScoreDimensionInputs {
   domainSignals: string[];
   includedByAllCompatible?: boolean;
   noScripts?: boolean;
+  blockers?: RecommendationBlocker[];
+  referenceDateIso?: string;
 }
 
 interface ScorePartitions {
@@ -35,10 +38,15 @@ interface ScorePartitions {
 }
 
 const SPECIFICITY_NEGATIVE_KINDS = new Map<string, number>([
-  ["generic_productivity_penalty", 20],
-  ["language_only_penalty", 20],
-  ["domain_mismatch_penalty", 30],
-  ["secondary_only_framework_penalty", 20]
+  ["generic_productivity_mismatch", 20],
+  ["language_only_match", 20],
+  ["domain_mismatch", 30],
+  ["secondary_scope_only", 20],
+  ["framework_mismatch", 25],
+  ["prompting_mismatch", 20],
+  ["mcp_mismatch", 20],
+  ["skill_authoring_mismatch", 15],
+  ["claude_api_mismatch", 15]
 ]);
 
 export function computeDimensionScores(input: ScoreDimensionInputs): RecommendationDimensionScores {
@@ -46,7 +54,7 @@ export function computeDimensionScores(input: ScoreDimensionInputs): Recommendat
   const relevance = roundDimension(normalizePositiveScore(relevancePartitions.relevanceRaw, 90));
   const specificity = roundDimension(computeSpecificity(input));
   const compatibility = roundDimension(computeCompatibility(input));
-  const quality = roundDimension(computeQuality(input.candidate));
+  const quality = roundDimension(computeQuality(input.candidate, input.referenceDateIso));
   const safety = roundDimension(computeSafety(input));
   const final = roundDimension(
     (relevance * 0.45)
@@ -150,21 +158,21 @@ function computeSpecificity(input: ScoreDimensionInputs): number {
   if (independentFactMatches >= 3) specificity += 7;
 
   for (const [kind, penalty] of SPECIFICITY_NEGATIVE_KINDS.entries()) {
-    if (hasBreakdownKind(input.scoreBreakdown, kind)) {
+    if (input.blockers?.some((blocker) => blocker.kind === kind)) {
       specificity -= penalty;
     }
   }
 
-  if (input.capsApplied.some((cap) => cap.kind === "weak_only_cap")) {
+  if (input.blockers?.some((blocker) => blocker.kind === "weak_only_match")) {
     specificity -= 10;
   }
-  if (input.capsApplied.some((cap) => cap.kind === "no_strong_need_cap")) {
+  if (input.blockers?.some((blocker) => blocker.kind === "no_strong_need_match")) {
     specificity -= 8;
   }
-  if (input.capsApplied.some((cap) => cap.kind === "negative_need_cap")) {
+  if (input.blockers?.some((blocker) => blocker.kind === "negative_need_match")) {
     specificity -= 10;
   }
-  if (input.capsApplied.some((cap) => cap.kind === "specialized_gate_cap")) {
+  if (input.blockers?.some((blocker) => blocker.severity === "hard")) {
     specificity -= 15;
   }
 
@@ -200,7 +208,7 @@ function computeCompatibility(input: ScoreDimensionInputs): number {
   return 0;
 }
 
-function computeQuality(candidate: SkillCandidate): number {
+function computeQuality(candidate: SkillCandidate, referenceDateIso?: string): number {
   const metadata = candidate.metadata;
   let quality = 0;
 
@@ -216,7 +224,7 @@ function computeQuality(candidate: SkillCandidate): number {
     quality += 10;
   }
 
-  if (isRecentlyUpdated(metadata.lastUpdatedIso)) {
+  if (isRecentlyUpdated(metadata.lastUpdatedIso, referenceDateIso)) {
     quality += 10;
   }
 
@@ -259,11 +267,13 @@ function hasBreakdownKind(scoreBreakdown: RecommendationScoreComponent[], kind: 
   return scoreBreakdown.some((component) => component.kind === kind && component.points !== 0);
 }
 
-function isRecentlyUpdated(lastUpdatedIso?: string): boolean {
+function isRecentlyUpdated(lastUpdatedIso?: string, referenceDateIso?: string): boolean {
   if (!lastUpdatedIso) return false;
   const updatedAt = new Date(lastUpdatedIso);
   if (Number.isNaN(updatedAt.getTime())) return false;
-  const ageMs = Date.now() - updatedAt.getTime();
+  const reference = referenceDateIso ? new Date(referenceDateIso) : null;
+  const now = reference && !Number.isNaN(reference.getTime()) ? reference.getTime() : updatedAt.getTime();
+  const ageMs = now - updatedAt.getTime();
   const ageDays = ageMs / (1000 * 60 * 60 * 24);
   return ageDays <= 365;
 }

@@ -14,7 +14,7 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
   legal: ["legal", "law", "contract"],
   medical: ["medical", "health", "clinical", "biology", "chemistry"],
   marketing: ["marketing", "brand", "newsletter", "campaign"],
-  art: ["art", "algorithmic-art", "design"],
+  art: ["art", "algorithmic-art", "creative-coding", "procedural-art"],
   spreadsheet: ["spreadsheet", "excel", "xlsx", "google-sheets"],
   internal_comms: ["internal-comms", "communication", "leadership-update"]
 };
