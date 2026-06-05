@@ -22,9 +22,9 @@ export const navLinks = [
 
 export const productLinks = [
   { href: "/docs#getting-started", label: "Getting started" },
-  { href: "/docs#search-workflow", label: "Search workflow" },
-  { href: "/docs#guided-go-workflow", label: "Go workflow" },
-  { href: "/docs#install-workflow", label: "Install" }
+  { href: "/docs#installation", label: "Install" },
+  { href: "/docs#search-workflow", label: "Search" },
+  { href: "/docs#guided-go-workflow", label: "Go" }
 ] as const;
 
 export function withBase(pathname: string): string {

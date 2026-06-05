@@ -26,8 +26,8 @@ const {
     {copyText && <CopyButton client:load text={copyText} label="Copy" />}
   </div>
   {asCode ? (
-    <pre class={`overflow-x-auto px-5 py-5 text-sm leading-7 text-text ${bodyClass}`.trim()}><code><slot /></code></pre>
+    <pre class={`terminal-shell overflow-x-auto px-5 py-5 text-sm leading-7 text-text ${bodyClass}`.trim()}><code><slot /></code></pre>
   ) : (
-    <div class={`text-sm leading-7 text-text ${bodyClass}`.trim()}><slot /></div>
+    <div class={`terminal-shell text-sm leading-7 text-text ${bodyClass}`.trim()}><slot /></div>
   )}
 </div>

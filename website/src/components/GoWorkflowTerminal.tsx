@@ -1,188 +1,219 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const FRAME_DURATIONS_MS = [1100, 1200, 1500, 1600, 1200, 1600, 2600];
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface GoWorkflowTerminalProps {
   version: string;
 }
 
-export default function GoWorkflowTerminal({ version }: GoWorkflowTerminalProps) {
-  const reducedMotion = usePrefersReducedMotion();
-  const [spinnerIndex, setSpinnerIndex] = useState(0);
-  const [frameIndex, setFrameIndex] = useState(reducedMotion ? FRAME_DURATIONS_MS.length - 1 : 0);
+type LineTone = "default" | "muted" | "section" | "success" | "loading" | "install";
 
-  useEffect(() => {
-    if (reducedMotion) {
-      setFrameIndex(FRAME_DURATIONS_MS.length - 1);
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setSpinnerIndex((current) => (current + 1) % SPINNER_FRAMES.length);
-    }, 90);
-
-    return () => window.clearInterval(timer);
-  }, [reducedMotion]);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setFrameIndex((current) => (current + 1) % FRAME_DURATIONS_MS.length);
-    }, FRAME_DURATIONS_MS[frameIndex] ?? 1400);
-
-    return () => window.clearTimeout(timeout);
-  }, [frameIndex, reducedMotion]);
-
-  const spinner = SPINNER_FRAMES[spinnerIndex];
-  const frames = useMemo(() => buildFrames(version, spinner), [spinner, version]);
-
-  return <div className="font-mono text-[0.92rem] leading-7 text-text">{frames[frameIndex]}</div>;
+interface TerminalLineData {
+  text: string;
+  tone?: LineTone;
 }
 
-function buildFrames(version: string, spinner: string) {
+const TYPING_MS = 72;
+const STEP_PAUSE_MS = 220;
+const LONG_PAUSE_MS = 420;
+
+export default function GoWorkflowTerminal({ version }: GoWorkflowTerminalProps) {
+  const reducedMotion = usePrefersReducedMotion();
+  const [inView, setInView] = useState(false);
+  const [typedCommand, setTypedCommand] = useState("");
+  const [lines, setLines] = useState<TerminalLineData[]>([]);
+  const [showTypingCursor, setShowTypingCursor] = useState(false);
+  const [showFinalPrompt, setShowFinalPrompt] = useState(false);
+  const runIdRef = useRef(0);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const finalLines = useMemo(() => buildFinalLines(version), [version]);
+
+  useEffect(() => {
+    const target = rootRef.current;
+    if (!target) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInView(entry.isIntersecting);
+      },
+      { threshold: 0.45 }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const scrollNode = scrollRef.current;
+    if (!scrollNode) return;
+    scrollNode.scrollTop = scrollNode.scrollHeight;
+  }, [lines, showFinalPrompt, typedCommand]);
+
+  useEffect(() => {
+    runIdRef.current += 1;
+    const currentRun = runIdRef.current;
+
+    if (!inView) {
+      setTypedCommand("");
+      setLines([]);
+      setShowTypingCursor(false);
+      setShowFinalPrompt(false);
+      return undefined;
+    }
+
+    if (reducedMotion) {
+      setTypedCommand("naar go");
+      setLines(finalLines);
+      setShowTypingCursor(false);
+      setShowFinalPrompt(true);
+      return undefined;
+    }
+
+    const run = async () => {
+      setTypedCommand("");
+      setLines([]);
+      setShowFinalPrompt(false);
+      setShowTypingCursor(true);
+
+      for (const char of "naar go") {
+        if (!isCurrentRun(runIdRef, currentRun)) return;
+        setTypedCommand((current) => current + char);
+        await wait(TYPING_MS);
+      }
+
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      setShowTypingCursor(false);
+      await wait(STEP_PAUSE_MS);
+
+      const draft: TerminalLineData[] = [];
+      const pushLine = async (line: TerminalLineData, delay = STEP_PAUSE_MS) => {
+        draft.push(line);
+        setLines([...draft]);
+        await wait(delay);
+      };
+      const replaceLast = async (line: TerminalLineData, delay = STEP_PAUSE_MS) => {
+        draft[draft.length - 1] = line;
+        setLines([...draft]);
+        await wait(delay);
+      };
+
+      await pushLine({ text: `Naar v${version}` }, LONG_PAUSE_MS);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await pushLine({ text: "Repo: ~/my-project", tone: "muted" });
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await pushLine({ text: "" }, 140);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await pushLine({ text: "[1/5] Scan", tone: "section" });
+      await pushLine({ text: "⠋ Scanning repository", tone: "loading" }, LONG_PAUSE_MS);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await replaceLast({ text: "✔ Repository scanned", tone: "success" });
+      await pushLine({ text: "Stack: TypeScript, npm, vitest, github-actions" });
+      await pushLine({ text: "Assistants: codex found · agents-md found" });
+      await pushLine({ text: "" }, 140);
+      await pushLine({ text: "[2/5] Providers", tone: "section" });
+      await pushLine({ text: "⠋ Fetching providers", tone: "loading" }, LONG_PAUSE_MS);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await replaceLast({ text: "✔ Providers fetched", tone: "success" });
+      await pushLine({ text: "" }, 140);
+      await pushLine({ text: "[3/5] Recommendations", tone: "section" });
+      await pushLine({ text: "⠋ Ranking skills", tone: "loading" }, LONG_PAUSE_MS);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await replaceLast({ text: "✔ Ranked skills", tone: "success" });
+      await pushLine({ text: "1) vitest-testing [clawhub]" });
+      await pushLine({ text: "Match: 75%   Pre-fetch risk: 0%   Status: PRELIMINARILY ELIGIBLE" });
+      await pushLine({ text: "Why: Matched repo need: vitest_testing" });
+      await pushLine({ text: "" }, 140);
+      await pushLine({ text: "[4/5] Selection", tone: "section" });
+      await pushLine({ text: "✔ Skill selected: vitest-testing", tone: "success" });
+      await pushLine({ text: "✔ Target selected: codex_repo_skills", tone: "success" });
+      await pushLine({ text: "" }, 140);
+      await pushLine({ text: "[5/5] Install", tone: "section" });
+      await pushLine({ text: "⠋ Building install plan", tone: "loading" }, LONG_PAUSE_MS);
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      await replaceLast({ text: "✔ Install plan ready", tone: "success" });
+      await pushLine({ text: "+ .naar/skills/vitest-testing/SKILL.md", tone: "install" });
+      await pushLine({ text: "+ .agents/skills/vitest-testing/SKILL.md", tone: "install" });
+      await pushLine({ text: "" }, 140);
+      await pushLine({ text: "Summary: 2 write · 0 update · 0 blocked" });
+
+      if (!isCurrentRun(runIdRef, currentRun)) return;
+      setShowFinalPrompt(true);
+    };
+
+    void run();
+    return undefined;
+  }, [finalLines, inView, reducedMotion, version]);
+
+  return (
+    <div ref={rootRef} className="flex h-[26.25rem] flex-col sm:h-[27rem] lg:h-[28.75rem]">
+      <div ref={scrollRef} className="terminal-scroll flex-1 min-h-0 px-5 py-5">
+        <PromptLine command={typedCommand} cursor={showTypingCursor} />
+        {lines.map((line, index) => (
+          <OutputLine key={`${index}:${line.text}`} line={line} />
+        ))}
+        {showFinalPrompt ? <PromptLine command="" cursor /> : null}
+      </div>
+    </div>
+  );
+}
+
+function OutputLine({ line }: { line: TerminalLineData }) {
+  if (!line.text) {
+    return <div aria-hidden="true" className="h-2" />;
+  }
+
+  const toneClass = {
+    default: "text-text",
+    muted: "text-text-muted",
+    section: "font-semibold text-text",
+    success: "text-success",
+    loading: "text-cyan-300",
+    install: "text-success"
+  }[line.tone ?? "default"];
+
+  return <p className={`terminal-line ${toneClass}`}>{line.text}</p>;
+}
+
+function PromptLine({ command, cursor }: { command: string; cursor: boolean }) {
+  return (
+    <p className="terminal-line mb-2">
+      <span className="terminal-prompt">➜</span>
+      <span className="text-text-soft">~</span>
+      <span className="terminal-command">{command ? command : ""}</span>
+      {cursor ? <span className="terminal-cursor" aria-hidden="true" /> : null}
+    </p>
+  );
+}
+
+function buildFinalLines(version: string): TerminalLineData[] {
   return [
-    <Fragment key="scan">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <ActiveLine spinner={spinner} text="Scanning repository" />
-    </Fragment>,
-    <Fragment key="providers">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <ActiveLine spinner={spinner} text="Fetching providers" />
-    </Fragment>,
-    <Fragment key="recommendations-loading">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <SuccessLine text="Providers fetched" />
-      <BlankLine />
-      <SectionLine text="[3/5] Recommendations" />
-      <ActiveLine spinner={spinner} text="Ranking skills" />
-    </Fragment>,
-    <Fragment key="recommendations-ready">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <SuccessLine text="Providers fetched" />
-      <BlankLine />
-      <SectionLine text="[3/5] Recommendations" />
-      <SuccessLine text="Ranked skills" />
-      <MutedLine text="Showing top 5 of 10" />
-      <BlankLine />
-      <SkillTitleLine index="1." name="vitest-testing" provider="clawhub" />
-      <LabelValueLine label="Match" value="75% · Risk 0% · Status PRELIMINARILY ELIGIBLE" />
-      <LabelValueLine label="Why" value="Matched repo need: vitest_testing (strong)" />
-      <InstallLine command="naar install clawhub:vitest-testing" />
-    </Fragment>,
-    <Fragment key="selection">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <SuccessLine text="Providers fetched" />
-      <BlankLine />
-      <SectionLine text="[3/5] Recommendations" />
-      <SuccessLine text="Ranked skills" />
-      <MutedLine text="Showing top 5 of 10" />
-      <BlankLine />
-      <SkillTitleLine index="1." name="vitest-testing" provider="clawhub" />
-      <LabelValueLine label="Match" value="75% · Risk 0% · Status PRELIMINARILY ELIGIBLE" />
-      <LabelValueLine label="Why" value="Matched repo need: vitest_testing (strong)" />
-      <InstallLine command="naar install clawhub:vitest-testing" />
-      <BlankLine />
-      <SectionLine text="[4/5] Selection" />
-      <MutedLine text="Review skills before installing." />
-    </Fragment>,
-    <Fragment key="installing">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <SuccessLine text="Providers fetched" />
-      <BlankLine />
-      <SectionLine text="[3/5] Recommendations" />
-      <SuccessLine text="Ranked skills" />
-      <MutedLine text="Showing top 5 of 10" />
-      <BlankLine />
-      <SectionLine text="[4/5] Selection" />
-      <MutedLine text="Review skills before installing." />
-      <BlankLine />
-      <SectionLine text="[5/5] Install" />
-      <ActiveLine spinner={spinner} text="Building install plan" />
-    </Fragment>,
-    <Fragment key="complete">
-      <TitleLine text={`Naar v${version}`} />
-      <MutedLine text="Repo: ~/my-project" />
-      <BlankLine />
-      <SectionLine text="[1/5] Scan" />
-      <SuccessLine text="Repository scanned" />
-      <LabelValueLine label="Stack" value="TypeScript, JavaScript · npm · vitest · github-actions" />
-      <LabelValueLine label="Assistants" value="codex found · agents-md found" />
-      <LabelValueLine label="Readiness" value="90% Excellent" valueTone="success" />
-      <BlankLine />
-      <SectionLine text="[2/5] Providers" />
-      <SuccessLine text="Providers fetched" />
-      <BlankLine />
-      <SectionLine text="[3/5] Recommendations" />
-      <SuccessLine text="Ranked skills" />
-      <MutedLine text="Showing top 5 of 10" />
-      <BlankLine />
-      <SkillTitleLine index="1." name="vitest-testing" provider="clawhub" />
-      <LabelValueLine label="Match" value="75% · Risk 0% · Status PRELIMINARILY ELIGIBLE" />
-      <LabelValueLine label="Why" value="Matched repo need: vitest_testing (strong)" />
-      <InstallLine command="naar install clawhub:vitest-testing" />
-      <BlankLine />
-      <SectionLine text="[4/5] Selection" />
-      <MutedLine text="Review skills before installing." />
-      <BlankLine />
-      <SectionLine text="[5/5] Install" />
-      <SuccessLine text="Install plan ready" />
-      <InstallLine command="+ .naar/skills/story-setup/SKILL.md" prefixTone="success" />
-      <InstallLine command="+ .agents/skills/story-setup/SKILL.md" prefixTone="success" />
-      <BlankLine />
-      <LabelValueLine label="Summary" value="2 write · 0 update · 0 blocked" />
-    </Fragment>
+    { text: `Naar v${version}` },
+    { text: "Repo: ~/my-project", tone: "muted" },
+    { text: "" },
+    { text: "[1/5] Scan", tone: "section" },
+    { text: "✔ Repository scanned", tone: "success" },
+    { text: "Stack: TypeScript, npm, vitest, github-actions" },
+    { text: "Assistants: codex found · agents-md found" },
+    { text: "" },
+    { text: "[2/5] Providers", tone: "section" },
+    { text: "✔ Providers fetched", tone: "success" },
+    { text: "" },
+    { text: "[3/5] Recommendations", tone: "section" },
+    { text: "✔ Ranked skills", tone: "success" },
+    { text: "1) vitest-testing [clawhub]" },
+    { text: "Match: 75%   Pre-fetch risk: 0%   Status: PRELIMINARILY ELIGIBLE" },
+    { text: "Why: Matched repo need: vitest_testing" },
+    { text: "" },
+    { text: "[4/5] Selection", tone: "section" },
+    { text: "✔ Skill selected: vitest-testing", tone: "success" },
+    { text: "✔ Target selected: codex_repo_skills", tone: "success" },
+    { text: "" },
+    { text: "[5/5] Install", tone: "section" },
+    { text: "✔ Install plan ready", tone: "success" },
+    { text: "+ .naar/skills/vitest-testing/SKILL.md", tone: "install" },
+    { text: "+ .agents/skills/vitest-testing/SKILL.md", tone: "install" },
+    { text: "" },
+    { text: "Summary: 2 write · 0 update · 0 blocked" }
   ];
 }
 
@@ -201,73 +232,10 @@ function usePrefersReducedMotion(): boolean {
   return reducedMotion;
 }
 
-function BlankLine() {
-  return <div aria-hidden="true">&nbsp;</div>;
+function isCurrentRun(runIdRef: { current: number }, currentRun: number): boolean {
+  return runIdRef.current === currentRun;
 }
 
-function TitleLine({ text }: { text: string }) {
-  return <p className="font-semibold text-text">{text}</p>;
-}
-
-function MutedLine({ text }: { text: string }) {
-  return <p className="text-text-muted">{text}</p>;
-}
-
-function SectionLine({ text }: { text: string }) {
-  return <p className="font-semibold text-text">{text}</p>;
-}
-
-function SuccessLine({ text }: { text: string }) {
-  return <p><span className="text-success">✔</span> {text}</p>;
-}
-
-function ActiveLine({ spinner, text }: { spinner: string; text: string }) {
-  return <p><span className="text-cyan-300">{spinner}</span> {text}</p>;
-}
-
-function LabelValueLine({
-  label,
-  value,
-  valueTone
-}: {
-  label: string;
-  value: string;
-  valueTone?: "default" | "success";
-}) {
-  return (
-    <p>
-      <span className="text-blue-300">{label}</span>
-      <span className="text-text-muted">: </span>
-      <span className={valueTone === "success" ? "text-success" : "text-text"}>{value}</span>
-    </p>
-  );
-}
-
-function SkillTitleLine({ index, name, provider }: { index: string; name: string; provider: string }) {
-  return (
-    <p>
-      <span className="font-semibold text-text">{index} {name}</span>{" "}
-      <span className="text-cyan-300">[{provider}]</span>
-    </p>
-  );
-}
-
-function InstallLine({
-  command,
-  prefixTone = "default"
-}: {
-  command: string;
-  prefixTone?: "default" | "success";
-}) {
-  if (prefixTone === "success") {
-    return <p className="text-success">{command}</p>;
-  }
-
-  return (
-    <p>
-      <span className="text-blue-300">Install</span>
-      <span className="text-text-muted">: </span>
-      <span className="text-cyan-300">{command}</span>
-    </p>
-  );
+function wait(durationMs: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, durationMs));
 }

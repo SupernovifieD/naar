@@ -8,13 +8,14 @@ import TerminalFrame from "../components/TerminalFrame.astro";
 import InstallCta from "../components/InstallCta";
 import SkillSearchTerminal from "../components/SkillSearchTerminal";
 import GoWorkflowTerminal from "../components/GoWorkflowTerminal";
-import CommandRotator from "../components/CommandRotator";
+import CommandTypingTerminal from "../components/CommandTypingTerminal";
+import HeroPomegranate from "../components/HeroPomegranate";
 import { cliVersion, siteMeta, withBase } from "../data/site";
 import { releases } from "../data/changelog";
 
 const logoLight = withBase("/assets/naar/naar-logotype-light.png");
 const logoMark = withBase("/assets/naar/naar-logo.png");
-const latestReleases = releases.slice(0, 3).map((release) => ({
+const latestReleases = releases.slice(0, 2).map((release) => ({
   ...release,
   summaryBullets: release.sections.flatMap((section) =>
     section.bullets
@@ -23,15 +24,6 @@ const latestReleases = releases.slice(0, 3).map((release) => ({
       .map((bullet) => bullet.text)
   ).slice(0, 3)
 }));
-
-const commandRotatorCommands = [
-  "naar go",
-  'naar search "testing"',
-  "naar install clawhub:vitest-testing",
-  "naar list",
-  "naar history",
-  "naar targets list"
-];
 
 const whyCards = [
   {
@@ -63,19 +55,12 @@ const whyCards = [
         <div class="relative isolate overflow-visible rounded-[2rem] px-2 py-10 sm:px-6 sm:py-16">
           <div class="pointer-events-none absolute inset-x-0 top-10 h-48 rounded-full bg-accent-red/12 blur-3xl"></div>
           <div class="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-orange/10 blur-3xl"></div>
-          <div class="pointer-events-none absolute right-[10%] top-6 hidden sm:block">
-            <div class="relative">
-              <div class="absolute inset-0 rounded-full bg-white/10 blur-2xl"></div>
-              <img
-                src={logoMark}
-                alt=""
-                class="relative w-28 rotate-6 drop-shadow-[0_24px_44px_rgba(0,0,0,0.4)] lg:w-36"
-              />
-            </div>
+          <div class="pointer-events-none absolute right-[7%] top-8 hidden sm:block lg:right-[9%]">
+            <HeroPomegranate client:load src={logoMark} className="relative" />
           </div>
 
           <div class="relative z-10 flex flex-col items-center gap-7">
-            <img src={logoLight} alt="Naar" class="h-11 w-auto sm:h-12" />
+            <img src={logoLight} alt="Naar" class="h-14 w-auto sm:h-16 lg:h-20" />
             <div class="space-y-5">
               <h1 class="mx-auto max-w-4xl text-5xl font-semibold tracking-tight text-text sm:text-6xl lg:text-7xl">
                 Find the right skills for your AI coding agent.
@@ -84,31 +69,13 @@ const whyCards = [
                 Naar searches skill providers, understands your repo, and helps you review before anything gets installed.
               </p>
             </div>
-            <div class="flex flex-col items-center gap-3 sm:flex-row">
-              <InstallCta client:load command={siteMeta.installCommand} defaultText={siteMeta.installCommand} copiedText="Copied" revealOnHover={false} className="w-full sm:w-auto" />
-              <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full sm:w-auto">
-                View on GitHub
-              </Button>
+            <div class="mx-auto mt-10 w-full max-w-5xl sm:mt-12 lg:mt-14">
+              <TerminalFrame title="Terminal" asCode={false} bodyClass="p-5 sm:p-6">
+                <SkillSearchTerminal client:load dataUrl={withBase("/data/skills-index.json")} />
+              </TerminalFrame>
             </div>
-            <p class="text-sm text-text-soft">Two doors into the same safe installer: search directly, or let <code>naar go</code> guide the repo.</p>
           </div>
         </div>
-      </div>
-    </Container>
-  </section>
-
-  <section class="pt-12 sm:pt-16">
-    <Container>
-      <SectionHeader
-        eyebrow="Door one"
-        title="Search the catalog locally, then copy an exact install command"
-        description="The website search runs on a build-time skills index. No browser-side provider API calls, just a local catalog you can inspect and copy from."
-        align="center"
-      />
-      <div class="mx-auto mt-10 max-w-5xl">
-        <TerminalFrame title="Search terminal" asCode={false} bodyClass="p-5 sm:p-6">
-          <SkillSearchTerminal client:load dataUrl={withBase("/data/skills-index.json")} />
-        </TerminalFrame>
       </div>
     </Container>
   </section>
@@ -140,7 +107,7 @@ const whyCards = [
       <div class="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
         <div class="space-y-5">
           <SectionHeader
-            eyebrow="Door two"
+            eyebrow="Guided repo workflow"
             title="Let `naar go` scan, rank, and stage the install plan"
             description="The guided flow is still the fastest way to see repo-aware recommendations, assistant detection, and a reviewed write plan in one pass."
           />
@@ -161,7 +128,7 @@ const whyCards = [
             </ul>
           </div>
         </div>
-        <TerminalFrame title="Guided workflow" asCode={false} bodyClass="p-5 sm:p-6">
+        <TerminalFrame title="Guided workflow" asCode={false} bodyClass="p-0">
           <GoWorkflowTerminal client:load version={cliVersion} />
         </TerminalFrame>
       </div>
@@ -177,35 +144,35 @@ const whyCards = [
         align="center"
       />
       <div class="mt-12 grid gap-6 lg:grid-cols-3">
-        <div class="glass-panel p-6">
+        <div class="glass-panel flex h-full flex-col p-6">
           <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-accent-orange">
             <Download size={22} strokeWidth={1.8} />
           </div>
           <h3 class="mt-5 text-xl font-semibold text-text">Install globally</h3>
           <p class="mt-3 text-sm leading-7 text-text-muted">Install the CLI once, then search directly or use <code>naar go</code> inside any repo.</p>
-          <div class="mt-5">
+          <div class="mt-auto pt-5">
             <InstallCta client:load command={siteMeta.installCommand} defaultText={siteMeta.installCommand} copiedText="Copied" revealOnHover={false} className="w-full justify-center" />
           </div>
         </div>
-        <div class="glass-panel p-6">
+        <div class="glass-panel flex h-full flex-col p-6">
           <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-accent-gold">
             <Star size={22} strokeWidth={1.8} />
           </div>
           <h3 class="mt-5 text-xl font-semibold text-text">Star on GitHub</h3>
           <p class="mt-3 text-sm leading-7 text-text-muted">Inspect the code, follow release work, and keep an eye on target and provider support as it grows.</p>
-          <div class="mt-5">
+          <div class="mt-auto pt-5">
             <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" class="w-full justify-center" variant="secondary">
               Open repository
             </Button>
           </div>
         </div>
-        <div class="glass-panel p-6">
+        <div class="glass-panel flex h-full flex-col p-6">
           <div class="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-success">
             <LockKeyhole size={22} strokeWidth={1.8} />
           </div>
           <h3 class="mt-5 text-xl font-semibold text-text">Review the security model</h3>
           <p class="mt-3 text-sm leading-7 text-text-muted">Read how recommendation risk, fetched-bundle analysis, prompts, and explicit overrides work before install.</p>
-          <div class="mt-5">
+          <div class="mt-auto pt-5">
             <Button href={withBase("/security")} class="w-full justify-center" variant="secondary">
               Open security guide
             </Button>
@@ -225,7 +192,11 @@ const whyCards = [
       />
       <div class="mx-auto mt-12 max-w-4xl space-y-5">
         {latestReleases.map((release, index) => (
-          <a href={withBase(`/changelog/${release.slug}`)} class="group block rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 transition-colors duration-200 ease-glide hover:border-white/20 hover:bg-white/[0.05]">
+          <a
+            href={withBase(`/changelog/${release.slug}`)}
+            class="group relative block rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 transition-[transform,border-color,background-color,box-shadow] duration-300 ease-glide hover:-translate-y-1 hover:border-white/30 hover:bg-white/[0.07] hover:shadow-[0_18px_40px_rgba(0,0,0,0.22)]"
+          >
+            <span class="absolute right-5 top-5 inline-flex h-3.5 w-3.5 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)] motion-safe:group-hover:animate-[release-dot-pulse_1.15s_ease-in-out_infinite]"></span>
             <div class="grid gap-4 lg:grid-cols-[auto_1fr] lg:gap-6">
               <div class="flex gap-4">
                 <div class="flex w-12 flex-col items-center">
@@ -234,8 +205,8 @@ const whyCards = [
                 </div>
                 <div class="space-y-2">
                   <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-lg font-semibold text-text">{release.slug}</span>
-                    <span class="text-sm text-text-soft">{release.date}</span>
+                    <span class="text-lg font-semibold text-text transition-colors duration-200 ease-glide group-hover:text-white">{release.slug}</span>
+                    <span class="text-sm text-text-soft">{release.formattedDate}</span>
                   </div>
                   <ul class="space-y-2 text-sm leading-7 text-text-muted">
                     {release.summaryBullets.map((bullet) => (
@@ -248,6 +219,11 @@ const whyCards = [
           </a>
         ))}
       </div>
+      <div class="mt-8 flex justify-center">
+        <Button href={withBase("/changelog")} variant="secondary">
+          Show more changelog →
+        </Button>
+      </div>
     </Container>
   </section>
 
@@ -255,15 +231,17 @@ const whyCards = [
     <Container>
       <div class="glass-panel mx-auto max-w-4xl px-6 py-10 text-center sm:px-10 sm:py-12">
         <div class="space-y-6">
-          <span class="eyebrow">Final CTA</span>
           <h2 class="text-3xl font-semibold text-text sm:text-4xl">
-            Give your repo better instructions. Keep control of what gets installed.
+            Better instructions for every repo.<br />
+            Full control before every install.
           </h2>
           <div class="mx-auto max-w-2xl">
-            <CommandRotator client:load commands={commandRotatorCommands} />
+            <TerminalFrame title="Terminal" asCode={false} bodyClass="p-0">
+              <CommandTypingTerminal client:load />
+            </TerminalFrame>
           </div>
           <div class="flex flex-col justify-center gap-3 sm:flex-row">
-            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" copiedText="Copied" className="w-full sm:w-auto" />
+            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" copiedText="Copied" revealOnHover />
             <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full sm:w-auto">
               Star on GitHub
             </Button>

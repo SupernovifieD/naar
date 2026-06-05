@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { formatLongDate } from "./date";
 
 export interface ReleaseBullet {
   text: string;
@@ -14,6 +15,7 @@ export interface ReleaseEntry {
   version: string;
   slug: string;
   date: string;
+  formattedDate: string;
   sections: ReleaseSection[];
 }
 
@@ -35,6 +37,7 @@ export function parseChangelog(): ReleaseEntry[] {
         version,
         slug: `v${version}`,
         date,
+        formattedDate: formatLongDate(date),
         sections: []
       };
       currentSection = null;

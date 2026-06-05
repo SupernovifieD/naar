@@ -1,6 +1,5 @@
 ---
 import InstallCta from "./InstallCta";
-import Container from "./Container.astro";
 import { navLinks, siteMeta, withBase } from "../data/site";
 
 const logoDark = withBase("/assets/naar/naar-logotype-light.png");
@@ -15,11 +14,11 @@ function isActive(pathname: string): boolean {
   return currentPath === target || currentPath.startsWith(`${target}/`);
 }
 ---
-<header class="sticky top-0 z-50 pt-4">
-  <Container>
-    <div class="gloss-bar flex items-center justify-between rounded-full px-4 py-3 shadow-glow shadow-black/20">
+<header class="sticky top-0 z-50 w-full pt-4">
+  <div class="gloss-bar mx-3 rounded-full px-4 py-3 shadow-glow shadow-black/20 sm:mx-6 sm:px-5">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-4">
       <a href={withBase("/")} class="flex items-center gap-3" aria-label="Naar home">
-        <img src={logoDark} alt="Naar" class="h-7 w-auto" />
+        <img src={logoDark} alt="Naar" class="h-8 w-auto sm:h-9 lg:h-10" />
       </a>
 
       <nav class="hidden items-center gap-2 md:flex" aria-label="Primary navigation">
@@ -40,15 +39,15 @@ function isActive(pathname: string): boolean {
         })}
       </nav>
 
-      <div class="hidden md:block">
-        <InstallCta client:load command={siteMeta.installCommand} />
+      <div class="hidden shrink-0 md:block">
+        <InstallCta client:load command={siteMeta.installCommand} defaultText="Install" revealOnHover />
       </div>
 
-      <details class="group md:hidden">
+      <details class="group relative md:hidden">
         <summary class="list-none rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-text marker:hidden">
           Menu
         </summary>
-        <div class="absolute inset-x-0 top-[calc(100%+0.75rem)] px-6">
+        <div class="absolute right-0 top-[calc(100%+0.75rem)] w-[min(22rem,calc(100vw-1.5rem))]">
           <div class="glass-panel space-y-4 rounded-3xl p-5">
             <nav class="flex flex-col gap-3" aria-label="Mobile navigation">
               {navLinks.map((link) => {
@@ -69,10 +68,10 @@ function isActive(pathname: string): boolean {
                 );
               })}
             </nav>
-            <InstallCta client:load command={siteMeta.installCommand} />
+            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" revealOnHover={false} className="w-full justify-center" />
           </div>
         </div>
       </details>
     </div>
-  </Container>
+  </div>
 </header>
