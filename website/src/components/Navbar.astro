@@ -15,12 +15,14 @@ function isActive(pathname: string): boolean {
 }
 ---
 <header class="sticky top-0 z-50 w-full border-b border-white/10 bg-surface-glass/70 backdrop-blur-xl">
-  <div class="mx-auto hidden h-20 max-w-7xl grid-cols-[1fr_auto_18rem] items-center px-6 md:grid lg:px-10">
-    <a href={withBase("/")} class="flex items-center gap-3" aria-label="Naar home">
-      <img src={logoDark} alt="Naar" class="h-8 w-auto sm:h-9 lg:h-10" />
-    </a>
+  <div class="mx-auto hidden h-20 max-w-7xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center px-6 md:grid lg:px-10">
+    <div class="min-w-0 justify-self-start">
+      <a href={withBase("/")} class="flex items-center gap-3" aria-label="Naar home">
+        <img src={logoDark} alt="Naar" class="h-8 w-auto sm:h-9 lg:h-10" />
+      </a>
+    </div>
 
-    <nav class="flex items-center justify-center gap-2" aria-label="Primary navigation">
+    <nav class="flex items-center justify-center gap-2 justify-self-center" aria-label="Primary navigation">
       {navLinks.map((link) => {
         const active = isActive(link.href);
         return (
@@ -28,7 +30,7 @@ function isActive(pathname: string): boolean {
             href={withBase(link.href)}
             aria-current={active ? "page" : undefined}
             class:list={[
-              "rounded-full px-3 py-2 text-sm font-medium transition-colors duration-200 ease-glide",
+              "inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium transition-colors duration-200 ease-glide",
               active ? "bg-white/10 text-text" : "text-text-muted hover:text-text"
             ]}
           >
@@ -38,7 +40,7 @@ function isActive(pathname: string): boolean {
       })}
     </nav>
 
-    <div class="justify-self-end">
+    <div class="min-w-0 justify-self-end">
       <InstallCta client:load command={siteMeta.installCommand} defaultText="Install" revealOnHover alignExpand="right" />
     </div>
   </div>
