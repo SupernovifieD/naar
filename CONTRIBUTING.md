@@ -84,6 +84,20 @@ Useful scripts:
 | `npm run build` | Build the CLI with `tsup`. |
 | `npm run verify` | Run typecheck and tests. |
 
+## Website Development
+
+The project website lives under `website/`.
+
+Use the root helper scripts:
+
+```bash
+npm run website:dev
+npm run website:build
+npm run website:preview
+```
+
+For website-specific setup, generated assets, contribution workflow, and deployment notes, see [website/README.md](./website/README.md).
+
 ## Agent Target Registry
 
 Naar's supported install targets are centralized in `src/targets/registry.ts`. The registry covers stable, experimental, deprecated, AGENTS.md, and research-only targets while keeping the default target set conservative.
