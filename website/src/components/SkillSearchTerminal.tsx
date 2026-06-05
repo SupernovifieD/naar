@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CopyButton from "./CopyButton";
 import type { IndexedSkillRecord, SkillsIndexPayload } from "../data/skillsIndex";
 import { formatLongDate } from "../lib/date";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const INITIAL_VISIBLE_RESULTS = 3;
 const MIN_SEARCH_SPINNER_MS = 720;
 
 interface RankedSkill {
@@ -17,6 +16,10 @@ interface SkillSearchTerminalProps {
   dataUrl: string;
 }
 
+interface SubmitEventLike {
+  preventDefault(): void;
+}
+
 export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProps) {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
@@ -25,10 +28,10 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
   const [skills, setSkills] = useState<IndexedSkillRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [results, setResults] = useState<RankedSkill[]>([]);
-  const [expanded, setExpanded] = useState(false);
   const [focused, setFocused] = useState(false);
   const loadPromiseRef = useRef<Promise<IndexedSkillRecord[]> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const resultsViewportRef = useRef<HTMLDivElement | null>(null);
 
   const loadIndex = useCallback(async (): Promise<IndexedSkillRecord[]> => {
     if (skills) return skills;
@@ -74,19 +77,25 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
     return () => window.clearInterval(timer);
   }, [searching]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (event: SubmitEventLike) => {
     event.preventDefault();
     const nextQuery = query.trim();
     if (!nextQuery) {
       setSubmittedQuery(null);
       setResults([]);
-      setExpanded(false);
+      setSearching(false);
+      if (resultsViewportRef.current) {
+        resultsViewportRef.current.scrollTop = 0;
+      }
       return;
     }
 
     setSubmittedQuery(nextQuery);
     setSearching(true);
-    setExpanded(false);
+    setResults([]);
+    if (resultsViewportRef.current) {
+      resultsViewportRef.current.scrollTop = 0;
+    }
 
     const startedAt = window.performance.now();
     const [index] = await Promise.all([loadIndex()]);
@@ -98,111 +107,108 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
 
     setResults(rankedResults);
     setSearching(false);
-  }
+  };
 
-  const visibleResults = useMemo(() => {
-    if (expanded) return results;
-    return results.slice(0, INITIAL_VISIBLE_RESULTS);
-  }, [expanded, results]);
+  useEffect(() => {
+    if (!submittedQuery || searching || !resultsViewportRef.current) return;
+    resultsViewportRef.current.scrollTop = 0;
+  }, [results, searching, submittedQuery]);
 
-  const hasMoreResults = results.length > INITIAL_VISIBLE_RESULTS && !expanded;
+  const terminalExpanded = searching || submittedQuery !== null;
   const promptWidth = `${Math.max(query.length + 1, 2)}ch`;
-  const rootHeight = expanded
-    ? "h-[30rem] sm:h-[33.75rem] lg:h-[38.75rem]"
-    : "h-[26.25rem] sm:h-[28.75rem] lg:h-[32.5rem]";
+  const rootHeight = terminalExpanded
+    ? "h-[26.25rem] sm:h-[28.75rem] lg:h-[32.5rem]"
+    : "h-[7.75rem] sm:h-[8.5rem]";
+  const promptHelper = loadError
+    ? <p className="text-warning">{loadError}</p>
+    : (
+        <>
+          <p className="text-text-soft">Try: testing, github actions, next</p>
+          <p className="text-text-soft">Press Enter to search.</p>
+        </>
+      );
 
   return (
-    <div className={`flex flex-col px-5 py-5 ${rootHeight}`}>
-      <form onSubmit={handleSubmit} className="shrink-0">
+    <div className={`flex flex-col overflow-hidden text-left transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${rootHeight}`}>
+      <form onSubmit={handleSubmit} className="shrink-0 px-5 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
         <label htmlFor="skill-search-input" className="sr-only">Search skills</label>
         <button type="submit" className="sr-only">Search</button>
-        <p className="terminal-line cursor-text" onClick={() => inputRef.current?.focus()}>
-          <span className="terminal-prompt">➜</span>
-          <span className="text-text-soft">~</span>
-          <span className="terminal-command shrink-0">naar search</span>
-          <input
-            id="skill-search-input"
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            spellCheck={false}
-            autoComplete="off"
-            aria-label="Search skills"
-            className="terminal-input"
-            style={{ width: promptWidth }}
-          />
-          {focused ? <span className="terminal-cursor" aria-hidden="true" /> : null}
-        </p>
-      </form>
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <p className="terminal-line items-center gap-3 cursor-text" onClick={() => inputRef.current?.focus()}>
+            <span className="terminal-prompt">➜</span>
+            <span className="text-text-soft">~</span>
+            <span className="terminal-command shrink-0">naar search</span>
+            <span className="inline-flex min-w-[1ch] items-center gap-0 text-text">
+              <input
+                id="skill-search-input"
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                spellCheck={false}
+                autoComplete="off"
+                aria-label="Search skills"
+                className="terminal-input max-w-full"
+                style={{ width: promptWidth }}
+              />
+              {!focused && query.length === 0 ? <span className="terminal-cursor" aria-hidden="true" /> : null}
+            </span>
+          </p>
 
-      <div className="relative mt-4 flex-1 min-h-0">
-        <div className={`h-full ${expanded ? "terminal-scroll pr-2" : "overflow-hidden"}`}>
-          {!submittedQuery && !loadError ? (
-            <div className="space-y-1 text-sm text-text-soft">
-              <p>Try: testing, github actions, next</p>
-              <p>Press Enter to search.</p>
-            </div>
-          ) : null}
-
-          {loadError && !searching ? (
-            <p className="text-sm text-warning">{loadError}</p>
-          ) : null}
-
-          {searching && submittedQuery ? (
-            <div className="space-y-1 text-sm text-text-muted">
-              <p className="terminal-line gap-3"><span className="text-cyan-300">{SPINNER_FRAMES[spinnerIndex]}</span><span>Searching for “{submittedQuery}”</span></p>
-            </div>
-          ) : null}
-
-          {!searching && submittedQuery ? (
-            <div className="space-y-4">
-              <div className="space-y-1 text-sm">
-                <p className="text-success">✔ Search complete</p>
-                <p className="text-text-soft">Showing {Math.min(visibleResults.length, results.length)} of {results.length}</p>
-              </div>
-
-              {results.length === 0 ? (
-                loadError ? null : <p className="text-sm text-text-soft">No matching skills found. Try testing, github actions, or next.</p>
-              ) : (
-                <div className="relative">
-                  <div className="space-y-5 pb-12">
-                    {visibleResults.map(({ skill }, index) => (
-                      <SearchResult key={skill.id} skill={skill} index={index} expanded={expanded} />
-                    ))}
-                  </div>
-
-                  {hasMoreResults ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-[#070a10] via-[#070a10]/92 to-transparent pt-16 pb-2">
-                      <button
-                        type="button"
-                        onClick={() => setExpanded(true)}
-                        className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-text transition-colors duration-200 ease-glide hover:border-white/20 hover:bg-white/10"
-                      >
-                        Show more ↓
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              )}
+          {!terminalExpanded ? (
+            <div className="mt-2 space-y-1 pl-[4.15rem] text-left text-sm">
+              {promptHelper}
             </div>
           ) : null}
         </div>
-      </div>
+      </form>
+
+      {terminalExpanded ? (
+        <div className="flex-1 min-h-0 border-t border-white/6 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <div ref={resultsViewportRef} className="terminal-scroll h-full pr-2">
+            {loadError && !searching ? (
+              <p className="text-sm text-warning">{loadError}</p>
+            ) : null}
+
+            {searching && submittedQuery ? (
+              <div className="space-y-1 text-sm text-text-muted">
+                <p className="terminal-line gap-3"><span className="text-cyan-300">{SPINNER_FRAMES[spinnerIndex]}</span><span>Searching for “{submittedQuery}”</span></p>
+              </div>
+            ) : null}
+
+            {!searching && submittedQuery ? (
+              <div className="space-y-4">
+                <div className="space-y-1 text-sm">
+                  <p className="text-success">✔ Search complete</p>
+                  <p className="text-text-soft">Showing {results.length} result{results.length === 1 ? "" : "s"} for “{submittedQuery}”</p>
+                </div>
+
+                {results.length === 0 ? (
+                  loadError ? null : <p className="text-sm text-text-soft">No matching skills found. Try testing, github actions, or next.</p>
+                ) : (
+                  <div className="space-y-5 pb-2">
+                    {results.map(({ skill }, index) => (
+                      <SearchResult key={skill.id} skill={skill} index={index} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function SearchResult({
   skill,
-  index,
-  expanded
+  index
 }: {
   skill: IndexedSkillRecord;
   index: number;
-  expanded: boolean;
 }) {
   const status = (skill.status ?? "eligible").toUpperCase();
   const statusClass = status === "BLOCKED"
@@ -230,7 +236,7 @@ function SearchResult({
         <span className="text-text-muted">: </span>
         <span className={statusClass}>{status}</span>
       </p>
-      <p className={`text-sm leading-6 text-text-muted ${expanded ? "" : "line-clamp-2"}`}>
+      <p className="text-sm leading-6 text-text-muted">
         <span className="text-blue-300">Description</span>
         <span className="text-text-muted">: </span>
         <span>{skill.description}</span>
@@ -261,9 +267,11 @@ function SearchResult({
           <span className="text-blue-300">Install</span>
           <span className="text-text-muted">:</span>
         </p>
-        <div className="flex flex-col gap-2 pl-3 sm:flex-row sm:items-center sm:justify-between">
-          <code className="min-w-0 break-all border-0 bg-transparent p-0 text-cyan-300">{skill.npxCommand}</code>
-          <CopyButton text={skill.npxCommand} label="Copy" />
+        <div className="flex items-start gap-2 pl-3">
+          <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-cyan-300">
+            {skill.npxCommand}
+          </code>
+          <CopyButton text={skill.npxCommand} label="Copy install command" iconOnly />
         </div>
       </div>
     </article>

@@ -154,6 +154,7 @@ a {
   .terminal-line {
     display: flex;
     align-items: flex-start;
+    flex-wrap: wrap;
     gap: 0.65rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -186,7 +187,7 @@ a {
     color: rgb(var(--text));
     font: inherit;
     line-height: inherit;
-    caret-color: transparent;
+    caret-color: rgba(245, 241, 237, 0.92);
     outline: none;
   }
 
