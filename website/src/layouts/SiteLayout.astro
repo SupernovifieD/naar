@@ -40,7 +40,6 @@ const canonicalUrl = Astro.url.href;
     <meta property="og:image" content={socialImage} />
     <meta property="og:site_name" content={siteMeta.name} />
     <link rel="canonical" href={canonicalUrl} />
-    <link rel="icon" type="image/svg+xml" href={withBase("/assets/naar/favicon.svg")} />
     <link rel="icon" type="image/png" href={withBase("/assets/naar/favicon.png")} />
     {noIndex && <meta name="robots" content="noindex, nofollow" />}
   </head>
