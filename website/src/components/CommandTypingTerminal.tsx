@@ -90,14 +90,13 @@ export default function CommandTypingTerminal() {
   }, [inView, reducedMotion]);
 
   return (
-    <div ref={rootRef} className="flex h-[8.25rem] flex-col px-5 py-5 sm:h-[9.375rem]">
+    <div ref={rootRef} className="flex h-[5rem] flex-col justify-center px-5 py-4 sm:h-[5.5rem]">
       <div className="terminal-line text-base sm:text-lg">
         <span className="terminal-prompt">➜</span>
         <span className="text-text-soft">~</span>
         <span className="terminal-command">{command}</span>
         <span className="terminal-cursor" aria-hidden="true" />
       </div>
-      <p className="mt-3 text-sm text-text-soft">Press Enter in your repo when you are ready.</p>
     </div>
   );
 }
