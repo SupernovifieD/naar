@@ -2,7 +2,7 @@ import { packageInfo } from "../lib/package";
 
 export const siteMeta = {
   name: packageInfo.displayName,
-  tagline: "Find, evaluate, and install AI-agent skills without turning your repo into a guessing game.",
+  tagline: "Find, evaluate, and install AI-agent skills safely",
   description: "Naar is a repo-aware CLI for discovering, reviewing, and installing AI-agent skills from provider catalogs.",
   installCommand: `npm i -g ${packageInfo.npmPackageName}`,
   npmUrl: `https://www.npmjs.com/package/${packageInfo.npmPackageName}`,
