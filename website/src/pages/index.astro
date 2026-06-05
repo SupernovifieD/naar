@@ -108,9 +108,11 @@ const whyCards = [
         <div class="space-y-5">
           <SectionHeader
             eyebrow="Guided repo workflow"
-            title="Let `naar go` scan, rank, and stage the install plan"
+            title="Let naar go scan, rank, and stage the install plan"
             description="The guided flow is still the fastest way to see repo-aware recommendations, assistant detection, and a reviewed write plan in one pass."
-          />
+          >
+            <span slot="title">Let <code>naar go</code> scan, rank, and stage the install plan</span>
+          </SectionHeader>
           <div class="glass-panel p-6">
             <ul class="space-y-4 text-sm leading-7 text-text-muted">
               <li class="flex gap-3">
@@ -128,7 +130,7 @@ const whyCards = [
             </ul>
           </div>
         </div>
-        <TerminalFrame title="Guided workflow" asCode={false} bodyClass="p-0">
+        <TerminalFrame title="Terminal" asCode={false} bodyClass="p-0">
           <GoWorkflowTerminal client:load version={cliVersion} />
         </TerminalFrame>
       </div>

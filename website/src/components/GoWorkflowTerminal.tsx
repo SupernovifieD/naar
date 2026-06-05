@@ -4,19 +4,27 @@ interface GoWorkflowTerminalProps {
   version: string;
 }
 
-type LineTone = "default" | "muted" | "section" | "success" | "loading" | "install";
+type LineTone = "default" | "muted" | "section" | "loading" | "install";
+type LinePartTone = "default" | "muted" | "label" | "command" | "success" | "warning" | "danger" | "info";
 
 interface TerminalLineData {
   text: string;
   tone?: LineTone;
+  parts?: LinePart[];
+}
+
+interface LinePart {
+  text: string;
+  tone?: LinePartTone;
+  strong?: boolean;
 }
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const TYPING_MS = 95;
-const STEP_PAUSE_MS = 550;
-const LONG_PAUSE_MS = 900;
-const SPINNER_STEP_MS = 90;
-const MIN_SPINNER_DURATION_MS = 950;
+const TYPING_MS = 112;
+const STEP_PAUSE_MS = 680;
+const LONG_PAUSE_MS = 1040;
+const SPINNER_STEP_MS = 108;
+const MIN_SPINNER_DURATION_MS = 1240;
 
 export default function GoWorkflowTerminal({ version }: GoWorkflowTerminalProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -93,35 +101,35 @@ export default function GoWorkflowTerminal({ version }: GoWorkflowTerminalProps)
         await wait(delay);
       };
 
-      await pushLine({ text: `Naar v${version}` }, LONG_PAUSE_MS);
+      await pushLine(versionLine(version), LONG_PAUSE_MS);
       if (!isCurrentRun(runIdRef, currentRun)) return;
-      await pushLine({ text: "Repo: ~/my-project", tone: "muted" });
+      await pushLine(repoLine("Repo", "~/my-project"));
       await pushLine({ text: "" }, 180);
       await pushLine({ text: "[1/5] Scan", tone: "section" }, 280);
       await runSpinnerLine(draft, setLines, runIdRef, currentRun, "Scanning repository", "Repository scanned");
-      await pushLine({ text: "Stack: TypeScript, npm, vitest, github-actions" });
-      await pushLine({ text: "Assistants: codex found · agents-md found" });
-      await pushLine({ text: "Readiness: 90% Excellent" });
+      await pushLine(keyValueLine("Stack", [{ text: "TypeScript, npm, vitest, github-actions" }]));
+      await pushLine(assistantsLine());
+      await pushLine(readinessLine());
       await pushLine({ text: "" }, 180);
       await pushLine({ text: "[2/5] Providers", tone: "section" }, 280);
       await runSpinnerLine(draft, setLines, runIdRef, currentRun, "Fetching providers", "Providers fetched");
       await pushLine({ text: "" }, 180);
       await pushLine({ text: "[3/5] Recommendations", tone: "section" }, 280);
       await runSpinnerLine(draft, setLines, runIdRef, currentRun, "Ranking skills", "Ranked skills");
-      await pushLine({ text: "1) vitest-testing [clawhub]" });
-      await pushLine({ text: "Match: 75%   Pre-fetch risk: 0%   Status: PRELIMINARILY ELIGIBLE" });
-      await pushLine({ text: "Why: Matched repo need: vitest_testing" });
+      await pushLine(recommendationHeadingLine());
+      await pushLine(recommendationMetaLine());
+      await pushLine(whyLine());
       await pushLine({ text: "" }, 180);
       await pushLine({ text: "[4/5] Selection", tone: "section" }, 280);
-      await pushLine({ text: "✔ Skill selected: vitest-testing", tone: "success" });
-      await pushLine({ text: "✔ Target selected: codex_repo_skills", tone: "success" });
+      await pushLine(selectionLine("Skill selected", "vitest-testing"));
+      await pushLine(selectionLine("Target selected", "codex_repo_skills"));
       await pushLine({ text: "" }, 180);
       await pushLine({ text: "[5/5] Install", tone: "section" }, 280);
       await runSpinnerLine(draft, setLines, runIdRef, currentRun, "Building install plan", "Install plan ready");
-      await pushLine({ text: "+ .naar/skills/vitest-testing/SKILL.md", tone: "install" });
-      await pushLine({ text: "+ .agents/skills/vitest-testing/SKILL.md", tone: "install" });
+      await pushLine(installPathLine(".naar/skills/vitest-testing/SKILL.md"));
+      await pushLine(installPathLine(".agents/skills/vitest-testing/SKILL.md"));
       await pushLine({ text: "" }, 180);
-      await pushLine({ text: "Summary: 2 write · 0 update · 0 blocked" });
+      await pushLine(summaryLine());
 
       if (!isCurrentRun(runIdRef, currentRun)) return;
       setShowFinalPrompt(true);
@@ -132,7 +140,7 @@ export default function GoWorkflowTerminal({ version }: GoWorkflowTerminalProps)
   }, [finalLines, inView, reducedMotion, version]);
 
   return (
-    <div ref={rootRef} className="flex h-[26.25rem] flex-col sm:h-[26.25rem] lg:h-[28.75rem]">
+    <div ref={rootRef} className="flex h-[26.25rem] flex-col lg:h-[27.125rem]">
       <div ref={scrollRef} className="terminal-scroll flex-1 min-h-0 px-5 py-5">
         <PromptLine command={typedCommand} cursor={showTypingCursor} />
         {lines.map((line, index) => (
@@ -149,13 +157,30 @@ function OutputLine({ line }: { line: TerminalLineData }) {
     return <div aria-hidden="true" className="h-2" />;
   }
 
+  if (line.parts) {
+    return (
+      <p className="whitespace-pre-wrap break-words leading-7 text-text">
+        {line.parts.map((part, index) => (
+          <span
+            key={`${index}:${part.text}`}
+            className={[
+              partToneClass(part.tone),
+              part.strong ? "font-semibold" : ""
+            ].filter(Boolean).join(" ")}
+          >
+            {part.text}
+          </span>
+        ))}
+      </p>
+    );
+  }
+
   const toneClass = {
     default: "text-text",
     muted: "text-text-muted",
     section: "font-semibold text-text",
-    success: "text-success",
-    loading: "text-cyan-300",
-    install: "text-success"
+    loading: "text-text",
+    install: "text-text"
   }[line.tone ?? "default"];
 
   return <p className={`terminal-line ${toneClass}`}>{line.text}</p>;
@@ -182,53 +207,192 @@ async function runSpinnerLine(
 ): Promise<void> {
   const startedAt = performance.now();
   let frameIndex = 0;
-  draft.push({ text: `${SPINNER_FRAMES[frameIndex]} ${label}`, tone: "loading" });
+  draft.push(spinnerLine(SPINNER_FRAMES[frameIndex], label));
   setLines([...draft]);
 
   while (performance.now() - startedAt < MIN_SPINNER_DURATION_MS) {
     if (!isCurrentRun(runIdRef, currentRun)) return;
     await wait(SPINNER_STEP_MS);
     frameIndex = (frameIndex + 1) % SPINNER_FRAMES.length;
-    draft[draft.length - 1] = { text: `${SPINNER_FRAMES[frameIndex]} ${label}`, tone: "loading" };
+    draft[draft.length - 1] = spinnerLine(SPINNER_FRAMES[frameIndex], label);
     setLines([...draft]);
   }
 
-  draft[draft.length - 1] = { text: `✔ ${successText}`, tone: "success" };
+  draft[draft.length - 1] = successLine(successText);
   setLines([...draft]);
   await wait(LONG_PAUSE_MS);
 }
 
 function buildFinalLines(version: string): TerminalLineData[] {
   return [
-    { text: `Naar v${version}` },
-    { text: "Repo: ~/my-project", tone: "muted" },
+    versionLine(version),
+    repoLine("Repo", "~/my-project"),
     { text: "" },
     { text: "[1/5] Scan", tone: "section" },
-    { text: "✔ Repository scanned", tone: "success" },
-    { text: "Stack: TypeScript, npm, vitest, github-actions" },
-    { text: "Assistants: codex found · agents-md found" },
-    { text: "Readiness: 90% Excellent" },
+    successLine("Repository scanned"),
+    keyValueLine("Stack", [{ text: "TypeScript, npm, vitest, github-actions" }]),
+    assistantsLine(),
+    readinessLine(),
     { text: "" },
     { text: "[2/5] Providers", tone: "section" },
-    { text: "✔ Providers fetched", tone: "success" },
+    successLine("Providers fetched"),
     { text: "" },
     { text: "[3/5] Recommendations", tone: "section" },
-    { text: "✔ Ranked skills", tone: "success" },
-    { text: "1) vitest-testing [clawhub]" },
-    { text: "Match: 75%   Pre-fetch risk: 0%   Status: PRELIMINARILY ELIGIBLE" },
-    { text: "Why: Matched repo need: vitest_testing" },
+    successLine("Ranked skills"),
+    recommendationHeadingLine(),
+    recommendationMetaLine(),
+    whyLine(),
     { text: "" },
     { text: "[4/5] Selection", tone: "section" },
-    { text: "✔ Skill selected: vitest-testing", tone: "success" },
-    { text: "✔ Target selected: codex_repo_skills", tone: "success" },
+    selectionLine("Skill selected", "vitest-testing"),
+    selectionLine("Target selected", "codex_repo_skills"),
     { text: "" },
     { text: "[5/5] Install", tone: "section" },
-    { text: "✔ Install plan ready", tone: "success" },
-    { text: "+ .naar/skills/vitest-testing/SKILL.md", tone: "install" },
-    { text: "+ .agents/skills/vitest-testing/SKILL.md", tone: "install" },
+    successLine("Install plan ready"),
+    installPathLine(".naar/skills/vitest-testing/SKILL.md"),
+    installPathLine(".agents/skills/vitest-testing/SKILL.md"),
     { text: "" },
-    { text: "Summary: 2 write · 0 update · 0 blocked" }
+    summaryLine()
   ];
+}
+
+function part(text: string, tone: LinePartTone = "default", strong = false): LinePart {
+  return { text, tone, strong };
+}
+
+function partToneClass(tone: LinePartTone | undefined): string {
+  switch (tone) {
+    case "muted":
+      return "text-text-soft";
+    case "label":
+      return "text-blue-300";
+    case "command":
+    case "info":
+      return "text-cyan-300";
+    case "success":
+      return "text-success";
+    case "warning":
+      return "text-warning";
+    case "danger":
+      return "text-danger";
+    default:
+      return "text-text";
+  }
+}
+
+function repoLine(label: string, value: string): TerminalLineData {
+  return {
+    text: `${label}: ${value}`,
+    parts: [part(`${label}: `), part(value, "muted")]
+  };
+}
+
+function versionLine(version: string): TerminalLineData {
+  return {
+    text: `Naar v${version}`,
+    parts: [part("Naar", "default", true), part(` v${version}`)]
+  };
+}
+
+function keyValueLine(label: string, valueParts: LinePart[]): TerminalLineData {
+  return {
+    text: `${label}: ${valueParts.map((segment) => segment.text).join("")}`,
+    parts: [part(`${label}: `, "label"), ...valueParts]
+  };
+}
+
+function spinnerLine(frame: string, label: string): TerminalLineData {
+  return {
+    text: `${frame} ${label}`,
+    tone: "loading",
+    parts: [part(`${frame} `, "info"), part(label)]
+  };
+}
+
+function successLine(text: string): TerminalLineData {
+  return {
+    text: `✔ ${text}`,
+    parts: [part("✔ ", "success"), part(text)]
+  };
+}
+
+function assistantsLine(): TerminalLineData {
+  return keyValueLine("Assistants", [
+    part("codex "),
+    part("found", "success"),
+    part(" · ", "muted"),
+    part("agents-md "),
+    part("found", "success")
+  ]);
+}
+
+function readinessLine(): TerminalLineData {
+  return keyValueLine("Readiness", [
+    part("90%", "success"),
+    part(" ", "muted"),
+    part("Excellent", "success")
+  ]);
+}
+
+function recommendationHeadingLine(): TerminalLineData {
+  return {
+    text: "1) vitest-testing [clawhub]",
+    parts: [
+      part("1) ", "default", true),
+      part("vitest-testing", "default", true),
+      part(" ", "default"),
+      part("[clawhub]", "info")
+    ]
+  };
+}
+
+function recommendationMetaLine(): TerminalLineData {
+  return {
+    text: "Match: 75%   Pre-fetch risk: 0%   Status: PRELIMINARILY ELIGIBLE",
+    parts: [
+      part("Match: ", "label"),
+      part("75%", "warning"),
+      part("   ", "muted"),
+      part("Pre-fetch risk: ", "label"),
+      part("0%", "success"),
+      part("   ", "muted"),
+      part("Status: ", "label"),
+      part("PRELIMINARILY ELIGIBLE", "success")
+    ]
+  };
+}
+
+function whyLine(): TerminalLineData {
+  return keyValueLine("Why", [part("Matched repo need: vitest_testing")]);
+}
+
+function selectionLine(label: string, value: string): TerminalLineData {
+  return {
+    text: `✔ ${label}: ${value}`,
+    parts: [part("✔ ", "success"), part(`${label}: `, "label"), part(value, "command")]
+  };
+}
+
+function installPathLine(path: string): TerminalLineData {
+  return {
+    text: `+ ${path}`,
+    tone: "install",
+    parts: [part("+ ", "success"), part(path, "muted")]
+  };
+}
+
+function summaryLine(): TerminalLineData {
+  return {
+    text: "Summary: 2 write · 0 update · 0 blocked",
+    parts: [
+      part("Summary: ", "label"),
+      part("2 write"),
+      part(" · ", "muted"),
+      part("0 update"),
+      part(" · ", "muted"),
+      part("0 blocked", "muted")
+    ]
+  };
 }
 
 function usePrefersReducedMotion(): boolean {
