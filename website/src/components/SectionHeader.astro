@@ -19,6 +19,10 @@ const alignment = align === "center"
 ---
 <div class={`space-y-4 ${alignment}`}>
   {eyebrow && <span class="eyebrow">{eyebrow}</span>}
-  <h2 class="text-3xl font-semibold tracking-tight text-text sm:text-4xl">{title}</h2>
+  {Astro.slots.has("title") ? (
+    <h2 class="text-3xl font-semibold tracking-tight text-text sm:text-4xl"><slot name="title" /></h2>
+  ) : (
+    <h2 class="text-3xl font-semibold tracking-tight text-text sm:text-4xl">{title}</h2>
+  )}
   {description && <p class="text-base leading-7 text-text-muted sm:text-lg">{description}</p>}
 </div>

@@ -5,6 +5,8 @@ interface InstallCtaProps {
   defaultText?: string;
   copiedText?: string;
   revealOnHover?: boolean;
+  alignExpand?: "left" | "right";
+  variant?: "light" | "code";
   className?: string;
 }
 
@@ -13,6 +15,8 @@ export default function InstallCta({
   defaultText = "Install",
   copiedText = "Copied",
   revealOnHover = true,
+  alignExpand = "left",
+  variant = "light",
   className = ""
 }: InstallCtaProps) {
   const [copied, setCopied] = useState(false);
@@ -24,7 +28,7 @@ export default function InstallCta({
   }, [copied]);
 
   const style = useMemo(() => {
-    const compactWidth = Math.max(defaultText.length + 4, 12);
+    const compactWidth = Math.max(defaultText.length + 4, variant === "code" ? 18 : 12);
     const expandedWidth = Math.max(command.length + 4, compactWidth);
     return {
       ["--install-cta-compact" as string]: `${compactWidth}ch`,
@@ -32,7 +36,7 @@ export default function InstallCta({
       fontFamily: "var(--terminal-font)",
       fontVariantLigatures: "none"
     } satisfies CSSProperties;
-  }, [command, defaultText.length]);
+  }, [command, defaultText.length, variant]);
 
   async function handleClick() {
     try {
@@ -43,49 +47,83 @@ export default function InstallCta({
     }
   }
 
-  const widthClasses = revealOnHover
-    ? "w-[var(--install-cta-compact)] hover:w-[var(--install-cta-expanded)] focus-visible:w-[var(--install-cta-expanded)]"
-    : "w-auto";
+  const baseButtonClasses = variant === "code"
+    ? "border-white/10 bg-white/5 text-cyan-200 shadow-[0_10px_22px_rgba(0,0,0,0.18)] hover:border-white/18 hover:bg-white/10 focus-visible:bg-white/10 focus-visible:text-white"
+    : "border-white/12 bg-white/95 text-bg shadow-[0_12px_30px_rgba(0,0,0,0.24)] hover:bg-white focus-visible:bg-white focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.12),0_0_24px_rgba(219,181,90,0.2)]";
+
+  const sharedButtonClasses = [
+    "group relative inline-flex h-11 items-center justify-center overflow-hidden rounded-full border px-4 text-sm font-medium transition-[width,transform,box-shadow,background-color] duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 motion-reduce:transition-none",
+    baseButtonClasses
+  ].join(" ");
+
+  const content = revealOnHover ? (
+    <>
+      <span
+        className={[
+          "whitespace-nowrap transition-all duration-300 motion-reduce:transition-none",
+          copied ? "translate-y-1 opacity-0" : "opacity-100 group-hover:-translate-y-4 group-hover:opacity-0 group-focus-visible:-translate-y-4 group-focus-visible:opacity-0"
+        ].join(" ")}
+      >
+        {defaultText}
+      </span>
+      <span
+        className={[
+          "absolute inset-0 flex items-center justify-center whitespace-nowrap transition-all duration-300 motion-reduce:transition-none",
+          copied ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
+        ].join(" ")}
+      >
+        {copied ? copiedText : command}
+      </span>
+    </>
+  ) : (
+    <span className="whitespace-nowrap">{copied ? copiedText : defaultText}</span>
+  );
+
+  if (!revealOnHover) {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        aria-label={`Copy install command: ${command}`}
+        aria-live="polite"
+        style={style}
+        className={`${sharedButtonClasses} w-auto ${className}`.trim()}
+      >
+        {variant === "light" ? (
+          <>
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent-red/10 via-white/0 to-accent-orange/12 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
+            <span className="pointer-events-none absolute inset-[1px] rounded-full bg-gradient-to-r from-white/10 via-transparent to-white/15 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
+          </>
+        ) : null}
+        <span className="relative flex min-w-0 items-center justify-center text-center">{content}</span>
+      </button>
+    );
+  }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={`Copy install command: ${command}`}
-      aria-live="polite"
+    <span
       style={style}
       className={[
-        "group relative inline-flex h-11 items-center justify-center overflow-hidden rounded-full border border-white/12 bg-white/95 px-4 text-sm font-medium text-bg shadow-[0_12px_30px_rgba(0,0,0,0.24)] transition-[width,transform,box-shadow,background-color] duration-[500ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:bg-white focus-visible:bg-white focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.12),0_0_24px_rgba(219,181,90,0.2)] motion-reduce:transition-none",
-        widthClasses,
+        "inline-flex w-[var(--install-cta-expanded)]",
+        alignExpand === "right" ? "justify-end" : "justify-start",
         className
       ].join(" ").trim()}
     >
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent-red/10 via-white/0 to-accent-orange/12 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
-      <span className="pointer-events-none absolute inset-[1px] rounded-full bg-gradient-to-r from-white/10 via-transparent to-white/15 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
-      <span className="relative flex min-w-0 items-center justify-center text-center">
-        {revealOnHover ? (
+      <button
+        type="button"
+        onClick={handleClick}
+        aria-label={`Copy install command: ${command}`}
+        aria-live="polite"
+        className={`${sharedButtonClasses} w-[var(--install-cta-compact)] hover:w-[var(--install-cta-expanded)] focus-visible:w-[var(--install-cta-expanded)]`.trim()}
+      >
+        {variant === "light" ? (
           <>
-            <span
-              className={[
-                "whitespace-nowrap transition-all duration-300 motion-reduce:transition-none",
-                copied ? "translate-y-1 opacity-0" : "opacity-100 group-hover:-translate-y-4 group-hover:opacity-0 group-focus-visible:-translate-y-4 group-focus-visible:opacity-0"
-              ].join(" ")}
-            >
-              {defaultText}
-            </span>
-            <span
-              className={[
-                "absolute inset-0 flex items-center justify-center whitespace-nowrap transition-all duration-300 motion-reduce:transition-none",
-                copied ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
-              ].join(" ")}
-            >
-              {copied ? copiedText : command}
-            </span>
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-accent-red/10 via-white/0 to-accent-orange/12 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
+            <span className="pointer-events-none absolute inset-[1px] rounded-full bg-gradient-to-r from-white/10 via-transparent to-white/15 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none" />
           </>
-        ) : (
-          <span className="whitespace-nowrap">{copied ? copiedText : defaultText}</span>
-        )}
-      </span>
-    </button>
+        ) : null}
+        <span className="relative flex min-w-0 items-center justify-center text-center">{content}</span>
+      </button>
+    </span>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const COMMANDS = [
   "naar search ui",
@@ -12,9 +12,9 @@ const COMMANDS = [
 ] as const;
 
 const BASE_COMMAND = "naar";
-const TYPE_MS = 70;
-const DELETE_MS = 46;
-const HOLD_MS = 1300;
+const TYPE_MS = 95;
+const DELETE_MS = 70;
+const HOLD_MS = 2200;
 
 export default function CommandTypingTerminal() {
   const [inView, setInView] = useState(false);
@@ -41,11 +41,7 @@ export default function CommandTypingTerminal() {
     const node = rootRef.current;
     if (!node) return undefined;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry.isIntersecting),
-      { threshold: 0.5 }
-    );
-
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0.5 });
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
@@ -70,6 +66,7 @@ export default function CommandTypingTerminal() {
       setCommand("");
       commandRef.current = "";
       await typeTo(COMMANDS[0], setCommand, commandRef, currentRun, runIdRef);
+
       while (isCurrentRun(runIdRef, currentRun)) {
         for (let index = 0; index < COMMANDS.length; index += 1) {
           if (index === 0) {
@@ -93,20 +90,21 @@ export default function CommandTypingTerminal() {
   }, [inView, reducedMotion]);
 
   return (
-    <div ref={rootRef} className="flex h-[7.25rem] items-center px-5 py-5 sm:h-[7.75rem]">
-      <div className="terminal-line w-full text-base sm:text-lg">
+    <div ref={rootRef} className="flex h-[8.25rem] flex-col px-5 py-5 sm:h-[9.375rem]">
+      <div className="terminal-line text-base sm:text-lg">
         <span className="terminal-prompt">➜</span>
         <span className="text-text-soft">~</span>
         <span className="terminal-command">{command}</span>
         <span className="terminal-cursor" aria-hidden="true" />
       </div>
+      <p className="mt-3 text-sm text-text-soft">Press Enter in your repo when you are ready.</p>
     </div>
   );
 }
 
 async function typeTo(
   nextValue: string,
-  setCommand: Dispatch<SetStateAction<string>>,
+  setCommand: React.Dispatch<React.SetStateAction<string>>,
   commandRef: { current: string },
   currentRun: number,
   runIdRef: { current: number },
@@ -127,7 +125,7 @@ async function typeTo(
 
 async function deleteTo(
   target: string,
-  setCommand: Dispatch<SetStateAction<string>>,
+  setCommand: React.Dispatch<React.SetStateAction<string>>,
   commandRef: { current: string },
   currentRun: number,
   runIdRef: { current: number }

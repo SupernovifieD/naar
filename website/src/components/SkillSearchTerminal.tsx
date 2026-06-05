@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import CopyButton from "./CopyButton";
 import type { IndexedSkillRecord, SkillsIndexPayload } from "../data/skillsIndex";
 import { formatLongDate } from "../lib/date";
@@ -26,19 +26,13 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
   const [loadError, setLoadError] = useState<string | null>(null);
   const [results, setResults] = useState<RankedSkill[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const [showSpinnerLine, setShowSpinnerLine] = useState(false);
   const [focused, setFocused] = useState(false);
   const loadPromiseRef = useRef<Promise<IndexedSkillRecord[]> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const loadIndex = useCallback(async (): Promise<IndexedSkillRecord[]> => {
-    if (skills) {
-      return skills;
-    }
-
-    if (loadPromiseRef.current) {
-      return loadPromiseRef.current;
-    }
+    if (skills) return skills;
+    if (loadPromiseRef.current) return loadPromiseRef.current;
 
     loadPromiseRef.current = fetch(dataUrl)
       .then(async (response) => {
@@ -76,24 +70,23 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
     const timer = window.setInterval(() => {
       setSpinnerIndex((current) => (current + 1) % SPINNER_FRAMES.length);
     }, 80);
+
     return () => window.clearInterval(timer);
   }, [searching]);
 
-  async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextQuery = query.trim();
     if (!nextQuery) {
       setSubmittedQuery(null);
       setResults([]);
       setExpanded(false);
-      setShowSpinnerLine(false);
       return;
     }
 
     setSubmittedQuery(nextQuery);
     setSearching(true);
     setExpanded(false);
-    setShowSpinnerLine(true);
 
     const startedAt = window.performance.now();
     const [index] = await Promise.all([loadIndex()]);
@@ -113,25 +106,20 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
   }, [expanded, results]);
 
   const hasMoreResults = results.length > INITIAL_VISIBLE_RESULTS && !expanded;
-  const showResults = submittedQuery !== null && !searching;
-  const showingCount = expanded ? results.length : Math.min(results.length, INITIAL_VISIBLE_RESULTS);
+  const promptWidth = `${Math.max(query.length + 1, 2)}ch`;
+  const rootHeight = expanded
+    ? "h-[30rem] sm:h-[33.75rem] lg:h-[38.75rem]"
+    : "h-[26.25rem] sm:h-[28.75rem] lg:h-[32.5rem]";
 
   return (
-    <div className={`flex flex-col ${expanded ? "h-[28rem] sm:h-[29rem] lg:h-[32.5rem]" : "h-[21.5rem] sm:h-[22.5rem] lg:h-[24rem]"}`}>
-      <form onSubmit={handleSubmit} className="border-b border-white/8 pb-4">
-        <button type="submit" className="sr-only">Search skills</button>
-        <label
-          htmlFor="skill-search-input"
-          className="terminal-line relative min-h-12 cursor-text rounded-2xl border border-white/10 bg-black/25 px-4 py-3 transition-colors duration-200 ease-glide hover:border-white/16 focus-within:border-white/20"
-          onClick={() => inputRef.current?.focus()}
-        >
+    <div className={`flex flex-col px-5 py-5 ${rootHeight}`}>
+      <form onSubmit={handleSubmit} className="shrink-0">
+        <label htmlFor="skill-search-input" className="sr-only">Search skills</label>
+        <button type="submit" className="sr-only">Search</button>
+        <p className="terminal-line cursor-text" onClick={() => inputRef.current?.focus()}>
           <span className="terminal-prompt">➜</span>
-          <span className="shrink-0 text-text-soft">~</span>
-          <span className="shrink-0 terminal-command">naar search</span>
-          <span className="min-w-0 flex-1 break-all text-text">
-            {query ? query : <span className="text-text-soft/70">ui</span>}
-            {focused ? <span className="terminal-cursor ml-1" aria-hidden="true" /> : null}
-          </span>
+          <span className="text-text-soft">~</span>
+          <span className="terminal-command shrink-0">naar search</span>
           <input
             id="skill-search-input"
             ref={inputRef}
@@ -142,119 +130,52 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
             onBlur={() => setFocused(false)}
             spellCheck={false}
             autoComplete="off"
-            className="absolute inset-0 opacity-0"
             aria-label="Search skills"
+            className="terminal-input"
+            style={{ width: promptWidth }}
           />
-        </label>
+          {focused ? <span className="terminal-cursor" aria-hidden="true" /> : null}
+        </p>
       </form>
 
-      <div className="relative flex-1 min-h-0 pt-4">
-        <div className={`h-full min-h-0 ${expanded ? "terminal-scroll pr-1" : "overflow-hidden"}`}>
-          {showSpinnerLine && searching && submittedQuery ? (
-            <div className="space-y-2 text-text-muted">
-              <p className="terminal-line"><span className="text-cyan-300">{SPINNER_FRAMES[spinnerIndex]}</span><span>Searching for “{submittedQuery}”</span></p>
-            </div>
-          ) : null}
-
+      <div className="relative mt-4 flex-1 min-h-0">
+        <div className={`h-full ${expanded ? "terminal-scroll pr-2" : "overflow-hidden"}`}>
           {!submittedQuery && !loadError ? (
-            <p className="text-sm text-text-soft">Type a query and press Enter. Try testing, github actions, or next.</p>
+            <div className="space-y-1 text-sm text-text-soft">
+              <p>Try: testing, github actions, next</p>
+              <p>Press Enter to search.</p>
+            </div>
           ) : null}
 
           {loadError && !searching ? (
             <p className="text-sm text-warning">{loadError}</p>
           ) : null}
 
-          {showResults ? (
+          {searching && submittedQuery ? (
+            <div className="space-y-1 text-sm text-text-muted">
+              <p className="terminal-line gap-3"><span className="text-cyan-300">{SPINNER_FRAMES[spinnerIndex]}</span><span>Searching for “{submittedQuery}”</span></p>
+            </div>
+          ) : null}
+
+          {!searching && submittedQuery ? (
             <div className="space-y-4">
-              <div className="space-y-1">
+              <div className="space-y-1 text-sm">
                 <p className="text-success">✔ Search complete</p>
-                <p className="font-semibold text-text">Search results for “{submittedQuery}”</p>
-                <p className="text-sm text-text-soft">Showing {showingCount} of {results.length}</p>
+                <p className="text-text-soft">Showing {Math.min(visibleResults.length, results.length)} of {results.length}</p>
               </div>
 
               {results.length === 0 ? (
                 loadError ? null : <p className="text-sm text-text-soft">No matching skills found. Try testing, github actions, or next.</p>
               ) : (
                 <div className="relative">
-                  <div className="space-y-5">
-                    {visibleResults.map(({ skill }, index) => {
-                      const license = skill.license ?? "No license declared";
-                      const status = (skill.status ?? "eligible").toUpperCase();
-
-                      return (
-                        <article key={skill.id} className="space-y-3 border-b border-white/8 pb-4 last:border-b-0 last:pb-0">
-                          <div className="terminal-line gap-2">
-                            <span className="font-semibold text-text">{index + 1})</span>
-                            {skill.url ? (
-                              <a
-                                href={skill.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-semibold text-text underline decoration-white/10 underline-offset-4 transition-colors duration-200 ease-glide hover:text-accent-gold"
-                              >
-                                {skill.name}
-                              </a>
-                            ) : (
-                              <span className="font-semibold text-text">{skill.name}</span>
-                            )}
-                            <span className="text-cyan-300">[{skill.provider}]</span>
-                          </div>
-                          <p className="text-sm leading-6 text-text-muted">
-                            <span className="text-blue-300">Publisher</span>
-                            <span className="text-text-muted">: </span>
-                            <span className="text-text">{skill.publisher ?? skill.provider}</span>
-                            <span className="px-2 text-text-soft">·</span>
-                            <span className="text-blue-300">License</span>
-                            <span className="text-text-muted">: </span>
-                            <span className={skill.license ? "text-text" : "text-warning"}>{license}</span>
-                            <span className="px-2 text-text-soft">·</span>
-                            <span className="text-blue-300">Status</span>
-                            <span className="text-text-muted">: </span>
-                            <span className={status === "BLOCKED" ? "text-danger" : status === "RISKY" ? "text-warning" : "text-success"}>{status}</span>
-                          </p>
-                          <p className="text-sm leading-6 text-text-muted">
-                            <span className="text-blue-300">Description</span>
-                            <span className="text-text-muted">: </span>
-                            <span>{skill.description}</span>
-                          </p>
-                          {skill.updatedAt ? (
-                            <p className="text-sm leading-6 text-text-muted">
-                              <span className="text-blue-300">Updated</span>
-                              <span className="text-text-muted">: </span>
-                              <span>{formatLongDate(skill.updatedAt)}</span>
-                            </p>
-                          ) : null}
-                          {skill.url ? (
-                            <p className="text-sm leading-6 text-text-muted">
-                              <span className="text-blue-300">Page</span>
-                              <span className="text-text-muted">: </span>
-                              <a
-                                href={skill.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="break-all text-accent-gold underline decoration-white/10 underline-offset-4 transition-colors duration-200 ease-glide hover:text-text"
-                              >
-                                {skill.url}
-                              </a>
-                            </p>
-                          ) : null}
-                          <div className="space-y-2">
-                            <p className="text-sm leading-6 text-text-muted">
-                              <span className="text-blue-300">Install</span>
-                              <span className="text-text-muted">:</span>
-                            </p>
-                            <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                              <code className="min-w-0 break-all border-0 bg-transparent p-0 text-sm text-cyan-300">{skill.npxCommand}</code>
-                              <CopyButton text={skill.npxCommand} label="Copy" />
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
+                  <div className="space-y-5 pb-12">
+                    {visibleResults.map(({ skill }, index) => (
+                      <SearchResult key={skill.id} skill={skill} index={index} expanded={expanded} />
+                    ))}
                   </div>
 
                   {hasMoreResults ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-2xl bg-gradient-to-t from-[rgba(8,11,17,0.98)] via-[rgba(8,11,17,0.88)] to-transparent pt-16">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center bg-gradient-to-t from-[#070a10] via-[#070a10]/92 to-transparent pt-16 pb-2">
                       <button
                         type="button"
                         onClick={() => setExpanded(true)}
@@ -271,6 +192,81 @@ export default function SkillSearchTerminal({ dataUrl }: SkillSearchTerminalProp
         </div>
       </div>
     </div>
+  );
+}
+
+function SearchResult({
+  skill,
+  index,
+  expanded
+}: {
+  skill: IndexedSkillRecord;
+  index: number;
+  expanded: boolean;
+}) {
+  const status = (skill.status ?? "eligible").toUpperCase();
+  const statusClass = status === "BLOCKED"
+    ? "text-danger"
+    : status === "RISKY"
+      ? "text-warning"
+      : "text-success";
+
+  return (
+    <article className="space-y-2 border-b border-white/8 pb-4 last:border-b-0 last:pb-0">
+      <p className="text-text">
+        <span className="font-semibold text-text">{index + 1}) {skill.name}</span>{" "}
+        <span className="text-cyan-300">[{skill.provider}]</span>
+      </p>
+      <p className="text-sm leading-6 text-text-muted">
+        <span className="text-blue-300">Publisher</span>
+        <span className="text-text-muted">: </span>
+        <span className="text-text">{skill.publisher ?? skill.provider}</span>
+        <span className="px-2 text-text-soft">·</span>
+        <span className="text-blue-300">License</span>
+        <span className="text-text-muted">: </span>
+        <span className={skill.license ? "text-text" : "text-warning"}>{skill.license ?? "No license declared"}</span>
+        <span className="px-2 text-text-soft">·</span>
+        <span className="text-blue-300">Status</span>
+        <span className="text-text-muted">: </span>
+        <span className={statusClass}>{status}</span>
+      </p>
+      <p className={`text-sm leading-6 text-text-muted ${expanded ? "" : "line-clamp-2"}`}>
+        <span className="text-blue-300">Description</span>
+        <span className="text-text-muted">: </span>
+        <span>{skill.description}</span>
+      </p>
+      {skill.updatedAt ? (
+        <p className="text-sm leading-6 text-text-muted">
+          <span className="text-blue-300">Updated</span>
+          <span className="text-text-muted">: </span>
+          <span>{formatLongDate(skill.updatedAt)}</span>
+        </p>
+      ) : null}
+      {skill.url ? (
+        <p className="text-sm leading-6 text-text-muted">
+          <span className="text-blue-300">Page</span>
+          <span className="text-text-muted">: </span>
+          <a
+            href={skill.url}
+            target="_blank"
+            rel="noreferrer"
+            className="break-all text-accent-gold underline decoration-white/10 underline-offset-4 transition-colors duration-200 ease-glide hover:text-text"
+          >
+            {skill.url}
+          </a>
+        </p>
+      ) : null}
+      <div className="space-y-1 text-sm leading-6 text-text-muted">
+        <p>
+          <span className="text-blue-300">Install</span>
+          <span className="text-text-muted">:</span>
+        </p>
+        <div className="flex flex-col gap-2 pl-3 sm:flex-row sm:items-center sm:justify-between">
+          <code className="min-w-0 break-all border-0 bg-transparent p-0 text-cyan-300">{skill.npxCommand}</code>
+          <CopyButton text={skill.npxCommand} label="Copy" />
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -320,11 +316,7 @@ function scoreSkill(skill: IndexedSkillRecord, normalizedQuery: string, tokens: 
   if (skill.risk === 0) score += 3;
   else if ((skill.risk ?? 0) >= 40) score -= 6;
 
-  return {
-    skill,
-    exact,
-    score
-  };
+  return { skill, exact, score };
 }
 
 function normalizeSearchText(value: string): string {
