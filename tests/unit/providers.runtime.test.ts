@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROVIDERS } from "../../src/config/defaults.js";
-import { buildProviders } from "../../src/providers/orchestrator.js";
+import { availableProviderIds, buildProviders } from "../../src/providers/orchestrator.js";
 import { resolveProviderRuntimeConfig } from "../../src/providers/runtime.js";
 
 describe("resolveProviderRuntimeConfig", () => {
@@ -34,8 +34,20 @@ describe("provider registry", () => {
     expect(providers[0].displayName).toBe("Anthropic Official Skills");
   });
 
+  it("registers awesome without changing defaults", () => {
+    const providers = buildProviders(["awesome"]);
+
+    expect(providers).toHaveLength(1);
+    expect(providers[0].id).toBe("awesome");
+    expect(providers[0].displayName).toBe("Awesome Agent Skills");
+  });
+
   it("keeps anthropic in the default provider selection", () => {
     expect(DEFAULT_PROVIDERS).toEqual(["anthropic", "clawhub"]);
     expect(buildProviders([]).map((provider) => provider.id)).toEqual(["anthropic", "clawhub"]);
+  });
+
+  it("lists all registered provider ids", () => {
+    expect(availableProviderIds()).toEqual(["anthropic", "clawhub", "awesome"]);
   });
 });

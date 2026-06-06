@@ -2,17 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SkillCandidate } from "../../src/types/index.js";
 
 const buildProvidersMock = vi.hoisted(() => vi.fn());
+const availableProviderIdsMock = vi.hoisted(() => vi.fn());
 const fetchFilesMock = vi.hoisted(() => vi.fn());
 const searchMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/providers/orchestrator.js", () => ({
-  buildProviders: buildProvidersMock
+  buildProviders: buildProvidersMock,
+  availableProviderIds: availableProviderIdsMock
 }));
 
 import { resolveSkillRefs } from "../../src/installer/resolveRefs.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  availableProviderIdsMock.mockReturnValue(["anthropic", "clawhub", "awesome"]);
   buildProvidersMock.mockImplementation((ids: string[]) => {
     const registry = [{ id: "clawhub", fetchFiles: fetchFilesMock, search: searchMock }];
     return ids.length > 0 ? registry.filter((provider) => ids.includes(provider.id)) : registry;
@@ -39,7 +42,7 @@ describe("resolveSkillRefs", () => {
 
   it("reports unknown providers with available provider ids", async () => {
     await expect(resolveSkillRefs([{ providerId: "unknown", skillId: "ui-ux" }], ["codex_repo_skills"]))
-      .rejects.toThrow('Unknown provider "unknown". Available providers: clawhub.');
+      .rejects.toThrow('Unknown provider "unknown". Available providers: anthropic, clawhub, awesome.');
   });
 });
 

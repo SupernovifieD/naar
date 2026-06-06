@@ -1,14 +1,24 @@
 import type { ProviderSearchQuery, SkillProvider, SkillProviderResult } from "../types/index.js";
+import { DEFAULT_PROVIDERS } from "../config/defaults.js";
+import { AwesomeAgentSkillsProvider } from "./awesome.js";
 import { ClawHubProvider } from "./clawhub.js";
 import { OfficialAnthropicSkillsProvider } from "./anthropic.js";
 
-export function buildProviders(providerIds: string[]): SkillProvider[] {
-  const registry: Record<string, SkillProvider> = {
+function createProviderRegistry(): Record<string, SkillProvider> {
+  return {
     anthropic: new OfficialAnthropicSkillsProvider(),
-    clawhub: new ClawHubProvider()
+    clawhub: new ClawHubProvider(),
+    awesome: new AwesomeAgentSkillsProvider()
   };
+}
 
-  const selected = providerIds.length > 0 ? providerIds : ["anthropic", "clawhub"];
+export function availableProviderIds(): string[] {
+  return Object.keys(createProviderRegistry());
+}
+
+export function buildProviders(providerIds: string[]): SkillProvider[] {
+  const registry = createProviderRegistry();
+  const selected = providerIds.length > 0 ? providerIds : DEFAULT_PROVIDERS;
   const providers: SkillProvider[] = [];
 
   for (const id of selected) {

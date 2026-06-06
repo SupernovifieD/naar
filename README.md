@@ -355,6 +355,23 @@ No Anthropic API key is required or used.
 
 You may set `GITHUB_TOKEN` to increase GitHub API rate limits when fetching from public GitHub sources.
 
+### Awesome Agent Skills
+
+Naar can search the public Awesome Agent Skills index as an opt-in provider:
+
+```bash
+naar search "stripe" --provider awesome
+naar install awesome:stripe/stripe-best-practices
+```
+
+Awesome Agent Skills is a curated public index. Naar uses it to discover skills, then installs only from the linked public GitHub source when a skill can be resolved to one.
+
+`awesome` is not enabled by default yet because it is a large aggregate catalog. You can make it part of your project defaults:
+
+```bash
+naar config --set-provider anthropic --set-provider clawhub --set-provider awesome
+```
+
 ### ClawHub
 
 ClawHub public read endpoints work without auth. Set `CLAWHUB_API_TOKEN` for token-auth mode when needed.
@@ -363,7 +380,7 @@ Provider environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `GITHUB_TOKEN` | Increase GitHub API rate-limit headroom when fetching public GitHub-backed providers such as Anthropic Official Skills. |
+| `GITHUB_TOKEN` | Increase GitHub API rate-limit headroom when fetching public GitHub-backed providers such as Anthropic Official Skills and Awesome Agent Skills. |
 | `CLAWHUB_API_TOKEN` | Use ClawHub token-auth mode when needed. |
 | `CLAWHUB_API_BASE_URL` | Optional ClawHub API base URL. Defaults to `https://clawhub.ai`. |
 | `GITHUB_API_BASE_URL` | Optional GitHub API base URL. Defaults to `https://api.github.com`. |

@@ -1,5 +1,5 @@
 import type { InstallTarget, SkillRef } from "../types/index.js";
-import { buildProviders } from "../providers/orchestrator.js";
+import { availableProviderIds, buildProviders } from "../providers/orchestrator.js";
 import { isCandidateCompatibleWithTarget } from "../targets/index.js";
 import type { ResolvedSkill } from "./plan.js";
 import { formatSkillRef } from "./refs.js";
@@ -31,8 +31,4 @@ export async function resolveSkillRefs(refs: SkillRef[], targets: InstallTarget[
   }
 
   return resolved;
-}
-
-function availableProviderIds(): string[] {
-  return buildProviders([]).map((provider) => provider.id);
 }
