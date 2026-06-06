@@ -1,41 +1,70 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { compareVersions, maybeNotifyUpdate } from "../../src/utils/updateNotifier.js";
+
+type MaybeNotifyUpdateTestOptions = Parameters<typeof maybeNotifyUpdate>[0];
+
+const NOW = 1_000_000;
+
+let cacheFilePath: string;
+let stdout: ReturnType<typeof createOutputCapture>;
+let stderr: ReturnType<typeof createOutputCapture>;
+let fetchImpl: ReturnType<typeof vi.fn>;
+let runInstallCommand: ReturnType<typeof vi.fn>;
+let prompt: ReturnType<typeof vi.fn>;
+let stdin: { isTTY: boolean };
+const tempDirs: string[] = [];
+
+beforeEach(async () => {
+  cacheFilePath = await createCacheFilePath();
+  stdout = createOutputCapture(true);
+  stderr = createOutputCapture(true);
+  fetchImpl = vi.fn().mockResolvedValue(makeFetchResponse({ version: "0.4.0" }));
+  runInstallCommand = vi.fn().mockResolvedValue(undefined);
+  prompt = vi.fn().mockResolvedValue(false);
+  stdin = { isTTY: false };
+});
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+function runMaybeNotifyUpdate(
+  overrides: Partial<MaybeNotifyUpdateTestOptions> = {}
+) {
+  return maybeNotifyUpdate({
+    currentVersion: "0.4.0",
+    nonInteractive: true,
+    commandArgs: ["scan"],
+    cacheFilePath,
+    stdout,
+    stderr,
+    fetchImpl,
+    runInstallCommand,
+    prompt,
+    stdin,
+    env: {},
+    now: () => NOW,
+    ...overrides
+  });
+}
 
 describe("maybeNotifyUpdate", () => {
   it("prints nothing when the latest version equals the current version", async () => {
-    const cacheFilePath = await createCacheFilePath();
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn().mockResolvedValue(makeFetchResponse({ version: "0.4.0" }));
+    fetchImpl.mockResolvedValue(makeFetchResponse({ version: "0.4.0" }));
 
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      nonInteractive: true,
-      commandArgs: ["scan"],
-      cacheFilePath,
-      stdout,
-      fetchImpl
-    });
+    await runMaybeNotifyUpdate();
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(stdout.output).toBe("");
   });
 
   it("prints the update message when a newer version exists", async () => {
-    const cacheFilePath = await createCacheFilePath();
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn().mockResolvedValue(makeFetchResponse({ version: "0.5.0" }));
+    fetchImpl.mockResolvedValue(makeFetchResponse({ version: "0.5.0" }));
 
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      nonInteractive: true,
-      commandArgs: ["scan"],
-      cacheFilePath,
-      stdout,
-      fetchImpl
-    });
+    await runMaybeNotifyUpdate();
 
     expect(stdout.output).toBe(
       "A new version of Naar is available:\n"
@@ -46,15 +75,9 @@ describe("maybeNotifyUpdate", () => {
   });
 
   it("does not print or fetch in json mode", async () => {
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn();
-
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
+    await runMaybeNotifyUpdate({
       jsonMode: true,
       commandArgs: ["scan", "--json"],
-      stdout,
-      fetchImpl
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -62,15 +85,8 @@ describe("maybeNotifyUpdate", () => {
   });
 
   it("does not print or fetch in CI", async () => {
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn();
-
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       env: { CI: "1" },
-      stdout,
-      fetchImpl
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -78,23 +94,12 @@ describe("maybeNotifyUpdate", () => {
   });
 
   it("does not print or fetch when disabled by environment variables", async () => {
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn();
-
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       env: { NAAR_NO_UPDATE_NOTIFIER: "1" },
-      stdout,
-      fetchImpl
     });
 
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       env: { NO_UPDATE_NOTIFIER: "1" },
-      stdout,
-      fetchImpl
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -102,30 +107,21 @@ describe("maybeNotifyUpdate", () => {
   });
 
   it("does not print or fetch for help/version or non-tty output", async () => {
-    const fetchImpl = vi.fn();
-
     const helpStdout = createOutputCapture(true);
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
+    await runMaybeNotifyUpdate({
       commandArgs: ["--help"],
       stdout: helpStdout,
-      fetchImpl
     });
 
     const versionStdout = createOutputCapture(true);
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
+    await runMaybeNotifyUpdate({
       commandArgs: ["--version"],
       stdout: versionStdout,
-      fetchImpl
     });
 
     const nonTtyStdout = createOutputCapture(false);
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       stdout: nonTtyStdout,
-      fetchImpl
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -136,6 +132,7 @@ describe("maybeNotifyUpdate", () => {
 
   it("uses a fresh cache without making a network request", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "naar-update-cache-"));
+    tempDirs.push(dir);
     const cacheFilePath = path.join(dir, "update-check.json");
     await mkdir(path.dirname(cacheFilePath), { recursive: true });
     await writeFile(cacheFilePath, JSON.stringify({
@@ -143,17 +140,8 @@ describe("maybeNotifyUpdate", () => {
       latestVersion: "0.5.0"
     }), "utf8");
 
-    const stdout = createOutputCapture(true);
-    const fetchImpl = vi.fn();
-
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      nonInteractive: true,
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       cacheFilePath,
-      now: () => 1_000_000,
-      stdout,
-      fetchImpl
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -162,34 +150,23 @@ describe("maybeNotifyUpdate", () => {
 
   it("swallows network and cache failures", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "naar-update-error-"));
-    const stdout = createOutputCapture(true);
+    tempDirs.push(dir);
+    fetchImpl.mockRejectedValue(new Error("network down"));
 
-    await expect(maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      nonInteractive: true,
-      commandArgs: ["scan"],
+    await expect(runMaybeNotifyUpdate({
       cacheFilePath: dir,
-      stdout,
-      fetchImpl: vi.fn().mockRejectedValue(new Error("network down"))
+      fetchImpl
     })).resolves.toBeUndefined();
 
     expect(stdout.output).toBe("");
   });
 
   it("runs the explicit npm install command only when the user confirms", async () => {
-    const cacheFilePath = await createCacheFilePath();
-    const stdout = createOutputCapture(true);
-    const runInstallCommand = vi.fn().mockResolvedValue(undefined);
-    const fetchImpl = vi.fn().mockResolvedValue(makeFetchResponse({ version: "0.5.0" }));
+    fetchImpl.mockResolvedValue(makeFetchResponse({ version: "0.5.0" }));
 
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       nonInteractive: false,
-      cacheFilePath,
-      stdout,
       stdin: { isTTY: true },
-      fetchImpl,
       prompt: vi.fn().mockResolvedValue(true),
       runInstallCommand
     });
@@ -199,11 +176,8 @@ describe("maybeNotifyUpdate", () => {
     runInstallCommand.mockReset();
     stdout.output = "";
 
-    await maybeNotifyUpdate({
-      currentVersion: "0.4.0",
-      commandArgs: ["scan"],
+    await runMaybeNotifyUpdate({
       nonInteractive: false,
-      cacheFilePath: await createCacheFilePath(),
       stdout,
       stdin: { isTTY: true },
       fetchImpl,
@@ -250,5 +224,6 @@ function makeFetchResponse(value: unknown): { ok: true; status: number; json(): 
 
 async function createCacheFilePath(): Promise<string> {
   const dir = await mkdtemp(path.join(os.tmpdir(), "naar-update-cache-"));
+  tempDirs.push(dir);
   return path.join(dir, "update-check.json");
 }
