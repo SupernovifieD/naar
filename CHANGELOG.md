@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.0] - 2026-06-06
+
+### Added
+- Added a public product website with a homepage, docs, security, FAQ, and changelog pages, plus GitHub Pages deployment.
+- Added an opt-in `awesome` provider backed by Awesome Agent Skills, including support for searchable/installable public GitHub-backed entries such as `awesome:stripe/stripe-best-practices`.
+- Added deterministic provider query planning, dimensional recommendation scoring, structured recommendation blockers, and offline recommendation evaluation fixtures for broader and more explainable recommendation retrieval.
+- Added a cached npm update notifier for newer `naar-cli` releases.
+
+### Changed
+- Promoted Naar's documentation and product presentation from a repo-only CLI readme into a fuller product surface, with the website carrying the long-form user guides and reference material.
+- Moved the Anthropic provider to public GitHub-only catalog and bundle fetching. `GITHUB_TOKEN` remains available for GitHub API rate limits, but Anthropic API transport and API-key-driven fetch paths are removed.
+- Unified command-line terminal UX and recommendation output around clearer fit summaries, safer install review, and consistent command behavior across search, recommend, install, and go flows.
+- Removed `.env` templates and `.env`-style setup guidance. Naar now documents shell and CI environment variables only while keeping runtime configuration on normal `process.env` values.
+
+### Docs and Website
+- Launched interactive website search and guided-flow demos, expanded docs and FAQ coverage, and added a dedicated security reference and release changelog presentation.
+- Rewrote the README to read as a product overview instead of a duplicated manual, and shifted deep command/reference reading to the website docs.
+- Added website contributor guidance and clarified documentation boundaries between the README, website docs, and maintainer docs.
+
 ## [0.4.0] - 2026-06-03
 
 ### Added
