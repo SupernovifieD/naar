@@ -9,69 +9,34 @@
 </p>
 
 <p align="center">
-  <strong>Find, evaluate, and install AI-agent skills without turning your repo into a guessing game.</strong>
+  <strong>Find, review, and install AI-agent skills with explicit safety checks and target-aware delivery.</strong>
 </p>
 
-Naar is a CLI and package-manager-style tool for AI-agent skills, rules, and instructions. It connects project context, provider catalogs, assistant targets, and safety checks so you can either let Naar guide you to a fit for the current repo or search directly when you already know what you want.
+Naar is a repo-aware CLI for discovering, evaluating, and installing AI-agent skills, rules, and instruction bundles. It combines provider catalogs, repository context, assistant targets, and install-time review so teams can adopt reusable agent behavior without blind copy-paste into their repositories.
 
-Both paths lead into the same safe installer: fetched bundles are reviewed, changes are previewed, and nothing is written until you explicitly approve it.
+Documentation and product guides:
 
-## Why Naar Exists
+- [Documentation](https://supernovified.github.io/naar/docs)
+- [Security](https://supernovified.github.io/naar/security)
+- [FAQ](https://supernovified.github.io/naar/faq)
+- [Changelog](https://supernovified.github.io/naar/changelog)
 
-Developers now work across multiple AI coding assistants, each with its own skill, rule, or instruction format. Finding the right skill for a specific repository is already messy; deciding whether to trust it and where to install it adds another layer of friction.
+## Why Naar
 
-Naar is a repo-aware bridge between your project, your AI assistants, and skill marketplaces. It turns "what should I install for this repo?" into a guided flow with matching, safety checks, and explicit installation control.
+- Search provider catalogs directly when you already know what you want.
+- Run `naar go` when repository context should drive discovery and ranking.
+- Install into assistant-specific targets such as Claude Code, Cursor, GitHub Copilot, OpenAI Codex, Gemini, and `AGENTS.md`.
+- Review fetched bundles, security signals, conflicts, and planned writes before anything changes on disk.
+- Keep managed state, lock data, and local lifecycle history for auditing and cleanup.
 
-## Two Doors Into Naar
-
-Installing Naar is very straight-forward. In your terminal:
-
-```bash
-npm i -g naar-cli
-```
-
-Then you can use Naar in your project easily — or ask your AI agent to do the job for you!
-
-### 1. Search first
-
-Use search when you already know the kind of skill you want and want to browse provider catalogs directly.
-
-```bash
-naar search "github actions"
-naar s "design"
-```
-
-Search is discovery-only. It does not scan your repo and it does not install anything by itself. It helps you find an explicit skill reference, then hand that reference to `naar install`.
-
-### 2. Let Naar guide you
-
-Use the guided flow when you want Naar to inspect the current repo, infer what fits, and walk you through selection and installation.
-
-```bash
-naar go
-```
-
-`naar go` scans the repo, detects stack and assistant targets, ranks relevant skills, estimates pre-fetch risk, and leads into the same reviewed install flow.
-
-## Quick Start
+## Installation
 
 Prerequisite: Node.js `>=20`.
 
+Install globally:
+
 ```bash
 npm i -g naar-cli
-```
-
-Start with the repo-guided path:
-
-```bash
-naar go
-```
-
-Or start with direct discovery:
-
-```bash
-naar search "github actions"
-naar s "next"
 ```
 
 Run without a global install:
@@ -81,302 +46,96 @@ npx -y naar-cli@latest go
 npx -y naar-cli@latest search "github actions"
 ```
 
-## How Naar Works
+## Start Here
 
-1. Start with either `naar search <query>` or `naar go`.
-2. `naar go` scans your repository for languages, frameworks, tools, topology, and assistant config.
-3. Naar detects compatible assistant targets such as Claude, Cursor, Copilot, Codex, Gemini, AGENTS.md, and generic agent skill folders.
-4. Naar fetches skill candidates from configured providers.
-5. Search returns direct catalog matches; `go` scores recommendations against repo needs and shows pre-fetch risk estimates.
-6. `naar install <provider>:<skill>` fetches selected bundles and performs final content security checks.
-7. Naar shows an install plan before writing files.
-8. Installs happen only after explicit approval.
+| Workflow | Command | What it does |
+| --- | --- | --- |
+| Guided discovery | `naar go` | Scans the repo, fetches provider candidates, ranks fit, and leads into the reviewed install flow. |
+| Direct search | `naar search "github actions"` | Searches provider catalogs directly without scanning the repo or installing anything. |
+| Explicit install | `naar install clawhub:brewpage --dry-run` | Fetches one provider ref, runs content checks, and previews writes before apply. |
+| Repo facts | `naar scan --json` | Prints the structured repository facts used by recommendation and targeting. |
 
-## Search-First Workflow
-
-Use search when:
-
-- you already know the type of skill you want
-- you want to browse provider catalogs directly
-- you do not want repo scanning or recommendation yet
-- you want to find an explicit skill ref and then install it safely
-
-```bash
-naar search "github actions"
-naar s ui ux
-naar search "design" --limit 10
-naar search "brewpage" --provider clawhub
-naar search "brewpage" --target claude_project_skills
-naar search "brewpage" --json
-naar search "brewpage" --all
-```
-
-Search does not install anything by itself. It prints install-ready refs and commands, but installation stays explicit.
-
-## Guided Repo Workflow
+Typical flow:
 
 ```bash
 naar go
-```
-
-Use the guided flow when you want Naar to figure out what fits the current repo. It scans the project, detects assistant targets, recommends relevant skills, estimates pre-fetch risk, and previews changes before writing anything.
-
-## From Search To Install
-
-```bash
-naar search "github actions"
+naar search "testing"
 naar install clawhub:brewpage --dry-run
-naar install clawhub:brewpage
 ```
 
-`naar install` is the shared safe installer behind both entry points. Whether you arrived through search or through `go`, install still performs bundle fetch, security analysis, review, plan preview, conflict handling, and state/history updates.
+## Core Commands
 
-## Commands
-
-| Command | What it does | Use it when | Example |
-| --- | --- | --- | --- |
-| `naar go` | Runs the guided scan, recommend, select, and install flow. | You want the complete experience. | `naar go` |
-| `naar search <query>` / `naar s <query>` | Searches provider catalogs directly without repo scanning. | You already know roughly what skill you want. | `naar search "github actions"` |
-| `naar install <refs...>` | Installs explicit provider skill refs with preview and confirmation. | You already know what to install or want a dry run. | `naar install clawhub:ui-ux --dry-run` |
-| `naar scan` | Prints structured repository facts. | You want to inspect what Naar detects. | `naar scan --json` |
-| `naar recommend` | Ranks matching skills from providers. | You want recommendations without installing yet. | `naar recommend --compact` |
-| `naar list` | Lists skills Naar has installed in the repository. | You want to audit installed skills and locations. | `naar list` |
-| `naar uninstall [skills...]` | Removes installed skills by canonical skill id. | You want to clean up skills Naar installed. | `naar uninstall my-skill` |
-| `naar config` | Views or updates Naar config for the repo. | You want default providers, targets, or score settings. | `naar config --json` |
-| `naar targets` | Lists and inspects supported assistant targets. | You want to see stable, experimental, deprecated, and research targets. | `naar targets list` |
-| `naar history` | Views and manages local skill lifecycle history across projects. | You want to inspect current and past Naar-managed skills on this machine. | `naar history` |
-
-## Common Examples
-
-Guided flow:
-
-```bash
-naar go
-```
-
-Scan the current repo:
-
-```bash
-naar scan
-```
-
-Get recommendations:
-
-```bash
-naar recommend
-```
-
-Naar explains each recommendation with a fit summary, matched repo signals, and cautions when a skill looks too domain-specific or framework-specific for your repo.
-
-Search provider catalogs directly:
-
-```bash
-naar search "github actions"
-naar s brewpage
-```
-
-Compact recommendations:
-
-```bash
-naar recommend --compact
-```
-
-Preview installation without writing:
-
-```bash
-naar install clawhub:ui-ux --dry-run
-```
-
-JSON output for automation:
-
-```bash
-naar recommend --json
-```
-
-Run against another repo:
-
-```bash
-naar scan --repo ../my-project
-```
-
-Recommend for a specific assistant target:
-
-```bash
-naar recommend --target claude
-```
-
-### Search for Skills
-
-Search provider catalogs directly without scanning your repository:
-
-```bash
-naar search "github actions"
-naar s brewpage
-naar search "brewpage" --provider clawhub
-naar search "brewpage" --target claude_project_skills
-naar search "github actions" --limit 10
-naar search "design" --all
-naar search "brewpage" --json
-naar search "brewpage" --include-installed
-```
-
-Search is discovery-only, similar to `npm search`. Naar shows related skills from configured providers in a compact list and prints a direct install command for each skill. Search mode does not run repo scanning, repo-need inference, recommendation scoring, recommendation storage, or installation.
-
-Install explicit provider references with `naar install`:
-
-```bash
-naar install clawhub:brewpage
-naar install clawhub:brewpage@1.0.0
-naar install clawhub:brewpage --target codex_repo_skills --apply --yes --non-interactive
-```
-
-Direct installs still use the safe install flow: fetched-bundle security analysis, security review, plan preview, conflict handling, local state, lockfile, and lifecycle history updates all apply. Standalone `naar install` never scans the repository, builds recommendations, reads recommendation storage, or falls back to search results.
-
-## Flags and Options
-
-### Repo, Provider, and Target Selection
-
-| Flag | Description |
+| Command | Purpose |
 | --- | --- |
-| `--repo <path>` | Run Naar against another repository path. Defaults to the current working directory. |
-| `--provider <id>` | Limit provider discovery to one or more provider ids. Repeatable. |
-| `--target <id>` | Limit recommendation or install behavior to one or more assistant targets. Accepts aliases such as `claude` and full target ids. Repeatable. |
-| `--all-compatible` | Select all compatible unblocked recommendations in automated flows. |
-| `--history <true\|false>` | Enable or disable local lifecycle history for this invocation. |
+| `naar go` | Guided scan, recommendation, selection, and install flow. |
+| `naar search <query>` / `naar s <query>` | Direct provider-catalog discovery. |
+| `naar install <refs...>` | Explicit installation for known provider refs. |
+| `naar scan` | Inspect structured repository facts. |
+| `naar recommend` | Generate recommendations without entering install selection. |
+| `naar list` | Show what Naar manages in the current repository. |
+| `naar uninstall [skills...]` | Remove Naar-managed skills by canonical id. |
+| `naar config` | View or update repo-level Naar defaults. |
+| `naar targets` | Inspect supported assistant targets and groups. |
+| `naar history` | Inspect local lifecycle history across repositories on this machine. |
 
-### Output and Automation
-
-| Flag | Description |
-| --- | --- |
-| `--json` | Emit JSON output. In install flows, JSON mode does not write unless `--apply` is also used. |
-| `--compact` | Keep recommendation output dense while preserving match, risk, status, and concise rationale. |
-| `--verbose` | Show more detailed diagnostic output where supported. |
-| `--non-interactive` | Disable prompts for automation. Security concerns still require explicit override flags. |
-
-### Install Behavior
-
-| Flag | Description |
-| --- | --- |
-| `--dry-run` | Preview only. No files are written. |
-| `--apply` | Apply writes in non-interactive or JSON modes. Use intentionally. |
-| `--yes` | Skip ordinary confirmation prompts. Does not silently bypass post-fetch security concerns. |
-| `--force` | Allow overwrite on install conflicts. Review carefully before using. |
-| `--reinstall` | Reinstall an already-installed skill. Without this, direct install skips installed provider refs. |
-
-### Safety Controls
-
-| Flag | Description |
-| --- | --- |
-| `--min-security-score <n>` | Set the minimum security score for the current run. Default is `80`. |
-| `--no-scripts` | Disallow script-bearing skills. This is the default behavior. |
-| `--allow-scripts` | Allow script-bearing skills. Unsafe; use only when you trust the bundle. |
-| `--allow-risky` | Acknowledge risky security concerns. Required for non-interactive concern overrides. Unsafe; use deliberately. |
-
-### Configuration
-
-These options are available on `naar config`:
-
-| Flag | Description |
-| --- | --- |
-| `--set-provider <id>` | Set default providers for the repo. Repeatable. |
-| `--set-target <id>` | Set default targets for the repo. Repeatable. |
-| `--set-min-security-score <n>` | Set the default minimum security score. |
+For full command examples, flags, and workflow walkthroughs, use the website documentation at [supernovified.github.io/naar/docs](https://supernovified.github.io/naar/docs).
 
 ## Targets
 
-Naar supports target aliases, full target ids, and target groups. Defaults stay conservative: Claude skills, Cursor rules, Copilot repository instructions, and Codex repo skills.
+Naar ships with conservative defaults and broader opt-in target coverage.
 
-Target status:
+Default write targets include:
 
-- `stable`: documented path and tested renderer.
-- `experimental`: documented path, newer integration, opt-in only.
-- `deprecated`: legacy path retained for compatibility, explicit opt-in only.
-- `research`: visible for discovery, not write-capable.
+- Claude Code project skills
+- Cursor project rules
+- GitHub Copilot repository instructions
+- OpenAI Codex repo skills
 
-Target commands:
+Additional stable and opt-in targets cover Gemini context, `AGENTS.md`, generic agent-skill conventions, and experimental integrations such as Windsurf, Cline, Roo Code, Continue, and Kiro.
+
+Inspect available targets locally:
 
 ```bash
 naar targets list
 naar targets inspect codex_repo_skills
-naar targets inspect agents-md
 ```
 
-Useful target groups:
+For the complete target reference, see [Website Docs: Targets](https://supernovified.github.io/naar/docs#targets). Maintainer-level target rules and schema details live in [docs/agent-target-registry.md](./docs/agent-target-registry.md).
 
-| Group | Meaning |
-| --- | --- |
-| `all` | Stable and experimental write-capable targets, excluding deprecated and research targets. |
-| `all-skills` | Stable and experimental skill-folder targets only. |
-| `all-rules` | Stable and experimental rule targets only. |
-| `all-instructions` | Stable and experimental instruction/context targets only. |
-| `agents-md` | Standard `AGENTS.md` managed block target. |
-| `experimental` | Experimental write-capable targets only. |
-| `deprecated` | Deprecated write-capable targets only. |
-| `research` | Research-only targets; these never write files. |
+## Providers
 
-Broad groups such as `all`, `experimental`, and `deprecated` require explicit confirmation. In non-interactive runs they require `--yes`.
+Naar currently supports:
 
-| Product | Target id | Artifact kind | Path | Status | Default? | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | `claude_project_skills` | skill | `.claude/skills/<skill>/SKILL.md` | stable | yes | Full skill folder target. |
-| Claude Code | `claude_project_memory` | context | `CLAUDE.md` | stable | no | Concise managed memory block. |
-| Cursor | `cursor_project_rules` | rule | `.cursor/rules/naar-<skill>.mdc` | stable | yes | Project rule file. |
-| Cursor | `cursor_legacy_rules` | rule | `.cursorrules` | deprecated | no | Legacy managed block. |
-| GitHub Copilot | `copilot_repo_instructions` | instruction | `.github/copilot-instructions.md` | stable | yes | Managed appended blocks. |
-| GitHub Copilot | `copilot_path_instructions` | instruction | `.github/instructions/naar-<skill>.instructions.md` | stable | no | Concise path instruction file. |
-| OpenAI Codex | `codex_repo_skills` | skill | `.agents/skills/<skill>/SKILL.md` | stable | yes | Full skill folder target. |
-| Gemini CLI | `gemini_context` | context | `GEMINI.md` | stable | no | Concise managed context block. |
-| AGENTS.md | `agents_md_standard` | agents-md | `AGENTS.md` | stable | no | Standard managed instructions block. |
-| Generic Agent | `generic_agent_skills` | generic-skill | `.agents/skills/<skill>/SKILL.md` | stable | no | Generic skill folder convention. |
-| Windsurf | `windsurf_workspace_skills` | skill | `.windsurf/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
-| Windsurf | `windsurf_agents_skills` | skill | `.agents/skills/<skill>/SKILL.md` | experimental | no | `.agents/skills` skill alias. |
-| Windsurf | `windsurf_rules` | rule | `.windsurf/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
-| Cline | `cline_workspace_skills` | skill | `.cline/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
-| Cline | `cline_clinerules_skills` | skill | `.clinerules/skills/<skill>/SKILL.md` | experimental | no | Rule-folder skill target. |
-| Cline | `cline_rules` | rule | `.clinerules/naar-<skill>.md` | experimental | no | Concise rule file. |
-| Roo Code | `roo_rules` | rule | `.roo/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
-| Roo Code | `roo_legacy_rules` | rule | `.roorules` | deprecated | no | Legacy managed block. |
-| Continue | `continue_rules` | rule | `.continue/rules/naar-<skill>.md` | experimental | no | Concise rule file. |
-| Kiro | `kiro_workspace_skills` | skill | `.kiro/skills/<skill>/SKILL.md` | experimental | no | Full skill folder target. |
-| Kiro | `kiro_steering` | context | `.kiro/steering/naar-<skill>.md` | experimental | no | Concise steering file. |
-| Research targets | `*_research` | unknown | research only | research | no | Discoverable but never write-capable. |
+- `anthropic` — Anthropic Official Skills fetched from the public GitHub repository at `anthropics/skills`
+- `clawhub` — ClawHub catalog and bundle fetches
+- `awesome` — Awesome Agent Skills as an opt-in index provider that resolves installable entries to public GitHub sources
 
-Skills are reusable `SKILL.md` folders. Rules, instructions, context files, steering files, and `AGENTS.md` entries are concise activation hints; Naar does not blindly dump full skill content into always-on instruction files.
+`awesome` is intentionally not part of the default provider set because it is a large aggregate catalog and is best enabled explicitly when you want that broader index.
 
-## Providers and Authentication
-
-### Anthropic skills
-
-Naar fetches Anthropic skills from the public GitHub repository:
-
-https://github.com/anthropics/skills
-
-No Anthropic API key is required or used.
-
-You may set `GITHUB_TOKEN` to increase GitHub API rate limits when fetching from public GitHub sources.
-
-### Awesome Agent Skills
-
-Naar can search the public Awesome Agent Skills index as an opt-in provider:
+Examples:
 
 ```bash
 naar search "stripe" --provider awesome
 naar install awesome:stripe/stripe-best-practices
 ```
 
-Awesome Agent Skills is a curated public index. Naar uses it to discover skills, then installs only from the linked public GitHub source when a skill can be resolved to one.
+Provider behavior and discovery guidance are covered in [Website Docs: Providers](https://supernovified.github.io/naar/docs#providers).
 
-`awesome` is not enabled by default yet because it is a large aggregate catalog. You can make it part of your project defaults:
+## Safety Model
 
-```bash
-naar config --set-provider anthropic --set-provider clawhub --set-provider awesome
-```
+Naar is designed to keep discovery fast and installation explicit:
 
-### ClawHub
+- Search stays discovery-only.
+- Recommendation and install use structured repo facts instead of blind catalog browsing.
+- Selected bundles are fetched and analyzed before write.
+- Security score, warnings, and conflicts are surfaced before apply.
+- `--dry-run`, `--json`, `--non-interactive`, and override flags preserve explicit control over writes.
 
-ClawHub public read endpoints work without auth. Set `CLAWHUB_API_TOKEN` for token-auth mode when needed.
+Naar is a safety layer, not a guarantee that a third-party skill is harmless. Review installed content and treat risky or low-trust bundles accordingly.
 
-Provider shell/CI environment variables:
+Read the full security model in [SECURITY.md](./SECURITY.md) or on the website at [supernovified.github.io/naar/security](https://supernovified.github.io/naar/security).
+
+## Provider Shell/CI Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
@@ -389,29 +148,9 @@ Provider shell/CI environment variables:
 
 Set these in your shell or CI environment. Naar does not load `.env` files.
 
-Provider discovery uses repository facts, not your full source tree. Naar does not upload your repository source files to providers.
-
-## Safety and Trust
-
-Naar is designed to avoid blind installation:
-
-- Shows recommendation-stage match and pre-fetch risk estimates.
-- Fetches selected bundles and performs final content security analysis before writing.
-- Blocks high-risk skills by default.
-- Uses a default minimum security score of `80`.
-- Disables scripts by default.
-- Shows install plans before applying changes.
-- Requires explicit confirmation for security concerns.
-- Requires `--allow-risky --yes` for non-interactive installs that proceed with post-fetch concerns.
-- Keeps JSON and non-interactive modes from silently writing unless explicitly applied.
-
-Naar helps you make safer decisions, but it cannot prove that a third-party skill is harmless. Review installed files and treat risky, blocked, or hard-blocked skills with care. See [SECURITY.md](./SECURITY.md) for the full security model.
-
 ## Local History
 
-Naar can remember, locally on your machine, which projects currently have Naar-managed skills and which install/uninstall lifecycle events happened there. This helps you inspect your own usage patterns and prepares for future personal recommendations.
-
-Naar history is local-only. It does not upload source code, file contents, secrets, environment variables, or full repositories.
+Naar can store local lifecycle history outside the project directory so you can inspect what it manages across repositories on the current machine.
 
 Useful commands:
 
@@ -425,9 +164,9 @@ naar history forget <project-path>
 naar history clear
 ```
 
-History can be disabled for a run with `--history false`, or through shell/CI environment variables such as `NAAR_HISTORY=0` or `NAAR_HISTORY=false`. Set `NAAR_HOME=/custom/path` in your shell/CI environment to store history at `$NAAR_HOME/history.json`.
+History can be disabled for a run with `--history false`, or through shell/CI environment variables such as `NAAR_HISTORY=0` or `NAAR_HISTORY=false`. Set `NAAR_HOME=/custom/path` in your shell or CI environment to store history at `$NAAR_HOME/history.json`.
 
-Uninstalling a skill removes it from the project's current history state and records an uninstall event. Projects remain in local history after all skills are uninstalled until you run `naar history forget`, `naar history prune`, or `naar history clear`.
+See [Website Docs: Local history](https://supernovified.github.io/naar/docs#local-history) for behavior and privacy details.
 
 ## Files Naar Writes
 
@@ -438,19 +177,22 @@ Naar writes only during install flows and only after the relevant preview and co
 | `.naar/installed.json` | Tracks installed skills, selected targets, managed files, provenance, and security score at install time. |
 | `naar.lock.json` | Stores lock data for resolved skill installs. |
 | `.naar/skills/<skill>/SKILL.md` | Keeps Naar's managed local copy of fetched skill markdown. |
-| Target-specific files | Writes or appends the assistant-specific files listed in [Targets](#targets). |
+| Target-specific files | Writes or appends the assistant-specific artifacts for the selected targets. |
 
-## Current Status
+## Documentation
 
-Naar is early, but already usable. The current focus is making skill discovery, recommendation, and installation safer and smoother across real projects.
+Use the website for the full product documentation set:
 
-Current capabilities include repository scanning, provider-backed recommendation, target-aware installation, security scoring, post-fetch content review, install previews, and installed-skill tracking.
+- [Documentation](https://supernovified.github.io/naar/docs)
+- [Security](https://supernovified.github.io/naar/security)
+- [FAQ](https://supernovified.github.io/naar/faq)
+- [Changelog](https://supernovified.github.io/naar/changelog)
 
-Future work is expected to deepen marketplace coverage, language and framework awareness, recommendation quality, and user experience.
+Contributor and maintainer workflow lives in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Contributing
 
-Issues, ideas, and thoughtful feedback are welcome. Development setup, local CLI usage, release notes, and documentation guidelines live in [CONTRIBUTING.md](./CONTRIBUTING.md).
+Issues, ideas, and well-scoped pull requests are welcome. For development workflow, local commands, release notes, and documentation boundaries, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 

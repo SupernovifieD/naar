@@ -2,7 +2,7 @@
 
 Thanks for contributing to Naar. This document is for contributors and maintainers.
 
-For the product overview, user-facing CLI usage, commands, flags, providers, targets, and safety model, see [README.md](./README.md).
+For the product overview and installation, start with [README.md](./README.md). For full end-user guides, command workflows, targets, providers, and product reference, use the website documentation at [supernovified.github.io/naar/docs](https://supernovified.github.io/naar/docs).
 
 ## Documentation Boundaries
 
@@ -10,10 +10,11 @@ Keep documentation split by audience:
 
 | File | Audience | Belongs there |
 | --- | --- | --- |
-| `README.md` | Users evaluating or using `naar-cli` | Product overview, quick start, user commands, flags, examples, providers, targets, safety model |
+| `README.md` | Users evaluating or installing `naar-cli` | Product overview, installation, core workflows, and links to deeper documentation |
+| `website/src/pages/` and `website/src/content/` | End users | Full user documentation, workflow guides, reference material, FAQ, security pages, changelog presentation |
 | `CONTRIBUTING.md` | Contributors and maintainers | Local setup, development commands, tests, build, release process, documentation guidelines |
 
-User-facing command descriptions belong in the README. Development commands and maintainer workflow details belong here.
+Keep the README compact. Put long-form user walkthroughs and reference material on the website. Keep development commands and maintainer workflow details here.
 
 ## Prerequisites
 
@@ -153,8 +154,9 @@ naar go --dry-run
 
 ## Documentation Guidelines
 
-- Keep README user-facing and approachable.
+- Keep README user-facing, concise, and product-level.
+- Put the full user guide and reference material on the website docs.
 - Keep development-only commands, release process, and maintainer notes in this file.
 - Treat `src/cli.ts`, command implementations, `package.json`, and install target source as the source of truth.
 - Do not document commands, flags, providers, targets, or security behavior that are not implemented.
-- Avoid "MVP" language in user-facing sections unless it is necessary and carefully framed.
+- Avoid "MVP", "early", or prototype framing in user-facing sections unless there is a verified product limitation that must be disclosed.
