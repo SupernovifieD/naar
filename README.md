@@ -345,21 +345,26 @@ Skills are reusable `SKILL.md` folders. Rules, instructions, context files, stee
 
 ## Providers and Authentication
 
-Naar discovers skills through provider APIs and fallback catalogs. Some providers work without credentials; API keys can improve access, reliability, or rate limits.
+### Anthropic skills
 
-| Provider | Authentication |
-| --- | --- |
-| Anthropic | Set `ANTHROPIC_API_KEY` to use Anthropic Skills API mode. If the key is missing or the API fails, Naar can fall back to Anthropic's GitHub skills catalog. |
-| ClawHub | Public read endpoints work without auth. Set `CLAWHUB_API_TOKEN` for token-auth mode when needed. |
-| GitHub fallback | Set `GITHUB_TOKEN` for higher rate-limit headroom when GitHub-backed fallback discovery is used. |
+Naar fetches Anthropic skills from the public GitHub repository:
+
+https://github.com/anthropics/skills
+
+No Anthropic API key is required or used.
+
+You may set `GITHUB_TOKEN` to increase GitHub API rate limits when fetching from public GitHub sources.
+
+### ClawHub
+
+ClawHub public read endpoints work without auth. Set `CLAWHUB_API_TOKEN` for token-auth mode when needed.
 
 Provider environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `ANTHROPIC_API_BASE_URL` | Optional Anthropic API base URL. Defaults to `https://api.anthropic.com`. |
-| `ANTHROPIC_API_VERSION` | Optional Anthropic API version. Defaults to `2023-06-01`. |
-| `ANTHROPIC_BETA_HEADERS` | Optional comma-separated Anthropic beta headers. |
+| `GITHUB_TOKEN` | Increase GitHub API rate-limit headroom when fetching public GitHub-backed providers such as Anthropic Official Skills. |
+| `CLAWHUB_API_TOKEN` | Use ClawHub token-auth mode when needed. |
 | `CLAWHUB_API_BASE_URL` | Optional ClawHub API base URL. Defaults to `https://clawhub.ai`. |
 | `GITHUB_API_BASE_URL` | Optional GitHub API base URL. Defaults to `https://api.github.com`. |
 | `NAAR_PROVIDER_TIMEOUT_MS` | Provider request timeout. Default is `10000`. |

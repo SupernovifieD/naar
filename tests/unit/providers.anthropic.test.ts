@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MockAgent, getGlobalDispatcher, setGlobalDispatcher } from "undici";
+import { MockAgent, getGlobalDispatcher, setGlobalDispatcher, type Headers as UndiciHeaders } from "undici";
 import { OfficialAnthropicSkillsProvider } from "../../src/providers/anthropic.js";
 import type { RepoFacts } from "../../src/types/index.js";
 
@@ -56,128 +56,108 @@ afterEach(async () => {
 });
 
 describe("OfficialAnthropicSkillsProvider", () => {
-  it("uses Anthropic API mode when API key is present", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-key";
+  it("always uses the public GitHub catalog for search even when Anthropic env vars are set", async () => {
+    process.env.ANTHROPIC_API_KEY = "fake-key";
 
-    const anthropicPool = mockAgent.get("https://api.anthropic.com");
-    anthropicPool
-      .intercept({ method: "GET", path: "/v1/skills?limit=3" })
-      .reply(200, {
-        data: [
-          {
-            id: "official/frontend-design",
-            name: "Frontend Design",
-            description: "Guidance for React + Next.js + Tailwind",
-            tags: ["react", "nextjs", "tailwind"],
-            latest_version: {
-              version: "1.2.3",
-              license: "MIT",
-              updated_at: "2026-05-20T00:00:00.000Z"
-            }
-          }
-        ]
-      });
+    mockAnthropicGitHubSearch({
+      skills: [{
+        slug: "frontend-design",
+        sha: "abc123",
+        markdown: "---\nname: Frontend Design\ndescription: Polished frontend guidance\nlicense: MIT\n---\n\n# Frontend Design"
+      }]
+    });
 
     const provider = new OfficialAnthropicSkillsProvider();
     const result = await provider.search({ repoFacts, limit: 3 });
 
-    expect(result.mode).toBe("api");
+    expect(result.mode).toBe("github");
     expect(result.warnings ?? []).toHaveLength(0);
     expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].providerScopedId).toBe("anthropic:official/frontend-design");
-    expect(result.candidates[0].metadata.pinnedRef).toBe("1.2.3");
+    expect(result.candidates[0].providerScopedId).toBe("anthropic:frontend-design");
+    expect(result.candidates[0].metadata.pinnedRef).toBe("abc123");
+    mockAgent.assertNoPendingInterceptors();
   });
 
-  it("uses Anthropic API text search in search mode when API key is present", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-key";
-
-    const anthropicPool = mockAgent.get("https://api.anthropic.com");
-    anthropicPool
-      .intercept({ method: "GET", path: "/v1/skills?limit=3&search=frontend" })
-      .reply(200, {
-        data: [
-          {
-            id: "official/frontend-design",
-            name: "Frontend Design",
-            description: "Guidance for React + Next.js + Tailwind",
-            tags: ["react", "nextjs", "tailwind"],
-            latest_version: {
-              version: "1.2.3",
-              license: "MIT",
-              updated_at: "2026-05-20T00:00:00.000Z"
-            }
-          }
-        ]
-      });
+  it("does not warn when Anthropic API env vars are missing", async () => {
+    mockAnthropicGitHubSearch({
+      skills: [{
+        slug: "copilot-instructions",
+        sha: "def456",
+        markdown: "# Copilot Instructions\n\nRepository instructions guidance."
+      }]
+    });
 
     const provider = new OfficialAnthropicSkillsProvider();
-    const result = await provider.search({ mode: "search", term: "frontend", limit: 3 });
+    const result = await provider.search({ repoFacts, limit: 10 });
 
-    expect(result.mode).toBe("api");
+    expect(result.mode).toBe("github");
+    expect(result.warnings?.some((warning) => warning.includes("ANTHROPIC_API_KEY"))).toBe(false);
     expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].providerScopedId).toBe("anthropic:official/frontend-design");
+    expect(result.candidates[0].providerSkillId).toBe("copilot-instructions");
+    mockAgent.assertNoPendingInterceptors();
   });
 
-  it("falls back to API catalog filtering when API text search is unavailable", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-key";
+  it("always fetches files from the public GitHub repository even when Anthropic env vars are set", async () => {
+    process.env.ANTHROPIC_API_KEY = "fake-key";
 
-    const anthropicPool = mockAgent.get("https://api.anthropic.com");
-    anthropicPool
-      .intercept({ method: "GET", path: "/v1/skills?limit=10&search=brewpage" })
-      .reply(404, { error: "not found" });
-
-    anthropicPool
-      .intercept({ method: "GET", path: "/v1/skills?limit=10" })
-      .reply(200, {
-        data: [
-          {
-            id: "brewpage",
-            name: "BrewPage Publish",
-            description: "Publish BrewPage websites",
-            tags: ["publish"],
-            latest_version: { version: "1.0.0", license: "MIT" }
-          },
-          {
-            id: "frontend-design",
-            name: "Frontend Design",
-            description: "Frontend UI guidance",
-            tags: ["react"],
-            latest_version: { version: "1.0.0", license: "MIT" }
-          }
-        ]
-      });
+    mockAnthropicGitHubFiles({
+      slug: "frontend-design",
+      sha: "ghi789",
+      files: {
+        "SKILL.md": "---\nname: Frontend Design\ndescription: Build polished frontends\nlicense: MIT\n---\n\n# Frontend Design",
+        "README.md": "# Notes\n\nExtra context."
+      }
+    });
 
     const provider = new OfficialAnthropicSkillsProvider();
-    const result = await provider.search({ mode: "search", term: "brewpage", limit: 10 });
+    const bundle = await provider.fetchFiles({ providerId: "anthropic", skillId: "frontend-design", version: "1.2.3" });
 
-    expect(result.mode).toBe("api");
-    expect(result.warnings?.some((warning) => warning.includes("catalog filtering"))).toBe(true);
-    expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].providerSkillId).toBe("brewpage");
+    expect(bundle.files["SKILL.md"]).toContain("Frontend Design");
+    expect(bundle.files["README.md"]).toContain("Extra context");
+    expect(bundle.skill.providerScopedId).toBe("anthropic:frontend-design");
+    expect(bundle.skill.metadata.license).toBe("MIT");
+    mockAgent.assertNoPendingInterceptors();
   });
 
-  it("falls back to GitHub catalog when API key is missing", async () => {
+  it("uses GITHUB_TOKEN only for GitHub API requests", async () => {
+    process.env.GITHUB_TOKEN = "github-token";
+
+    let repoAuthHeader: string | undefined;
+    let treeAuthHeader: string | undefined;
+
     const githubPool = mockAgent.get("https://api.github.com");
     const rawPool = mockAgent.get("https://raw.githubusercontent.com");
 
     githubPool
       .intercept({ method: "GET", path: "/repos/anthropics/skills" })
-      .reply(200, {
-        default_branch: "main",
-        stargazers_count: 999,
-        pushed_at: "2026-05-25T00:00:00.000Z"
+      .reply((opts) => {
+        repoAuthHeader = readHeader(opts.headers, "authorization");
+        return {
+          statusCode: 200,
+          data: {
+            default_branch: "main",
+            stargazers_count: 999,
+            pushed_at: "2026-05-25T00:00:00.000Z"
+          }
+        };
       });
 
     githubPool
       .intercept({ method: "GET", path: "/repos/anthropics/skills/git/trees/main?recursive=1" })
-      .reply(200, {
-        tree: [
-          {
-            path: "skills/frontend-design/SKILL.md",
-            type: "blob",
-            sha: "abc123"
+      .reply((opts) => {
+        treeAuthHeader = readHeader(opts.headers, "authorization");
+        return {
+          statusCode: 200,
+          data: {
+            tree: [
+              {
+                path: "skills/frontend-design/SKILL.md",
+                type: "blob",
+                sha: "abc123"
+              }
+            ]
           }
-        ]
+        };
       });
 
     rawPool
@@ -185,61 +165,101 @@ describe("OfficialAnthropicSkillsProvider", () => {
         method: "GET",
         path: "/anthropics/skills/main/skills/frontend-design/SKILL.md"
       })
-      .reply(200, "---\nname: Frontend Design\ndescription: Polished frontend guidance\n---\n\n# Frontend Design");
+      .reply(200, "# Frontend Design\n\nPolished frontend guidance.");
 
     const provider = new OfficialAnthropicSkillsProvider();
     const result = await provider.search({ repoFacts, limit: 10 });
 
-    expect(result.mode).toBe("github_fallback");
-    expect(result.warnings?.some((warning) => warning.includes("ANTHROPIC_API_KEY not set"))).toBe(true);
     expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].providerSkillId).toBe("frontend-design");
-    expect(result.candidates[0].metadata.pinnedRef).toBe("abc123");
+    expect(repoAuthHeader).toBe("Bearer github-token");
+    expect(treeAuthHeader).toBe("Bearer github-token");
+    mockAgent.assertNoPendingInterceptors();
   });
+});
 
-  it("falls back to GitHub when Anthropic API fails", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-key";
+function mockAnthropicGitHubSearch(input: {
+  skills: Array<{
+    slug: string;
+    sha: string;
+    markdown: string;
+  }>;
+}): void {
+  const githubPool = mockAgent.get("https://api.github.com");
+  const rawPool = mockAgent.get("https://raw.githubusercontent.com");
 
-    const anthropicPool = mockAgent.get("https://api.anthropic.com");
-    const githubPool = mockAgent.get("https://api.github.com");
-    const rawPool = mockAgent.get("https://raw.githubusercontent.com");
+  githubPool
+    .intercept({ method: "GET", path: "/repos/anthropics/skills" })
+    .reply(200, {
+      default_branch: "main",
+      stargazers_count: 999,
+      pushed_at: "2026-05-25T00:00:00.000Z"
+    });
 
-    anthropicPool
-      .intercept({ method: "GET", path: "/v1/skills?limit=5" })
-      .reply(503, { error: "unavailable" });
+  githubPool
+    .intercept({ method: "GET", path: "/repos/anthropics/skills/git/trees/main?recursive=1" })
+    .reply(200, {
+      tree: input.skills.map((skill) => ({
+        path: `skills/${skill.slug}/SKILL.md`,
+        type: "blob",
+        sha: skill.sha
+      }))
+    });
 
-    githubPool
-      .intercept({ method: "GET", path: "/repos/anthropics/skills" })
-      .reply(200, {
-        default_branch: "main",
-        stargazers_count: 1000,
-        pushed_at: "2026-05-25T00:00:00.000Z"
-      });
-
-    githubPool
-      .intercept({ method: "GET", path: "/repos/anthropics/skills/git/trees/main?recursive=1" })
-      .reply(200, {
-        tree: [
-          {
-            path: "skills/copilot-instructions/SKILL.md",
-            type: "blob",
-            sha: "def456"
-          }
-        ]
-      });
-
+  for (const skill of input.skills) {
     rawPool
       .intercept({
         method: "GET",
-        path: "/anthropics/skills/main/skills/copilot-instructions/SKILL.md"
+        path: `/anthropics/skills/main/skills/${skill.slug}/SKILL.md`
       })
-      .reply(200, "# Copilot Instructions\n\nRepository instructions guidance.");
+      .reply(200, skill.markdown);
+  }
+}
 
-    const provider = new OfficialAnthropicSkillsProvider();
-    const result = await provider.search({ repoFacts, limit: 5 });
+function mockAnthropicGitHubFiles(input: {
+  slug: string;
+  sha: string;
+  files: Record<string, string>;
+}): void {
+  const githubPool = mockAgent.get("https://api.github.com");
+  const rawPool = mockAgent.get("https://raw.githubusercontent.com");
 
-    expect(result.mode).toBe("github_fallback");
-    expect(result.candidates).toHaveLength(1);
-    expect(result.warnings?.some((warning) => warning.includes("falling back to GitHub catalog"))).toBe(true);
-  });
-});
+  githubPool
+    .intercept({ method: "GET", path: "/repos/anthropics/skills" })
+    .reply(200, {
+      default_branch: "main",
+      stargazers_count: 999,
+      pushed_at: "2026-05-25T00:00:00.000Z"
+    });
+
+  githubPool
+    .intercept({ method: "GET", path: "/repos/anthropics/skills/git/trees/main?recursive=1" })
+    .reply(200, {
+      tree: Object.keys(input.files).map((relativePath, index) => ({
+        path: `skills/${input.slug}/${relativePath}`,
+        type: "blob",
+        sha: `${input.sha}-${index}`
+      }))
+    });
+
+  for (const [relativePath, content] of Object.entries(input.files)) {
+    rawPool
+      .intercept({
+        method: "GET",
+        path: `/anthropics/skills/main/skills/${input.slug}/${relativePath}`
+      })
+      .reply(200, content);
+  }
+}
+
+function readHeader(
+  headers: UndiciHeaders | Record<string, string> | undefined,
+  name: string
+): string | undefined {
+  if (!headers) return undefined;
+  if ("get" in headers && typeof headers.get === "function") {
+    return headers.get(name) ?? undefined;
+  }
+
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase());
+  return entry?.[1];
+}
