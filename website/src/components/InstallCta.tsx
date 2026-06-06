@@ -20,6 +20,8 @@ export default function InstallCta({
   className = ""
 }: InstallCtaProps) {
   const [copied, setCopied] = useState(false);
+  const defaultTextIsCommand = looksLikeCommand(defaultText);
+  const commandIsCommand = looksLikeCommand(command);
 
   useEffect(() => {
     if (!copied) return undefined;
@@ -28,15 +30,15 @@ export default function InstallCta({
   }, [copied]);
 
   const style = useMemo(() => {
-    const compactWidth = Math.max(defaultText.length + 4, variant === "code" ? 18 : 12);
-    const expandedWidth = Math.max(command.length + 4, compactWidth);
+    const compactWidth = Math.max(defaultText.length + (defaultTextIsCommand ? 6 : 4), variant === "code" ? 18 : 12);
+    const expandedWidth = Math.max(command.length + (commandIsCommand ? 6 : 4), compactWidth);
     return {
       ["--install-cta-compact" as string]: `${compactWidth}ch`,
       ["--install-cta-expanded" as string]: `${expandedWidth}ch`,
       fontFamily: "var(--terminal-font)",
       fontVariantLigatures: "none"
     } satisfies CSSProperties;
-  }, [command, defaultText.length, variant]);
+  }, [command, commandIsCommand, defaultText.length, defaultTextIsCommand, variant]);
 
   async function handleClick() {
     try {
@@ -56,6 +58,27 @@ export default function InstallCta({
     baseButtonClasses
   ].join(" ");
 
+  const commandChipClasses = variant === "code"
+    ? "border-white/10 bg-black/25 text-cyan-100"
+    : "border-black/10 bg-black/10 text-bg";
+
+  const renderLabel = (label: string, treatAsCommand: boolean) => {
+    if (!treatAsCommand) {
+      return <span className="whitespace-nowrap">{label}</span>;
+    }
+
+    return (
+      <code
+        className={[
+          "inline-flex max-w-full items-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-[0.92em] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
+          commandChipClasses
+        ].join(" ")}
+      >
+        {label}
+      </code>
+    );
+  };
+
   const content = revealOnHover ? (
     <>
       <span
@@ -64,7 +87,7 @@ export default function InstallCta({
           copied ? "translate-y-1 opacity-0" : "opacity-100 group-hover:-translate-y-4 group-hover:opacity-0 group-focus-visible:-translate-y-4 group-focus-visible:opacity-0"
         ].join(" ")}
       >
-        {defaultText}
+        {renderLabel(defaultText, !copied && defaultTextIsCommand)}
       </span>
       <span
         className={[
@@ -72,11 +95,11 @@ export default function InstallCta({
           copied ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100"
         ].join(" ")}
       >
-        {copied ? copiedText : command}
+        {copied ? renderLabel(copiedText, false) : renderLabel(command, commandIsCommand)}
       </span>
     </>
   ) : (
-    <span className="whitespace-nowrap">{copied ? copiedText : defaultText}</span>
+    copied ? renderLabel(copiedText, false) : renderLabel(defaultText, defaultTextIsCommand)
   );
 
   if (!revealOnHover) {
@@ -126,4 +149,8 @@ export default function InstallCta({
       </button>
     </span>
   );
+}
+
+function looksLikeCommand(value: string): boolean {
+  return /^(npm|npx|pnpm|yarn|bun|naar)\b/.test(value.trim());
 }
