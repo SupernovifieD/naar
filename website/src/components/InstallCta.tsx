@@ -1,3 +1,4 @@
+import { Download } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 interface InstallCtaProps {
@@ -7,6 +8,7 @@ interface InstallCtaProps {
   revealOnHover?: boolean;
   alignExpand?: "left" | "right";
   variant?: "light" | "code";
+  icon?: "download";
   className?: string;
 }
 
@@ -17,6 +19,7 @@ export default function InstallCta({
   revealOnHover = true,
   alignExpand = "left",
   variant = "light",
+  icon,
   className = ""
 }: InstallCtaProps) {
   const [copied, setCopied] = useState(false);
@@ -30,15 +33,16 @@ export default function InstallCta({
   }, [copied]);
 
   const style = useMemo(() => {
-    const compactWidth = Math.max(defaultText.length + (defaultTextIsCommand ? 6 : 4), variant === "code" ? 18 : 12);
-    const expandedWidth = Math.max(command.length + (commandIsCommand ? 6 : 4), compactWidth);
+    const iconWidth = icon ? 3 : 0;
+    const compactWidth = Math.max(defaultText.length + (defaultTextIsCommand ? 6 : 4) + iconWidth, variant === "code" ? 18 : 12);
+    const expandedWidth = Math.max(command.length + (commandIsCommand ? 6 : 4) + iconWidth, compactWidth);
     return {
       ["--install-cta-compact" as string]: `${compactWidth}ch`,
       ["--install-cta-expanded" as string]: `${expandedWidth}ch`,
       fontFamily: "var(--terminal-font)",
       fontVariantLigatures: "none"
     } satisfies CSSProperties;
-  }, [command, commandIsCommand, defaultText.length, defaultTextIsCommand, variant]);
+  }, [command, commandIsCommand, defaultText.length, defaultTextIsCommand, icon, variant]);
 
   async function handleClick() {
     try {
@@ -62,12 +66,13 @@ export default function InstallCta({
     ? "border-white/10 bg-black/25 text-cyan-100"
     : "border-black/10 bg-black/10 text-bg";
 
-  const renderLabel = (label: string, treatAsCommand: boolean) => {
-    if (!treatAsCommand) {
-      return <span className="whitespace-nowrap">{label}</span>;
-    }
+  const renderIcon = () => {
+    if (icon !== "download") return null;
+    return <Download size={15} strokeWidth={1.9} className="shrink-0" aria-hidden="true" />;
+  };
 
-    return (
+  const renderLabel = (label: string, treatAsCommand: boolean) => {
+    const content = treatAsCommand ? (
       <code
         className={[
           "inline-flex max-w-full items-center whitespace-nowrap rounded-lg border px-2.5 py-1 text-[0.92em] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]",
@@ -76,6 +81,19 @@ export default function InstallCta({
       >
         {label}
       </code>
+    ) : (
+      <span className="whitespace-nowrap">{label}</span>
+    );
+
+    if (!icon) {
+      return content;
+    }
+
+    return (
+      <span className="inline-flex items-center gap-2 whitespace-nowrap">
+        {renderIcon()}
+        {content}
+      </span>
     );
   };
 

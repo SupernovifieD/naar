@@ -41,7 +41,7 @@ function isActive(pathname: string): boolean {
     </nav>
 
     <div class="min-w-0 justify-self-end">
-      <InstallCta client:load command={siteMeta.installCommand} defaultText="Install" revealOnHover alignExpand="right" />
+      <InstallCta client:load command={siteMeta.installCommand} defaultText="Install" revealOnHover alignExpand="right" icon="download" />
     </div>
   </div>
 
@@ -75,7 +75,7 @@ function isActive(pathname: string): boolean {
               );
             })}
           </nav>
-          <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" revealOnHover={false} className="w-full justify-center" />
+          <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" revealOnHover={false} icon="download" className="w-full justify-center" />
         </div>
       </div>
     </details>

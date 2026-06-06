@@ -241,10 +241,11 @@ const whyCards = [
               <CommandTypingTerminal client:load />
             </TerminalFrame>
           </div>
-          <div class="flex flex-col justify-center gap-3 sm:flex-row">
-            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" copiedText="Copied" revealOnHover />
-            <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full sm:w-auto">
-              Star on GitHub
+          <div class="flex flex-col justify-center gap-3 sm:flex-row sm:items-center">
+            <InstallCta client:load command={siteMeta.installCommand} defaultText="Install Naar" copiedText="Copied" revealOnHover alignExpand="right" icon="download" />
+            <Button href={siteMeta.githubUrl} target="_blank" rel="noreferrer" variant="secondary" class="w-full gap-2 sm:w-auto">
+              <Star size={16} strokeWidth={1.8} />
+              <span>Star on GitHub</span>
             </Button>
           </div>
         </div>
