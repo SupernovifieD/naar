@@ -193,17 +193,16 @@ const whyCards = [
         align="center"
       />
       <div class="mx-auto mt-12 max-w-4xl space-y-5">
-        {latestReleases.map((release, index) => (
+        {latestReleases.map((release) => (
           <a
             href={withBase(`/changelog/${release.slug}`)}
-            class="group relative block rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-6 transition-[transform,border-color,background-color,box-shadow] duration-300 ease-glide hover:-translate-y-1 hover:border-white/30 hover:bg-white/[0.07] hover:shadow-[0_18px_40px_rgba(0,0,0,0.22)]"
+            class="glass-panel group relative block p-6 transition-[transform,border-color,background-color,box-shadow] duration-300 ease-glide hover:-translate-y-1 hover:border-white/30 hover:bg-surface/80 hover:shadow-[0_18px_40px_rgba(0,0,0,0.22)]"
           >
-            <span class="absolute right-5 top-5 inline-flex h-3.5 w-3.5 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)] motion-safe:group-hover:animate-[release-dot-pulse_1.15s_ease-in-out_infinite]"></span>
             <div class="grid gap-4 lg:grid-cols-[auto_1fr] lg:gap-6">
               <div class="flex gap-4">
                 <div class="flex w-12 flex-col items-center">
-                  <span class="inline-flex h-4 w-4 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)]"></span>
-                  {index < latestReleases.length - 1 && <span class="mt-3 h-full w-px bg-white/10"></span>}
+                  <span class="inline-flex h-4 w-4 rounded-full border border-white/15 bg-accent-red-soft/90 shadow-[0_0_0_6px_rgba(218,92,98,0.12)] motion-safe:animate-[release-dot-pulse_1.15s_ease-in-out_infinite]"></span>
+                  <span class="mt-3 min-h-12 flex-1 w-px bg-white/10"></span>
                 </div>
                 <div class="space-y-2">
                   <div class="flex flex-wrap items-center gap-3">
