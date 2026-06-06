@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PROVIDERS } from "../../src/config/defaults.js";
 import { availableProviderIds, buildProviders } from "../../src/providers/orchestrator.js";
@@ -22,6 +25,29 @@ describe("resolveProviderRuntimeConfig", () => {
     expect(JSON.stringify(runtime)).not.toContain("2099-01-01");
     expect(JSON.stringify(runtime)).not.toContain("alpha");
     expect(JSON.stringify(runtime)).not.toContain("beta");
+  });
+
+  it("does not auto-load values from a .env file on disk", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "naar-env-test-"));
+    try {
+      await writeFile(path.join(tempDir, ".env"), [
+        "GITHUB_TOKEN=file-token",
+        "GITHUB_API_BASE_URL=https://api.github.from-file",
+        "CLAWHUB_API_TOKEN=file-clawhub-token",
+        "NAAR_PROVIDER_TIMEOUT_MS=42000",
+        "NAAR_PROVIDER_RETRY_ATTEMPTS=7"
+      ].join("\n"));
+
+      const runtime = resolveProviderRuntimeConfig({} as NodeJS.ProcessEnv);
+
+      expect(runtime.github.token).toBeUndefined();
+      expect(runtime.github.apiBaseUrl).toBe("https://api.github.com");
+      expect(runtime.clawhub.token).toBeUndefined();
+      expect(runtime.timeoutMs).toBe(10_000);
+      expect(runtime.retryMaxAttempts).toBe(3);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -376,16 +376,18 @@ naar config --set-provider anthropic --set-provider clawhub --set-provider aweso
 
 ClawHub public read endpoints work without auth. Set `CLAWHUB_API_TOKEN` for token-auth mode when needed.
 
-Provider environment variables:
+Provider shell/CI environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `GITHUB_TOKEN` | Increase GitHub API rate-limit headroom when fetching public GitHub-backed providers such as Anthropic Official Skills and Awesome Agent Skills. |
-| `CLAWHUB_API_TOKEN` | Use ClawHub token-auth mode when needed. |
-| `CLAWHUB_API_BASE_URL` | Optional ClawHub API base URL. Defaults to `https://clawhub.ai`. |
-| `GITHUB_API_BASE_URL` | Optional GitHub API base URL. Defaults to `https://api.github.com`. |
-| `NAAR_PROVIDER_TIMEOUT_MS` | Provider request timeout. Default is `10000`. |
-| `NAAR_PROVIDER_RETRY_ATTEMPTS` | Provider retry attempts. Default is `3`. |
+| `GITHUB_TOKEN` | Optional. Increases GitHub API rate-limit headroom when fetching public GitHub-backed providers such as Anthropic Official Skills and Awesome Agent Skills. |
+| `CLAWHUB_API_TOKEN` | Optional. Uses ClawHub token-auth mode when needed. |
+| `CLAWHUB_API_BASE_URL` | Optional. Overrides the ClawHub API base URL. Defaults to `https://clawhub.ai`. |
+| `GITHUB_API_BASE_URL` | Optional. Overrides the GitHub API base URL. Defaults to `https://api.github.com`. |
+| `NAAR_PROVIDER_TIMEOUT_MS` | Optional. Provider request timeout in milliseconds. Defaults to `10000`. |
+| `NAAR_PROVIDER_RETRY_ATTEMPTS` | Optional. Provider retry attempts. Defaults to `3`. |
+
+Set these in your shell or CI environment. Naar does not load `.env` files.
 
 Provider discovery uses repository facts, not your full source tree. Naar does not upload your repository source files to providers.
 
@@ -423,7 +425,7 @@ naar history forget <project-path>
 naar history clear
 ```
 
-History can be disabled for a run with `--history false`, or through the environment with `NAAR_HISTORY=0` or `NAAR_HISTORY=false`. Set `NAAR_HOME=/custom/path` to store history at `$NAAR_HOME/history.json`.
+History can be disabled for a run with `--history false`, or through shell/CI environment variables such as `NAAR_HISTORY=0` or `NAAR_HISTORY=false`. Set `NAAR_HOME=/custom/path` in your shell/CI environment to store history at `$NAAR_HOME/history.json`.
 
 Uninstalling a skill removes it from the project's current history state and records an uninstall event. Projects remain in local history after all skills are uninstalled until you run `naar history forget`, `naar history prune`, or `naar history clear`.
 
