@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createCliProgram } from "../../src/cli.js";
+import { createCliProgram } from "../../src/program.js";
 
 describe("install CLI registration", () => {
   it("registers install with positional refs and reinstall option", () => {
