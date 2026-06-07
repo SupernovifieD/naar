@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.1] - 2026-06-07
+
+### Fixed
+- Fix npm binary entrypoint so the installed `naar` command runs correctly through npm’s bin symlink.
+
 ## [1.0.0] - 2026-06-06
 
 ### Added

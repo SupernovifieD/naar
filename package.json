@@ -1,6 +1,6 @@
 {
   "name": "naar-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A repo-aware package manager for AI-agent skills, rules, and instructions",
   "type": "module",
   "repository": {
